@@ -1,0 +1,9 @@
+numpy
+scipy
+astropy>=3.2.1
+matplotlib>=2.0
+sep
+photutils>=0.7.2
+palettable
+tqdm
+PyYAML
