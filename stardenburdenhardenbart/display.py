@@ -267,7 +267,6 @@ def display_single(img,
         return fig
     return ax1
 
-
 def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
     """
     Display multiple images together using the same strecth and scale.
@@ -302,7 +301,6 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
         return fig
     else:
         return axes
-
 
 def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle_size=30, 
                  pixel_scale=0.168, color='r', **kwargs):
