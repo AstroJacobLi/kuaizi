@@ -10,6 +10,7 @@ __author__ = ['Jiaxuan Li']
 from . import utils
 from . import display
 from . import measure
+from . import detection
 
 # Version
 from pkg_resources import get_distribution, DistributionNotFound

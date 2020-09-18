@@ -207,7 +207,6 @@ def display_single(img,
             scale_bar_x_0 = int(img_size_x * 0.95 -
                                 (scale_bar_length / pixel_scale))
             scale_bar_x_1 = int(img_size_x * 0.95)
-
         scale_bar_y = int(img_size_y * 0.10)
         scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
         scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
@@ -425,4 +424,45 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
+def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+    from scarlet.display import AsinhMapping
+    import scarlet
+    # Compute model
+    model = blend.get_model()  # this model is under `model_frame`, i.e. under the modest PSF
+    # Render it in the observed frame
+    model_ = observation.render(model)
+    # Compute residual
+    residual = images - model_
 
+    # Create RGB images
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+    channel_map = scarlet.display.channels_to_rgb(len(channels))
+    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch / 2, Q=Q)
+    residual_rgb = scarlet.display.img_to_rgb(residual, norm=norm, channel_map=channel_map)
+    
+    # Show the data, model, and residual
+    fig = plt.figure(figsize=(15, 5))
+    ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+    ax[0].imshow(img_rgb)
+    ax[0].set_title("Data")
+    ax[1].imshow(model_rgb)
+    ax[1].set_title("Model")
+    ax[2].imshow(residual_rgb)
+    ax[2].set_title("Residual")
+
+    if show_mark:
+        for k, src in enumerate(blend):
+            if sources_type[k] == 'PSF':
+                color = 'white'
+            elif sources_type[k] == 'Extended':
+                color = 'red'
+            elif sources_type[k] == 'Multi': #'Wavelet':
+                color = 'cyan'
+            if hasattr(src, "center"):
+                y, x = src.center
+                ax[0].text(x, y, k, color=color)
+                ax[1].text(x, y, k, color=color)
+                ax[2].text(x, y, k, color=color)
+    plt.show()
