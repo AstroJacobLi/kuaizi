@@ -453,13 +453,15 @@ def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.
     ax[2].set_title("Residual")
 
     if show_mark:
-        for k, src in enumerate(blend):
-            if sources_type[k] == 'PSF':
+        for k, src in enumerate(blend.sources):
+            if isinstance(src, scarlet.source.PointSource):
                 color = 'white'
-            elif sources_type[k] == 'Extended':
+            elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
-            elif sources_type[k] == 'Multi': #'Wavelet':
+            elif isinstance(src, scarlet.source.MultiExtendedSource): #'Wavelet':
                 color = 'cyan'
+            elif isinstance(src, scarlet.source.StarletSource):
+                color = 'lime'
             if hasattr(src, "center"):
                 y, x = src.center
                 ax[0].text(x, y, k, color=color)

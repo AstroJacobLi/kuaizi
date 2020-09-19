@@ -58,34 +58,41 @@ def cen_peak(component):
     return peak_set + component.bbox.origin[1:]
 
 
-def shape(component, show_fig=False):
+def shape(component, show_fig=False, weight=None):
     """Determine b/a ratio `q` and position angle `pa` of model by calculating its second moments.
+
+    TODO: add weight function
 
     Parameters
     ----------
     component: `scarlet.Component` or `scarlet.ComponentTree`
         Component to analyze
+    weight: 2-D numpy array, W(x, y)
     """
 
-    def raw_moment(data, i_order, j_order):
+    def raw_moment(data, i_order, j_order, weight):
         n_depth, n_row, n_col = data.shape
         y, x = np.mgrid[:n_row, :n_col]
-        data = data * x**i_order * y**j_order
+        if weight is None:
+            data = data * x**i_order * y**j_order
+        else:
+            data = data * weight * x**i_order * y**j_order
         return np.sum(data, axis=(1, 2))
     
     model = component.get_model()
-    data_sum = np.sum(model, axis=(1, 2))
+    # zeroth-order moment: total flux
+    w00 = raw_moment(model, 0, 0, weight)
 
     # first-order moment: centroid
-    w10 = raw_moment(model, 1, 0)
-    w01 = raw_moment(model, 0, 1)
-    x_mean = w10 / data_sum
-    y_mean = w01 / data_sum
+    w10 = raw_moment(model, 1, 0, weight)
+    w01 = raw_moment(model, 0, 1, weight)
+    x_c = w10 / w00
+    y_c = w01 / w00
 
     # second-order moment: b/a ratio and position angle
-    m11 = (raw_moment(model, 1, 1) - x_mean * w01 - y_mean * w10 + x_mean * y_mean * data_sum) / data_sum
-    m20 = (raw_moment(model, 2, 0) - 2 * x_mean * w10 + data_sum * x_mean**2) / data_sum
-    m02 = (raw_moment(model, 0, 2) - 2 * y_mean * w01 + data_sum * y_mean**2) / data_sum
+    m11 = raw_moment(model, 1, 1, weight) / w00 - x_c * y_c
+    m20 = raw_moment(model, 2, 0, weight) / w00 - x_c**2
+    m02 = raw_moment(model, 0, 2, weight) / w00 - y_c**2
     cov = np.array([m20, m11, m11, m02]).T.reshape(-1, 2, 2)
     eigvals, eigvecs = np.linalg.eigh(cov)
 
@@ -110,9 +117,10 @@ def shape(component, show_fig=False):
             vec = 1 * std * eigvecs[:, i] / np.hypot(*eigvecs[:, i])
             x, y = np.vstack((mean - vec, mean, mean + vec)).T
             return x, y
-        mean = np.array([x_mean[0], y_mean[0]])
-        ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, 0), marker='o', color='white', alpha=0.5)
-        ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, -1), marker='o', color='red', alpha=0.5)
+        
+        mean = np.array([x_c[0], y_c[0]])
+        ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, 0), marker='o', color='blue', alpha=0.4)
+        ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, -1), marker='o', color='red', alpha=0.4)
         ax.axis('image')
         plt.show()
     return {'q': q, 'pa': pa}
