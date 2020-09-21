@@ -60,7 +60,35 @@ def interpolate(data_lr, data_hr):
 # Vanilla detection: SEP
 def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
+    '''
+    Source detection using Source Extractor (actually SEP). 
 
+    Parameters
+    ----------
+    detect_image: 2-D numpy array
+        image
+    sigma: float
+        detection threshold
+    b: float
+        box size
+    f: float
+        kernel size
+    minarea: float
+        minimum area for a source
+    sky_subtract: bool
+        whether subtract the estimated sky from the input image, then detect sources
+    show_fig: bool
+        whether plot a figure showing objects and segmentation map
+    **kwargs: see `utils.extract_obj`.
+
+    Result
+    ------
+    obj_cat: `astropy.table.Table` object
+        catalog of detected sources
+    segmap: numpy array
+        segmentation map
+    fig: `matplotlib.pyplot.figure` object
+    '''
     result = extract_obj(
         detect_image,
         b=b,
@@ -85,7 +113,42 @@ def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthre
 
 def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
-    Sw = Starlet(detect_image, lvl=4) # wavelet decomposition
+    '''
+    Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
+    
+    Parameters
+    ----------
+    detect_image: 2-D numpy array
+        image
+    wavelet_lvl: int
+        the number of wavelet decompositions
+    high_freq_lvl: int
+        this parameter controls how much low-frequency features are wiped away. It should be smaller than `wavelet_lvl - 1`.
+        `high_freq_lvl=0` means no low-freq features are wiped, higher number yields a image with less low-freq features.  
+    sigma: float
+        detection threshold
+    b: float
+        box size
+    f: float
+        kernel size
+    minarea: float
+        minimum area for a source
+    sky_subtract: bool
+        whether subtract the estimated sky from the input image, then detect sources
+    show_fig: bool
+        whether plot a figure showing objects and segmentation map
+    **kwargs: see `utils.extract_obj`.
+
+    Result
+    ------
+    obj_cat: `astropy.table.Table` object
+        catalog of detected sources
+    segmap: numpy array
+        segmentation map
+    fig: `matplotlib.pyplot.figure` object
+
+    '''
+    Sw = Starlet(detect_image, lvl=wavelet_lvl) # wavelet decomposition
     w = Sw.coefficients
     iw = Sw.image
 
@@ -113,8 +176,8 @@ def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=6
         return obj_cat, segmap
 
     
-def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, visual_gaia=False, **kwargs):
-    ''' Creates a detection catalog by combining low and high resolution data
+def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
+    ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
     It is particularly useful for stellar crowded fields and for detecting high frequency features.
@@ -129,15 +192,23 @@ def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, 
         Options: 
             "wavelet" uses wavelet decomposition of images before combination, emphasizes high-frequency features
             "vanilla" directly detect objects using SEP
-    args: 
+    match_gaia: bool
+        whether matching the detection catalog with Gaia dataset
+    show_fig: bool
+        whether show the detection catalog as a figure
+    visual_gaia: bool
+        whether mark Gaia stars in the figure
+    kwargs: 
         See the arguments of 'utils.extract_obj'.
 
     Returns
     -------
-    obj_cat: sextractor catalog
+    obj_cat: `astropy.table.Table` object
         catalog of detected sources
+    segmap: numpy array
+        segmentation map
     bg_rms: array
-        background level for each data set
+        background level for each dataset
     '''
     if len(datas) == 1:
         hr_images = datas[0].images / np.sum(datas[0].images, axis=(1, 2))[:, None, None]
