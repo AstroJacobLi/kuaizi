@@ -439,9 +439,10 @@ def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.
     img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
     channel_map = scarlet.display.channels_to_rgb(len(channels))
     model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
-    norm = AsinhMapping(minimum=minimum, stretch=stretch / 2, Q=Q)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch / 2, Q=Q / 2)
     residual_rgb = scarlet.display.img_to_rgb(residual, norm=norm, channel_map=channel_map)
-    
+    vmax = np.max(np.abs(residual_rgb))
+
     # Show the data, model, and residual
     fig = plt.figure(figsize=(15, 5))
     ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
@@ -449,7 +450,7 @@ def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.
     ax[0].set_title("Data")
     ax[1].imshow(model_rgb)
     ax[1].set_title("Model")
-    ax[2].imshow(residual_rgb)
+    ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
     ax[2].set_title("Residual")
 
     if show_mark:
@@ -458,10 +459,12 @@ def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.
                 color = 'white'
             elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
-            elif isinstance(src, scarlet.source.MultiExtendedSource): #'Wavelet':
+            elif isinstance(src, scarlet.source.MultiExtendedSource):
                 color = 'cyan'
             elif isinstance(src, scarlet.source.StarletSource):
                 color = 'lime'
+            else:
+                color = 'yellow'
             if hasattr(src, "center"):
                 y, x = src.center
                 ax[0].text(x, y, k, color=color)

@@ -1,16 +1,34 @@
 from __future__ import division, print_function
-import os
+import os, sys
 import sep
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse as mpl_ellip
+from contextlib import contextmanager
 
 from astropy.io import fits
 from astropy import wcs
 from astropy.table import Table, Column
+from astropy import units as u
+from astropy.units import Quantity
+from astropy.coordinates import SkyCoord
 
-from .display import display_single, SEG_CMAP
+from .display import display_single, SEG_CMAP, ORG
 
+@contextmanager
+def suppress_stdout():
+    """Suppress the output.
+
+    Based on: https://thesmithfam.org/blog/2012/10/25/temporarily-suppress-console-output-in-python/
+    """
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 
 def set_env(project='HSC', name='HSC_LSBG'):
@@ -30,7 +48,7 @@ def set_env(project='HSC', name='HSC_LSBG'):
 
 def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
     deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 
-    sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=True, 
+    sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False, 
     verbose=True, logger=None):
     '''
     Extract objects for a given image using ``sep`` (a Python-wrapped ``SExtractor``). 
@@ -88,12 +106,12 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
 
     if verbose:
         if logger is not None:
-            logger.info("    - Detect %d objects" % len(objects))
+            logger.info("    - Detected %d objects" % len(objects))
         else:
-            print("# Detect %d objects" % len(objects))
+            print("# Detected %d objects" % len(objects))
     objects = Table(objects)
     objects.add_column(Column(data=np.arange(len(objects)) + 1, name='index'))
-    # Maximum flux, defined as flux within six 'a' in radius.
+    # Maximum flux, defined as flux within 6 * `a` (semi-major axis) in radius.
     objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], 
                                     6. * objects['a'])[0], name='flux_max'))
     # Add FWHM estimated from 'a' and 'b'. 
@@ -101,6 +119,12 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
     objects.add_column(Column(data=2* np.sqrt(np.log(2) * (objects['a']**2 + objects['b']**2)), 
                               name='fwhm_custom'))
     
+    # Measure R30, R50, R80
+    temp = sep.flux_radius(input_data, objects['x'], objects['y'], 6. * objects['a'], [0.3, 0.5, 0.8])[0]
+    objects.add_column(Column(data=temp[:, 0], name='R30'))
+    objects.add_column(Column(data=temp[:, 1], name='R50'))
+    objects.add_column(Column(data=temp[:, 2], name='R80'))
+
     # Use Kron radius to calculate FLUX_AUTO in SourceExtractor.
     # Here PHOT_PARAMETER = 2.5, 3.5
     if flux_auto:
@@ -153,4 +177,131 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
             ax[0].add_artist(e)
         ax[1] = display_single(segmap, scale='linear', cmap=SEG_CMAP , ax=ax[1], scale_bar_length=scale_bar_length)
         plt.savefig('./extract_obj.png', bbox_inches='tight')
+        return objects, segmap, fig
     return objects, segmap
+
+
+
+def image_gaia_stars(image, wcs, pixel=0.168, mask_a=694.7, mask_b=3.5,
+                     verbose=False, visual=False, size_buffer=1.4,
+                     tap_url=None):
+    """
+    Search for bright stars using GAIA catalog. From https://github.com/dr-guangtou/kungpao.
+    """
+    # Central coordinate
+    ra_cen, dec_cen = wcs.wcs_pix2world(image.shape[0] / 2,
+                                        image.shape[1] / 2,
+                                        0)
+    img_cen_ra_dec = SkyCoord(
+        ra_cen, dec_cen, unit=('deg', 'deg'), frame='icrs')
+
+    # Width and height of the search box
+    img_search_x = Quantity(pixel * (image.shape)[0] * size_buffer, u.arcsec)
+    img_search_y = Quantity(pixel * (image.shape)[1] * size_buffer, u.arcsec)
+
+    # Search for stars
+    if tap_url is not None:
+        with suppress_stdout():
+            from astroquery.gaia import TapPlus, GaiaClass
+            Gaia = GaiaClass(TapPlus(url=tap_url))
+
+            gaia_results = Gaia.query_object_async(
+                coordinate=img_cen_ra_dec,
+                width=img_search_x,
+                height=img_search_y,
+                verbose=verbose)
+    else:
+        with suppress_stdout():
+            from astroquery.gaia import Gaia
+
+            gaia_results = Gaia.query_object_async(
+                coordinate=img_cen_ra_dec,
+                width=img_search_x,
+                height=img_search_y,
+                verbose=verbose)
+
+    if gaia_results:
+        # Convert the (RA, Dec) of stars into pixel coordinate
+        ra_gaia = np.asarray(gaia_results['ra'])
+        dec_gaia = np.asarray(gaia_results['dec'])
+        x_gaia, y_gaia = wcs.wcs_world2pix(ra_gaia, dec_gaia, 0)
+
+        # Generate mask for each star
+        rmask_gaia_arcsec = mask_a * np.exp(
+            -gaia_results['phot_g_mean_mag'] / mask_b)
+
+        # Update the catalog
+        gaia_results.add_column(Column(data=x_gaia, name='x_pix'))
+        gaia_results.add_column(Column(data=y_gaia, name='y_pix'))
+        gaia_results.add_column(
+            Column(data=rmask_gaia_arcsec, name='rmask_arcsec'))
+
+        if visual:
+            fig = plt.figure(figsize=(8, 8))
+            ax1 = fig.add_subplot(111)
+
+            ax1 = display_single(image, ax=ax1)
+            # Plot an ellipse for each object
+            for star in gaia_results:
+                smask = mpl_ellip(
+                    xy=(star['x_pix'], star['y_pix']),
+                    width=(2.0 * star['rmask_arcsec'] / pixel),
+                    height=(2.0 * star['rmask_arcsec'] / pixel),
+                    angle=0.0)
+                smask.set_facecolor(ORG(0.2))
+                smask.set_edgecolor(ORG(1.0))
+                smask.set_alpha(0.3)
+                ax1.add_artist(smask)
+
+            # Show stars
+            ax1.scatter(
+                gaia_results['x_pix'],
+                gaia_results['y_pix'],
+                color=ORG(1.0),
+                s=100,
+                alpha=0.9,
+                marker='+')
+
+            ax1.set_xlim(0, image.shape[0])
+            ax1.set_ylim(0, image.shape[1])
+
+            return gaia_results
+
+        return gaia_results
+
+    return None
+
+
+def gaia_star_mask(img, wcs, pix=0.168, mask_a=694.7, mask_b=4.04,
+                   size_buffer=1.4, gaia_bright=18.0,
+                   factor_b=1.3, factor_f=1.9):
+    """Find stars using Gaia and mask them out if necessary.
+
+    Using the stars found in the GAIA TAP catalog, we build a bright star mask following
+    similar procedure in Coupon et al. (2017).
+
+    We separate the GAIA stars into bright (G <= 18.0) and faint (G > 18.0) groups, and
+    apply different parameters to build the mask.
+    """
+    gaia_stars = image_gaia_stars(img, wcs, pixel=pix,
+                                  mask_a=mask_a, mask_b=mask_b,
+                                  verbose=False, visual=False,
+                                  size_buffer=size_buffer)
+
+    # Make a mask image
+    msk_star = np.zeros(img.shape).astype('uint8')
+
+    if gaia_stars is not None:
+        gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
+        sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],
+                        gaia_b['rmask_arcsec'] / factor_b / pix,
+                        gaia_b['rmask_arcsec'] / factor_b / pix, 0.0, r=1.0)
+
+        gaia_f = gaia_stars[gaia_stars['phot_g_mean_mag'] > gaia_bright]
+        sep.mask_ellipse(msk_star, gaia_f['x_pix'], gaia_f['y_pix'],
+                        gaia_f['rmask_arcsec'] / factor_f / pix,
+                        gaia_f['rmask_arcsec'] / factor_f / pix, 0.0, r=1.0)
+
+        return gaia_stars, msk_star
+
+    return None, msk_star
