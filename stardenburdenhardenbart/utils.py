@@ -166,16 +166,15 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
             scale_bar_length = 61
         else:
             scale_bar_length = 10
+        ax[0] = display_single(input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
         if mask is not None:
-            ax[0] = display_single(input_data * (~mask.astype(bool)), ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
-        else:
-            ax[0] = display_single(input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
+            ax[0].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
         from matplotlib.patches import Ellipse
         # plot an ellipse for each object
         for obj in objects:
             e = Ellipse(xy=(obj['x'], obj['y']),
-                        width=5*obj['a'],
-                        height=5*obj['b'],
+                        width=5 * obj['a'],
+                        height=5 * obj['b'],
                         angle=obj['theta'] * 180. / np.pi)
             e.set_facecolor('none')
             e.set_edgecolor('red')
@@ -316,7 +315,7 @@ def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                                   mask_a=mask_a, mask_b=mask_b,
                                   verbose=False, visual=False,
                                   size_buffer=size_buffer)
-
+    print(f'#{len(gaia_stars)} stars from GAIA are masked!')
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
 

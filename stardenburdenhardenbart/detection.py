@@ -16,12 +16,13 @@ class Data:
     While it is possible for scarlet to run without wcs or psf,
     it is strongly recommended not to, which is why these entry are not optional.
     """
-    def __init__(self, images, wcs, psfs, channels):
+    def __init__(self, images, weights, wcs, psfs, channels):
         self._images = images
+        self._weights = weights
         self.wcs = wcs
         self.psfs = psfs
         self.channels = channels
-
+        
     @property
     def images(self):
         return self._images
@@ -29,6 +30,15 @@ class Data:
     @images.setter
     def images(self, images):
         self._images = images
+
+    @property
+    def weights(self):
+        return self._weights
+
+    @weights.setter
+    def weights(self, weights):
+        self._weights = weights
+
 
 def interpolate(data_lr, data_hr):
     ''' Interpolate low resolution data to high resolution
