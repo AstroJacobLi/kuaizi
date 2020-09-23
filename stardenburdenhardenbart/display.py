@@ -424,9 +424,14 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
-def display_scarlet_model(blend, images, observation, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+def display_scarlet_model(blend, images, observation, show_ind=None, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
     from scarlet.display import AsinhMapping
     import scarlet
+    # Sometimes we only want to show a few sources
+    if show_ind is not None:
+        sources = np.copy(blend.sources)
+        gal_sources = np.array(sources)[show_ind]
+        blend = scarlet.Blend(gal_sources, observation)
     # Compute model
     model = blend.get_model()  # this model is under `model_frame`, i.e. under the modest PSF
     # Render it in the observed frame
