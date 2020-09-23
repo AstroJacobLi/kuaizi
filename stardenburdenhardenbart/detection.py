@@ -58,7 +58,7 @@ def interpolate(data_lr, data_hr):
     return np.array(interp)
 
 # Vanilla detection: SEP
-def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
+def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Source detection using Source Extractor (actually SEP). 
@@ -67,6 +67,8 @@ def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthre
     ----------
     detect_image: 2-D numpy array
         image
+    mask: numpy 2-D array
+        image mask
     sigma: float
         detection threshold
     b: float
@@ -91,6 +93,7 @@ def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthre
     '''
     result = extract_obj(
         detect_image,
+        mask=mask,
         b=b,
         f=f,
         sigma=sigma,
@@ -111,7 +114,7 @@ def vanilla_detection(detect_image, sigma=3, b=64, f=3, minarea=5, deblend_nthre
         obj_cat, segmap = result
         return obj_cat, segmap
 
-def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
+def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
@@ -120,11 +123,13 @@ def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=6
     ----------
     detect_image: 2-D numpy array
         image
+    mask: numpy 2-D array
+        image mask
     wavelet_lvl: int
         the number of wavelet decompositions
     high_freq_lvl: int
         this parameter controls how much low-frequency features are wiped away. It should be smaller than `wavelet_lvl - 1`.
-        `high_freq_lvl=0` means no low-freq features are wiped, higher number yields a image with less low-freq features.  
+        `high_freq_lvl=0` means no low-freq features are wiped (equivalent to vanilla), higher number yields a image with less low-freq features.  
     sigma: float
         detection threshold
     b: float
@@ -158,6 +163,7 @@ def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=6
 
     result = vanilla_detection(
         high_freq_image, 
+        mask=mask,
         sigma=sigma, 
         b=b, 
         f=f, 
@@ -176,7 +182,7 @@ def wavelet_detection(detect_image, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=6
         return obj_cat, segmap
 
     
-def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
+def makeCatalog(datas, mask=None, lvl=3, method='wavelet', match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
@@ -186,6 +192,8 @@ def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, 
     ----------
     datas: array
         array of Data objects
+    mask: numpy 2-D array
+        image mask
     lvl: int
         detection lvl, i.e., sigma in SEP
     method: str
@@ -233,9 +241,9 @@ def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, 
         detect = detect_image
 
     if method == 'wavelet':
-        result = wavelet_detection(detect, sigma=lvl, show_fig=show_fig, **kwargs)
+        result = wavelet_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
     else:
-        result = vanilla_detection(detect, sigma=lvl, **kwargs)
+        result = vanilla_detection(detect, mask=mask, sigma=lvl, **kwargs)
 
     obj_cat = result[0]
     segmap = result[1]
@@ -277,13 +285,13 @@ def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, 
         
         # Retrieve GAIA catalog
         gaia_stars = image_gaia_stars(
-            detect, w, pixel=pixel_scale, 
+            detect, w, pixel_scale=pixel_scale, 
             verbose=True, visual=visual_gaia)
         # Cross-match with SExtractor catalog
         from astropy.coordinates import SkyCoord, match_coordinates_sky
         temp, dist, _ = match_coordinates_sky(SkyCoord(ra=gaia_stars['ra'], dec=gaia_stars['dec'], unit='deg'),
                                               SkyCoord(ra=obj_cat['ra'], dec=obj_cat['dec'], unit='deg'), nthneighbor=1)
-        flag = dist < 7 * u.arcsec
+        flag = dist < 5 * u.arcsec
         star_mag = gaia_stars['phot_g_mean_mag'].data
         psf_ind = temp[flag]
         star_mag = star_mag[flag]
@@ -305,6 +313,8 @@ def makeCatalog(datas, lvl=3, method='wavelet', match_gaia=True, show_fig=True, 
         #obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
         #obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
         print(f'# Matched {len(psf_ind)} stars from GAIA')
+
+    obj_cat['index'] = np.arange(len(obj_cat))
 
     # Visualize the results
     if show_fig and match_gaia:
