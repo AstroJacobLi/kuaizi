@@ -424,7 +424,7 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
-def display_scarlet_model(blend, images, observation, show_ind=None, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+def display_scarlet_model(blend, observation, show_ind=None, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
     from scarlet.display import AsinhMapping
     import scarlet
     # Sometimes we only want to show a few sources
@@ -432,6 +432,11 @@ def display_scarlet_model(blend, images, observation, show_ind=None, stretch=2, 
         sources = np.copy(blend.sources)
         gal_sources = np.array(sources)[show_ind]
         blend = scarlet.Blend(gal_sources, observation)
+    # Image
+    images = observation.images
+    # Weights
+    weights = observation.weights
+    mask = (np.sum(observation.weights == 0, axis=0) != 0)
     # Compute model
     model = blend.get_model()  # this model is under `model_frame`, i.e. under the modest PSF
     # Render it in the observed frame
@@ -452,10 +457,15 @@ def display_scarlet_model(blend, images, observation, show_ind=None, stretch=2, 
     fig = plt.figure(figsize=(15, 5))
     ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
     ax[0].imshow(img_rgb)
+    ax[0].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[0].set_title("Data")
+
     ax[1].imshow(model_rgb)
+    ax[1].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[1].set_title("Model")
+
     ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
+    ax[2].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[2].set_title("Residual")
 
     if show_mark:
