@@ -27,6 +27,15 @@ def flux(component):
     model = component.get_model()
     return model.sum(axis=(1, 2))
 
+def SED(component):
+    """Determine SED of component
+
+    Parameters
+    ----------
+    component: `scarlet.Component` or `scarlet.ComponentTree`
+        Component to analyze
+    """
+    return np.sum([*component.parameters[::2]], axis=0)
 
 def centroid(component):
     """Determine centroid of model
