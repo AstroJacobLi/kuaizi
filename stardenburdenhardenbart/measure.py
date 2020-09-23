@@ -37,22 +37,37 @@ def SED(component):
     """
     return np.sum([*component.parameters[::2]], axis=0)
 
-def centroid(component):
-    """Determine centroid of model
+def centroid(components, observation=None):
+    """Determine centroid of (multiple) components
 
     Parameters
     ----------
-    component: `scarlet.Component` or `scarlet.ComponentTree`
-        Component to analyze
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
+        Components to analyze
     """
-    model = component.get_model()
-    indices = np.indices(model.shape)
-    centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
-    return centroid + component.bbox.origin
-
+    if isinstance(components, scarlet.Component):
+        # Single component
+        model = components.get_model()
+        indices = np.indices(model.shape)
+        centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
+        return centroid + components.bbox.origin
+    else:
+        if observation is None:
+            raise ValueError('Please provide `Observation`.')
+            return
+        else:
+            # Multiple components
+            blend = scarlet.Blend(components, observation)
+            model = blend.get_model()
+            indices = np.indices(model.shape)
+            centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
+            return centroid
+    
 
 def cen_peak(component):
     """Determine position of the pixel with maximum intensity of a model
+
+    TODO: expand to multiple components
 
     Parameters
     ----------
@@ -66,29 +81,46 @@ def cen_peak(component):
     peak_set = np.array(peak_set)
     return peak_set + component.bbox.origin[1:]
 
+def raw_moment(data, i_order, j_order, weight):
+    n_depth, n_row, n_col = data.shape
+    y, x = np.mgrid[:n_row, :n_col]
+    if weight is None:
+        data = data * x**i_order * y**j_order
+    else:
+        data = data * weight * x**i_order * y**j_order
+    return np.sum(data, axis=(1, 2))
 
-def shape(component, show_fig=False, weight=None):
+def shape(components, observation=None, show_fig=False, weight_order=0):
     """Determine b/a ratio `q` and position angle `pa` of model by calculating its second moments.
 
     TODO: add weight function
 
     Parameters
     ----------
-    component: `scarlet.Component` or `scarlet.ComponentTree`
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
         Component to analyze
     weight: 2-D numpy array, W(x, y)
-    """
 
-    def raw_moment(data, i_order, j_order, weight):
-        n_depth, n_row, n_col = data.shape
-        y, x = np.mgrid[:n_row, :n_col]
-        if weight is None:
-            data = data * x**i_order * y**j_order
+    """
+    if isinstance(components, scarlet.Component):
+        # Single component
+        model = components.get_model()
+    else:
+        if observation is None:
+            raise ValueError('Please provide `Observation`.')
+            return
         else:
-            data = data * weight * x**i_order * y**j_order
-        return np.sum(data, axis=(1, 2))
+            # Multiple components
+            blend = scarlet.Blend(components, observation)
+            model = blend.get_model()
+
+    if weight_order < 0:
+        raise ValueError('Weight order cannot be negative, this will introduce infinity!') 
+    elif weight_order == 0:
+        weight = None
+    else:
+        weight = model ** weight_order
     
-    model = component.get_model()
     # zeroth-order moment: total flux
     w00 = raw_moment(model, 0, 0, weight)
 
@@ -117,7 +149,7 @@ def shape(component, show_fig=False, weight=None):
 
     if show_fig:
         fig, ax = plt.subplots()
-        norm = scarlet.display.AsinhMapping(minimum=0, stretch=0.1, Q=1)
+        norm = scarlet.display.AsinhMapping(minimum=0, stretch=1, Q=1)
         ax.imshow(scarlet.display.img_to_rgb(model, norm=norm))
 
         def make_lines(eigvals, eigvecs, mean, i):
@@ -130,6 +162,12 @@ def shape(component, show_fig=False, weight=None):
         mean = np.array([x_c[0], y_c[0]])
         ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, 0), marker='o', color='blue', alpha=0.4)
         ax.plot(*make_lines(eigvals[0], eigvecs[0], mean, -1), marker='o', color='red', alpha=0.4)
+
+        mean = np.array([x_c[2], y_c[2]])
+        ax.plot(*make_lines(eigvals[2], eigvecs[2], mean, 0), marker='o', color='blue', alpha=0.4)
+        ax.plot(*make_lines(eigvals[2], eigvecs[2], mean, -1), marker='o', color='red', alpha=0.4)
+
         ax.axis('image')
         plt.show()
+
     return {'q': q, 'pa': pa}
