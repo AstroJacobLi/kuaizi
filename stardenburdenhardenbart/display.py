@@ -424,7 +424,46 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
-def display_scarlet_model(blend, observation, show_ind=None, stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+def display_scarlet_sources(data, sources, show_mask=True, show_ind=None, 
+    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+    from scarlet.display import AsinhMapping
+    import scarlet
+    if show_ind is not None:
+        sources = np.array(sources)[show_ind]
+    # Image
+    images = data.images
+    # Weights
+    weights = data.weights
+    mask = (np.sum(data.weights == 0, axis=0) != 0)
+    # Display
+    norm = AsinhMapping(minimum=-0.2, stretch=stretch, Q=Q)
+    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    plt.imshow(img_rgb)
+    if show_mask:
+        plt.imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+
+    if show_mark:
+        # Mark all of the sources from the detection cataog
+        for k, src in enumerate(sources):
+            if isinstance(src, scarlet.source.PointSource):
+                color = 'white'
+            elif isinstance(src, scarlet.source.SingleExtendedSource):
+                color = 'red'
+            elif isinstance(src, scarlet.source.MultiExtendedSource):
+                color = 'cyan'
+            elif isinstance(src, scarlet.source.StarletSource):
+                color = 'lime'
+            else:
+                color = 'yellow'
+            if hasattr(src, "center"):
+                y, x = src.center
+                plt.text(x, y, str(k), color=color)
+            else:
+                raise ValueError('Wrong!')
+
+def display_scarlet_model(blend, observation, show_mask=False, show_ind=None, 
+    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
     from scarlet.display import AsinhMapping
     import scarlet
     # Sometimes we only want to show a few sources
@@ -436,7 +475,7 @@ def display_scarlet_model(blend, observation, show_ind=None, stretch=2, Q=1, min
     images = observation.images
     # Weights
     weights = observation.weights
-    mask = (np.sum(observation.weights == 0, axis=0) != 0)
+    mask = (np.sum(weights == 0, axis=0) != 0)
     # Compute model
     model = blend.get_model()  # this model is under `model_frame`, i.e. under the modest PSF
     # Render it in the observed frame
@@ -457,16 +496,16 @@ def display_scarlet_model(blend, observation, show_ind=None, stretch=2, Q=1, min
     fig = plt.figure(figsize=(15, 5))
     ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
     ax[0].imshow(img_rgb)
-    ax[0].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[0].set_title("Data")
-
     ax[1].imshow(model_rgb)
-    ax[1].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[1].set_title("Model")
-
     ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
-    ax[2].imshow(mask.astype(float), origin='lower', alpha=0.2, cmap='Greys_r')
     ax[2].set_title("Residual")
+
+    if show_mask:
+        ax[0].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+        ax[1].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+        ax[2].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
 
     if show_mark:
         for k, src in enumerate(blend.sources):
