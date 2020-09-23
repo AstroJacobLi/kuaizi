@@ -46,7 +46,7 @@ def set_env(project='HSC', name='HSC_LSBG'):
     return data_dir
 
 
-def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
+def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
     deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 
     sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False, 
     verbose=True, logger=None):
@@ -56,6 +56,7 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
 
     Parameters:
         img (numpy 2-D array): input image
+        mask (numpy 2-D array): image mask
         b (float): size of box
         f (float): size of convolving kernel
         sigma (float): detection threshold
@@ -95,6 +96,7 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
 
     objects, segmap = sep.extract(input_data,
                                 sigma,
+                                mask=mask,
                                 err=bkg.globalrms,
                                 segmentation_map=True,
                                 filter_type='matched',
@@ -110,7 +112,7 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
         else:
             print("# Detected %d objects" % len(objects))
     objects = Table(objects)
-    objects.add_column(Column(data=np.arange(len(objects)) + 1, name='index'))
+    objects.add_column(Column(data=np.arange(len(objects)), name='index'))
     # Maximum flux, defined as flux within 6 * `a` (semi-major axis) in radius.
     objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], 
                                     6. * objects['a'])[0], name='flux_max'))
@@ -164,7 +166,10 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
             scale_bar_length = 61
         else:
             scale_bar_length = 10
-        ax[0] = display_single(input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
+        if mask is not None:
+            ax[0] = display_single(input_data * (~mask.astype(bool)), ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
+        else:
+            ax[0] = display_single(input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
         from matplotlib.patches import Ellipse
         # plot an ellipse for each object
         for obj in objects:
@@ -181,12 +186,22 @@ def extract_obj(img, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
     return objects, segmap
 
 
-
-def image_gaia_stars(image, wcs, pixel=0.168, mask_a=694.7, mask_b=3.5,
+def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                      verbose=False, visual=False, size_buffer=1.4,
                      tap_url=None):
     """
     Search for bright stars using GAIA catalog. From https://github.com/dr-guangtou/kungpao.
+
+    Parameters:
+        image (numpy 2-D array): input image.
+        wcs (`astropy.wcs` object): WCS of the input image.
+        pixel_scale (float): default is 0.168 (HSC pixel size). This only affect the figure scale bar.
+        mask_a (float): a scaling factor for the size of the plotted star, larger value means larger circle will be plotted.
+        mask_b (float): a scale size for the plotted star, larger value gives larger circle. 
+        visual (bool): whether display the matched Gaia stars.
+        
+    Return: 
+        gaia_results (`astropy.table.Table` object): a catalog of matched stars.
     """
     # Central coordinate
     ra_cen, dec_cen = wcs.wcs_pix2world(image.shape[0] / 2,
@@ -196,8 +211,8 @@ def image_gaia_stars(image, wcs, pixel=0.168, mask_a=694.7, mask_b=3.5,
         ra_cen, dec_cen, unit=('deg', 'deg'), frame='icrs')
 
     # Width and height of the search box
-    img_search_x = Quantity(pixel * (image.shape)[0] * size_buffer, u.arcsec)
-    img_search_y = Quantity(pixel * (image.shape)[1] * size_buffer, u.arcsec)
+    img_search_x = Quantity(pixel_scale * (image.shape)[0] * size_buffer, u.arcsec)
+    img_search_y = Quantity(pixel_scale * (image.shape)[1] * size_buffer, u.arcsec)
 
     # Search for stars
     if tap_url is not None:
@@ -245,8 +260,8 @@ def image_gaia_stars(image, wcs, pixel=0.168, mask_a=694.7, mask_b=3.5,
             for star in gaia_results:
                 smask = mpl_ellip(
                     xy=(star['x_pix'], star['y_pix']),
-                    width=(2.0 * star['rmask_arcsec'] / pixel),
-                    height=(2.0 * star['rmask_arcsec'] / pixel),
+                    width=(2.0 * star['rmask_arcsec'] / pixel_scale),
+                    height=(2.0 * star['rmask_arcsec'] / pixel_scale),
                     angle=0.0)
                 smask.set_facecolor(ORG(0.2))
                 smask.set_edgecolor(ORG(1.0))
@@ -272,18 +287,32 @@ def image_gaia_stars(image, wcs, pixel=0.168, mask_a=694.7, mask_b=3.5,
     return None
 
 
-def gaia_star_mask(img, wcs, pix=0.168, mask_a=694.7, mask_b=4.04,
+def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                    size_buffer=1.4, gaia_bright=18.0,
                    factor_b=1.3, factor_f=1.9):
-    """Find stars using Gaia and mask them out if necessary.
-
+    """Find stars using Gaia and mask them out if necessary. From https://github.com/dr-guangtou/kungpao.
+    
     Using the stars found in the GAIA TAP catalog, we build a bright star mask following
     similar procedure in Coupon et al. (2017).
 
     We separate the GAIA stars into bright (G <= 18.0) and faint (G > 18.0) groups, and
     apply different parameters to build the mask.
+
+    Parameters:
+        img (numpy 2-D array): input image.
+        wcs (`astropy.wcs` object): WCS of the input image.
+        pixel_scale (float): default is 0.168 (HSC pixel size). This only affect the figure scale bar.
+        mask_a (float): a scale factor for the size of the plotted star, larger value means larger circle will be plotted.
+        mask_b (float): a scale size for the plotted star, larger value gives larger circle. 
+        gaia_bright (float): a threshold above which are classified as bright stars.
+        factor_b (float): a scale size of mask for bright stars. Larger value gives smaller mask size.
+        factor_f (float): a scale size of mask for faint stars. Larger value gives smaller mask size.
+        
+    Return: 
+        msk_star (numpy 2-D array): the masked pixels are marked by one.
+
     """
-    gaia_stars = image_gaia_stars(img, wcs, pixel=pix,
+    gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
                                   mask_a=mask_a, mask_b=mask_b,
                                   verbose=False, visual=False,
                                   size_buffer=size_buffer)
@@ -294,13 +323,13 @@ def gaia_star_mask(img, wcs, pix=0.168, mask_a=694.7, mask_b=4.04,
     if gaia_stars is not None:
         gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
         sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],
-                        gaia_b['rmask_arcsec'] / factor_b / pix,
-                        gaia_b['rmask_arcsec'] / factor_b / pix, 0.0, r=1.0)
+                        gaia_b['rmask_arcsec'] / factor_b / pixel_scale,
+                        gaia_b['rmask_arcsec'] / factor_b / pixel_scale, 0.0, r=1.0)
 
         gaia_f = gaia_stars[gaia_stars['phot_g_mean_mag'] > gaia_bright]
         sep.mask_ellipse(msk_star, gaia_f['x_pix'], gaia_f['y_pix'],
-                        gaia_f['rmask_arcsec'] / factor_f / pix,
-                        gaia_f['rmask_arcsec'] / factor_f / pix, 0.0, r=1.0)
+                        gaia_f['rmask_arcsec'] / factor_f / pixel_scale,
+                        gaia_f['rmask_arcsec'] / factor_f / pixel_scale, 0.0, r=1.0)
 
         return gaia_stars, msk_star
 
