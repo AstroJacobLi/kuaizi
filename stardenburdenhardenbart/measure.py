@@ -16,7 +16,7 @@ def max_pixel(component):
     )
 
 
-def flux(component):
+def flux(components):
     """Determine flux in every channel
 
     Parameters
@@ -24,11 +24,14 @@ def flux(component):
     component: `scarlet.Component` or `scarlet.ComponentTree`
         Component to analyze
     """
-    model = component.get_model()
-    return model.sum(axis=(1, 2))
+    tot_flux = 0
+    for comp in components:
+        model = comp.get_model()
+        tot_flux += model.sum(axis=(1, 2))
+    return tot_flux
 
 def SED(component):
-    """Determine SED of component
+    """Determine SED of single component
 
     Parameters
     ----------
@@ -44,6 +47,10 @@ def centroid(components, observation=None):
     ----------
     components: a list of `scarlet.Component` or `scarlet.ComponentTree`
         Components to analyze
+
+    Returns
+    -------
+        y, x
     """
     if isinstance(components, scarlet.Component):
         # Single component
@@ -63,7 +70,40 @@ def centroid(components, observation=None):
             centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
             return centroid
     
+def winpos(components, observation=None):
+    """Calculate more accurate object centroids using ‘windowed’ algorithm.
+    https://sep.readthedocs.io/en/v1.0.x/api/sep.winpos.html
 
+    Parameters
+    ----------
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
+        Components to analyze
+
+    Returns
+    -------
+        y, x: winpos in each channel
+    """
+    import sep
+    _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
+    blend = scarlet.Blend(components, observation) # Render model image
+    model = blend.get_model()
+
+    R50 = R_frac(components, observation, frac=0.5)
+    sig = 2. / 2.35 * R50  # R50 is half-light radius for each channel
+
+    depth = model.shape[0]
+
+    x_ = []
+    y_ = []
+    if depth > 1:
+        for i in range(depth):
+            xwin, ywin, flag = sep.winpos(model[i], x_cen, y_cen, sig[i])
+            x_.append(xwin)
+            y_.append(ywin)
+    
+    return np.array(x_), np.array(y_)
+    
+'''
 def cen_peak(component):
     """Determine position of the pixel with maximum intensity of a model
 
@@ -80,6 +120,86 @@ def cen_peak(component):
         peak_set.append(np.mean(np.where(model[i] == np.max(model[i])), axis=1))
     peak_set = np.array(peak_set)
     return peak_set + component.bbox.origin[1:]
+'''
+
+def R_frac(components, observation=None, frac=0.5, weight_order=0):
+    """
+    Determine the radius R (in pixels), the flux within R has a fraction of `frac` over the total flux.
+
+    Parameters
+    ----------
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
+        Component to analyze
+    observation: 
+
+    frac: float
+        fraction of lights within this R.
+
+    """
+    import sep
+    from scipy.interpolate import interp1d, UnivariateSpline
+
+    _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
+    s = shape(components, observation, show_fig=False, weight_order=weight_order)
+    q = s['q']
+    theta = np.deg2rad(s['pa'])
+
+    blend = scarlet.Blend(components, observation) # Render model image
+    model = blend.get_model()
+    total_flux = model.sum(axis=(1, 2))
+
+    depth = model.shape[0]
+    r_frac = []
+
+    if depth > 1:
+        for i in range(depth):
+            r_max = max(model.shape)
+            r_ = np.linspace(0, r_max, 500)
+            flux_ = sep.sum_ellipse(model[i], x_cen, y_cen, 1, 1 * q[i], theta[i], r=r_)[0]
+            flux_ /= total_flux[i]
+            func = UnivariateSpline(r_, flux_ - frac, s=0)
+            r_frac.append(func.roots()[0])
+    else: # might be buggy
+        r_max = max(model.shape)
+        r_ = np.linspace(0, r_max, 500)
+        flux_ = sep.sum_ellipse(model[0], x_cen, y_cen, 1, 1 * q[0], theta[0], r=r_)[0]
+        flux_ /= total_flux[0]
+        func = UnivariateSpline(r_, flux_ - frac, s=0)
+        r_frac.append(func.roots()[0])
+
+    return np.array(r_frac)
+
+def kron_radius(components, observation=None, weight_order=0):
+    """
+    Determine the Kron Radius 
+
+    Parameters
+    ----------
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
+        Component to analyze
+    observation
+
+    """
+    import sep
+
+    _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
+    s = shape(components, observation, show_fig=False, weight_order=weight_order)
+    q = s['q']
+    theta = np.deg2rad(s['pa'])
+
+    blend = scarlet.Blend(components, observation) # Render model image
+    model = blend.get_model()
+
+    depth = model.shape[0]
+    kron = []
+
+    if depth > 1:
+        for i in range(depth):
+            r_max = max(model.shape)
+            r = sep.kron_radius(model[i], x_cen, y_cen, 1, 1 * q[i], theta[i], r_max)[0]
+            kron.append(r)
+
+    return np.array(kron)
 
 def raw_moment(data, i_order, j_order, weight):
     n_depth, n_row, n_col = data.shape
@@ -99,7 +219,7 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
     ----------
     components: a list of `scarlet.Component` or `scarlet.ComponentTree`
         Component to analyze
-    weight: 2-D numpy array, W(x, y)
+    weight_order: W(x, y) = I(x, y) ** (weight_order)
 
     """
     if isinstance(components, scarlet.Component):
@@ -171,3 +291,30 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
         plt.show()
 
     return {'q': q, 'pa': pa}
+
+def mu_central(components, observation=None, zeropoint=27.0, pixel_scale=0.168, weight_order=0):
+    """
+    Determine the central surface brightness, by calculating the average of 9 pixels around the centroid
+
+    Parameters
+    ----------
+    components: a list of `scarlet.Component` or `scarlet.ComponentTree`
+        Component to analyze
+    observation
+
+    """
+    _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
+    
+    blend = scarlet.Blend(components, observation) # Render model image
+    model = blend.get_model()
+
+    depth = model.shape[0]
+    mu_cen = []
+
+    if depth > 1:
+        for i in range(depth):
+            img = model[i]
+            mu = img[int(y_cen) - 1:int(y_cen) + 2, int(x_cen) - 1:int(x_cen) + 2].mean()
+            mu_cen.append(mu)
+    mu_cen = -2.5 * np.log10(np.array(mu_cen) / (pixel_scale**2)) + zeropoint
+    return mu_cen
