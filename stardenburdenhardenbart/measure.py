@@ -340,3 +340,29 @@ def makeMeasurement(components, observation, frac=0.5):
     measure_dict['pa'] = _shape['pa']
     measure_dict['SB0'] = mu_central(components, observation)
     return measure_dict
+
+# Sersic constant
+def bn(n):
+    temp = 2 * n - 1 / 3 + 4 / (405 * n) + 46 / (25515 * n**2) + 131 / (
+        1148175 * n**3) - 2194697 / (30690717750 * n**4)
+    return temp
+def delta_bn(n):
+    temp = 2 - 4 / (405 * n**2) - 2 * 46 / (25515 * n**3) - 3 * 131 / (
+            1148175 * n**4) + 4 * 2194697 / (30690717750 * n**5)
+    return temp
+
+def cal_mu0(n, Re, mag):
+    '''
+    Re should be circularized: a * np.sqrt(b/a)!
+    '''
+    from scipy.special import gamma, polygamma
+    mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1) * np.pi) - 5 * n * np.log10(bn(n))
+    return mu
+
+def cal_mue(n, Re, mag):
+    '''
+    Re should be circularized: a * np.sqrt(b/a)!
+    '''
+    from scipy.special import gamma, polygamma
+    mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1) * np.pi) + 2.5 * bn(n) / np.log(10) - 5 * n * np.log10(bn(n))
+    return mu
