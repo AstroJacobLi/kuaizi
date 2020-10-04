@@ -354,6 +354,7 @@ def delta_bn(n):
 def cal_mu0(n, Re, mag):
     '''
     Re should be circularized: a * np.sqrt(b/a)!
+    https://ui.adsabs.harvard.edu/abs/10.1071/AS05001
     '''
     from scipy.special import gamma, polygamma
     mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1) * np.pi) - 5 * n * np.log10(bn(n))
@@ -362,6 +363,7 @@ def cal_mu0(n, Re, mag):
 def cal_mue(n, Re, mag):
     '''
     Re should be circularized: a * np.sqrt(b/a)!
+    https://ui.adsabs.harvard.edu/abs/10.1071/AS05001
     '''
     from scipy.special import gamma, polygamma
     mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1) * np.pi) + 2.5 * bn(n) / np.log(10) - 5 * n * np.log10(bn(n))
