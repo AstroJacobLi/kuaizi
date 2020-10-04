@@ -52,6 +52,7 @@ def centroid(components, observation=None):
     -------
         y, x
     """
+    
     if isinstance(components, scarlet.Component):
         # Single component
         model = components.get_model()
@@ -139,6 +140,9 @@ def R_frac(components, observation=None, frac=0.5, weight_order=0):
     import sep
     from scipy.interpolate import interp1d, UnivariateSpline
 
+    if not isinstance(components, list):
+        components = [components]
+
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     s = shape(components, observation, show_fig=False, weight_order=weight_order)
     q = s['q']
@@ -209,6 +213,7 @@ def raw_moment(data, i_order, j_order, weight):
     else:
         data = data * weight * x**i_order * y**j_order
     return np.sum(data, axis=(1, 2))
+
 
 def shape(components, observation=None, show_fig=False, weight_order=0):
     """Determine b/a ratio `q` and position angle `pa` of model by calculating its second moments.
@@ -303,6 +308,8 @@ def mu_central(components, observation=None, zeropoint=27.0, pixel_scale=0.168, 
     observation
 
     """
+    if not isinstance(components, list):
+        components = [components]
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     
     blend = scarlet.Blend(components, observation) # Render model image
@@ -318,3 +325,18 @@ def mu_central(components, observation=None, zeropoint=27.0, pixel_scale=0.168, 
             mu_cen.append(mu)
     mu_cen = -2.5 * np.log10(np.array(mu_cen) / (pixel_scale**2)) + zeropoint
     return mu_cen
+
+
+def makeMeasurement(components, observation, frac=0.5):
+    measure_dict = {}
+    _cen = centroid(components)
+    measure_dict['x_cen'] = _cen[2]
+    measure_dict['y_cen'] = _cen[1]
+    measure_dict['flux'] = flux(components)
+    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + 27.0
+    measure_dict['R50'] = R_frac(components, observation, frac=0.5) * 0.168
+    _shape = shape(components, observation)
+    measure_dict['q'] = _shape['q']
+    measure_dict['pa'] = _shape['pa']
+    measure_dict['SB0'] = mu_central(components, observation)
+    return measure_dict

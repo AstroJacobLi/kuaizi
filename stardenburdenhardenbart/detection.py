@@ -22,7 +22,7 @@ class Data:
         self.wcs = wcs
         self.psfs = psfs
         self.channels = channels
-        
+
     @property
     def images(self):
         return self._images
