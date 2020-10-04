@@ -462,10 +462,16 @@ def display_scarlet_sources(data, sources, show_mask=True, show_ind=None,
             else:
                 raise ValueError('Wrong!')
 
-def display_scarlet_model(blend, observation, show_mask=False, show_ind=None, 
+def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind=None, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
     from scarlet.display import AsinhMapping
     import scarlet
+
+
+    if ax is None:
+        fig = plt.figure(figsize=(15, 5))
+        ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+
     # Sometimes we only want to show a few sources
     if show_ind is not None:
         sources = np.copy(blend.sources)
@@ -493,8 +499,6 @@ def display_scarlet_model(blend, observation, show_mask=False, show_ind=None,
     vmax = np.max(np.abs(residual_rgb))
 
     # Show the data, model, and residual
-    fig = plt.figure(figsize=(15, 5))
-    ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
     ax[0].imshow(img_rgb)
     ax[0].set_title("Data")
     ax[1].imshow(model_rgb)
@@ -524,4 +528,8 @@ def display_scarlet_model(blend, observation, show_mask=False, show_ind=None,
                 ax[0].text(x, y, k, color=color)
                 ax[1].text(x, y, k, color=color)
                 ax[2].text(x, y, k, color=color)
-    plt.show()
+    
+    
+    if ax is None:
+        return fig
+    return ax
