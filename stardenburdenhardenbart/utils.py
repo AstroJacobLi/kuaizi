@@ -348,7 +348,10 @@ def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                                   mask_a=mask_a, mask_b=mask_b,
                                   verbose=False, visual=False,
                                   size_buffer=size_buffer)
-    print(f'#{len(gaia_stars)} stars from GAIA are masked!')
+    if gaia_stars is not None:
+        print(f'#{len(gaia_stars)} stars from GAIA are masked!')
+    else:
+        print('No GAIA stars are masked.')
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
 
