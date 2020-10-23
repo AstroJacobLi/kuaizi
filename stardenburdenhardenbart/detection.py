@@ -114,14 +114,17 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
         show_fig=show_fig,
         **kwargs)
 
-    result[0].sort('flux', reverse=True)
-    result[0]['index'] = np.arange(len(result[0]))
+    obj_cat = result[0]
+    arg_ind = obj_cat.argsort('flux', reverse=True)
+    obj_cat.sort('flux', reverse=True)
+    obj_cat['index'] = np.arange(len(obj_cat)) 
+    segmap = result[1]
+    segmap = np.append(-1, np.argsort(arg_ind))[segmap] + 1
 
     if show_fig is True:
-        obj_cat, segmap, fig = result
+        fig = result[2]
         return obj_cat, segmap, fig
     else:
-        obj_cat, segmap = result
         return obj_cat, segmap
 
 def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 

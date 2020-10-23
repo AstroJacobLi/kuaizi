@@ -102,7 +102,7 @@ def winpos(components, observation=None):
             x_.append(xwin)
             y_.append(ywin)
     
-    return np.array(x_), np.array(y_)
+    return np.array(y_), np.array(x_)
     
 '''
 def cen_peak(component):
@@ -274,7 +274,7 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
 
     if show_fig:
         fig, ax = plt.subplots()
-        norm = scarlet.display.AsinhMapping(minimum=0, stretch=1, Q=1)
+        norm = scarlet.display.AsinhMapping(minimum=0, stretch=0.5, Q=1)
         ax.imshow(scarlet.display.img_to_rgb(model, norm=norm))
 
         def make_lines(eigvals, eigvecs, mean, i):
@@ -297,7 +297,7 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
 
     return {'q': q, 'pa': pa}
 
-def mu_central(components, observation=None, zeropoint=27.0, pixel_scale=0.168, weight_order=0):
+def mu_central(components, observation=None, method='centroid', zeropoint=27.0, pixel_scale=0.168, weight_order=0):
     """
     Determine the central surface brightness, by calculating the average of 9 pixels around the centroid
 
@@ -310,7 +310,12 @@ def mu_central(components, observation=None, zeropoint=27.0, pixel_scale=0.168, 
     """
     if not isinstance(components, list):
         components = [components]
-    _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
+    if method == 'winpos':
+        y_cen, x_cen = winpos(components, observation=observation)
+        y_cen = y_cen.mean()
+        x_cen = x_cen.mean()
+    else:
+        _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     
     blend = scarlet.Blend(components, observation) # Render model image
     model = blend.get_model()
@@ -332,6 +337,10 @@ def makeMeasurement(components, observation, frac=0.5):
     _cen = centroid(components)
     measure_dict['x_cen'] = _cen[2]
     measure_dict['y_cen'] = _cen[1]
+    _cen = winpos([components], observation)
+    measure_dict['x_cen_winpos'] = _cen[1].mean()
+    measure_dict['y_cen_winpos'] = _cen[0].mean()
+
     measure_dict['flux'] = flux(components)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + 27.0
     measure_dict['R50'] = R_frac(components, observation, frac=0.5) * 0.168
@@ -339,6 +348,7 @@ def makeMeasurement(components, observation, frac=0.5):
     measure_dict['q'] = _shape['q']
     measure_dict['pa'] = _shape['pa']
     measure_dict['SB0'] = mu_central(components, observation)
+    measure_dict['SB0_winpos'] = mu_central(components, observation, method='winpos')
     return measure_dict
 
 # Sersic constant

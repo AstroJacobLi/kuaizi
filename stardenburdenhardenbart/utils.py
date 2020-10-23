@@ -46,6 +46,39 @@ def set_env(project='HSC', name='HSC_LSBG'):
     return data_dir
 
 
+def set_matplotlib(usetex=True, fontsize=20):
+    '''
+    Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
+    '''
+
+    import matplotlib.pyplot as plt
+    from matplotlib.colorbar import Colorbar
+    from matplotlib import rcParams
+    plt.rc('text', usetex=usetex)
+    plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
+    '''
+    rcParams.update({'axes.linewidth': 1.3})
+    rcParams.update({'xtick.direction': 'in'})
+    rcParams.update({'ytick.direction': 'in'})
+    rcParams.update({'xtick.minor.visible': 'True'})
+    rcParams.update({'ytick.minor.visible': 'True'})
+    rcParams.update({'xtick.major.pad': '7.0'})
+    rcParams.update({'xtick.major.size': 5.0})
+    rcParams.update({'xtick.major.width': '1.5'})
+    rcParams.update({'xtick.minor.pad': '7.0'})
+    rcParams.update({'xtick.minor.size': 3.0})
+    rcParams.update({'xtick.minor.width': 1.0})
+    rcParams.update({'ytick.major.pad': '7.0'})
+    rcParams.update({'ytick.major.size': 5.0})
+    rcParams.update({'ytick.major.width': '1.5'})
+    rcParams.update({'ytick.minor.pad': '7.0'})
+    rcParams.update({'ytick.minor.size': 3.0})
+    rcParams.update({'ytick.minor.width': 1.0})
+    rcParams.update({'axes.titlepad': '10.0'})
+    '''
+    rcParams.update({'font.size': fontsize})
+
+
 def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
     deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 
     sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False, 
