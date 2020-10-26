@@ -12,7 +12,7 @@ with open('requirements.txt') as infd:
     INSTALL_REQUIRES = [x.strip('\n') for x in infd.readlines()]
     print(INSTALL_REQUIRES)
 
-setup(name='stardenburdenhardenbart', 
+setup(name='kuaizi', 
 	description='Handy code to use',
 	long_description=readme(),
 	long_description_content_type="text/markdown",
@@ -26,7 +26,7 @@ setup(name='stardenburdenhardenbart',
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
     ],
-	url='https://github.com/AstroJacobLi/stardenburdenhardenbart',
+	url='https://github.com/AstroJacobLi/kuaizi',
 	author='Jiaxuan Li',
 	author_email='jiaxuan_li@pku.edu.cn',
 	license='MIT',

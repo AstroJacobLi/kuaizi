@@ -3,7 +3,7 @@ import warnings
 warnings.simplefilter('ignore')
 
 __all__ = ["utils"]
-__name__ = 'stardenburdenhardenbart'
+__name__ = 'kuaizi'
 __author__ = ['Jiaxuan Li']
 
 
