@@ -104,6 +104,7 @@ def display_single(img,
                    color_bar_fontsize=18,
                    color_bar_color='w',
                    add_text=None,
+                   usetex=True,
                    text_fontsize=30,
                    text_y_offset=0.80,
                    text_color='w'):
@@ -132,7 +133,8 @@ def display_single(img,
         scale_bar_color (str): Color of scale bar.
         scale_bar_loc (str): Scale bar position, options are "left" and "right".
         color_bar (bool): Whether show colorbar or not.
-        add_text (str): The text you want to add to the figure. Note that it is wrapped within ``$\mathrm{}$``.
+        add_text (str): The text you want to add to the figure.
+        usetex (bool): whether render the text in LaTeX.
         text_fontsize (float): Fontsize of text.
         text_y_offset (float): Offset of text on y-axis.
         text_color (str): Color of text.
@@ -239,7 +241,10 @@ def display_single(img,
     if add_text is not None:
         text_x_0 = int(img_size_x*0.08)
         text_y_0 = int(img_size_y*text_y_offset)
-        ax1.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        if usetex:
+            ax.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax.text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
 
     # Put a color bar on the image
     if color_bar:
@@ -424,10 +429,34 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
-def display_scarlet_sources(data, sources, show_mask=True, show_ind=None, 
-    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=None, 
+    stretch=2, Q=1, minimum=0.0, show_mark=True, pixel_scale=0.168, scale_bar=True,
+    scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
+    scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+    '''
+    Display the scene, including image, mask, and sources.
+
+    Arguments:
+        data (kuazi.detection.Data): input `Data` object
+        sources (list): a list containing `scarlet` sources
+        ax (matplotlib.axes object): input axes object
+        show_mask (bool): whether displaying the mask encoded in `data.weights'
+        show_ind (list): if not None, only objects with these indices are shown in the figure
+        stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
+        show_mark (bool): whether plot the indices of sources in the figure
+        pixel_scale (float): default is 0.168 arcsec/pixel.
+
+    Returns: 
+        ax: if input `ax` is provided
+        fig: if no `ax` is provided as input
+
+    '''
     from scarlet.display import AsinhMapping
     import scarlet
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 8))
+
     if show_ind is not None:
         sources = np.array(sources)[show_ind]
     # Image
@@ -438,10 +467,18 @@ def display_scarlet_sources(data, sources, show_mask=True, show_ind=None,
     # Display
     norm = AsinhMapping(minimum=-0.2, stretch=stretch, Q=Q)
     img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
-    fig, ax = plt.subplots(figsize=(8, 8))
     plt.imshow(img_rgb)
+
     if show_mask:
         plt.imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+
+    ax.tick_params(
+        labelbottom=False,
+        labelleft=False,
+        axis=u'both',
+        which=u'both',
+        length=0)
+    #ax.axis('off')
 
     if show_mark:
         # Mark all of the sources from the detection cataog
@@ -462,11 +499,78 @@ def display_scarlet_sources(data, sources, show_mask=True, show_ind=None,
             else:
                 raise ValueError('Wrong!')
 
+    (img_size_x, img_size_y) = data.images[0].shape
+    if scale_bar:
+        if scale_bar_loc == 'left':
+            scale_bar_x_0 = int(img_size_x * 0.04)
+            scale_bar_x_1 = int(img_size_x * 0.04 +
+                                (scale_bar_length / pixel_scale))
+        else:
+            scale_bar_x_0 = int(img_size_x * 0.95 -
+                                (scale_bar_length / pixel_scale))
+            scale_bar_x_1 = int(img_size_x * 0.95)
+        scale_bar_y = int(img_size_y * 0.10)
+        scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+        scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+        
+        if scale_bar_length < 60:
+            scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+        elif 60 < scale_bar_length < 3600:
+            scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+        else: 
+            scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+        scale_bar_text_size = scale_bar_fontsize
+
+        ax.plot(
+            [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+            linewidth=3,
+            c=scale_bar_color,
+            alpha=1.0)
+        ax.text(
+            scale_bar_text_x,
+            scale_bar_text_y,
+            scale_bar_text,
+            fontsize=scale_bar_text_size,
+            horizontalalignment='center',
+            color=scale_bar_color)
+
+    if add_text is not None:
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
+        if usetex:
+            ax.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax.text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
+
+    if ax is None:
+        return fig
+    return ax
+
 def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind=None, 
-    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True):
+    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
+    scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
+    scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+    '''
+    Display the scene, including image, mask, and the models.
+
+    Arguments:
+        blend (scarlet.blend): the blend of observation and sources
+        observation (scarlet.observation): the observation
+        ax (matplotlib.axes object): input axes object
+        show_mask (bool): whether displaying the mask encoded in `data.weights'
+        show_ind (list): if not None, only objects with these indices are shown in the figure
+        stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
+        channels (str): names of the bands in `observation`
+        show_mark (bool): whether plot the indices of sources in the figure
+        pixel_scale (float): default is 0.168 arcsec/pixel
+
+    Returns: 
+        ax: if input `ax` is provided
+        fig: if no `ax` is provided as input
+
+    '''
     from scarlet.display import AsinhMapping
     import scarlet
-
 
     if ax is None:
         fig = plt.figure(figsize=(15, 5))
@@ -529,7 +633,50 @@ def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind
                 ax[1].text(x, y, k, color=color)
                 ax[2].text(x, y, k, color=color)
     
-    
+    (img_size_x, img_size_y) = images[0].shape
+    if scale_bar:
+        if scale_bar_loc == 'left':
+            scale_bar_x_0 = int(img_size_x * 0.04)
+            scale_bar_x_1 = int(img_size_x * 0.04 +
+                                (scale_bar_length / pixel_scale))
+        else:
+            scale_bar_x_0 = int(img_size_x * 0.95 -
+                                (scale_bar_length / pixel_scale))
+            scale_bar_x_1 = int(img_size_x * 0.95)
+        scale_bar_y = int(img_size_y * 0.10)
+        scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+        scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+        
+        if scale_bar_length < 60:
+            scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+        elif 60 < scale_bar_length < 3600:
+            scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+        else: 
+            scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+        scale_bar_text_size = scale_bar_fontsize
+
+        ax[0].plot(
+            [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+            linewidth=3,
+            c=scale_bar_color,
+            alpha=1.0)
+        ax[0].text(
+            scale_bar_text_x,
+            scale_bar_text_y,
+            scale_bar_text,
+            fontsize=scale_bar_text_size,
+            horizontalalignment='center',
+            color=scale_bar_color)
+
+    if add_text is not None:
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
+        if usetex:
+            ax[0].text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax[0].text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
+
+
     if ax is None:
         return fig
     return ax
