@@ -546,7 +546,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         return fig
     return ax
 
-def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind=None, 
+def display_scarlet_model(blend, observation, ax=None, show_loss=False, show_mask=False, show_ind=None, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
     scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
     scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
@@ -557,6 +557,7 @@ def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind
         blend (scarlet.blend): the blend of observation and sources
         observation (scarlet.observation): the observation
         ax (matplotlib.axes object): input axes object
+        show_loss (bool): whether displaying the loss curve
         show_mask (bool): whether displaying the mask encoded in `data.weights'
         show_ind (list): if not None, only objects with these indices are shown in the figure
         stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
@@ -571,16 +572,21 @@ def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind
     '''
     from scarlet.display import AsinhMapping
     import scarlet
-
+    
     if ax is None:
-        fig = plt.figure(figsize=(15, 5))
-        ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+        if show_loss:
+            fig = plt.figure(figsize=(24, 6))
+            ax = [fig.add_subplot(1, 4, n + 1) for n in range(4)]
+        else:
+            fig = plt.figure(figsize=(18, 6))
+            ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
 
     # Sometimes we only want to show a few sources
     if show_ind is not None:
         sources = np.copy(blend.sources)
         gal_sources = np.array(sources)[show_ind]
         blend = scarlet.Blend(gal_sources, observation)
+    
     # Image
     images = observation.images
     # Weights
@@ -676,6 +682,17 @@ def display_scarlet_model(blend, observation, ax=None, show_mask=False, show_ind
         else:
             ax[0].text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
 
+
+    if show_loss:
+        ax[3].plot(-np.array(blend.loss))
+        ax[3].set_xlabel('Iteration')
+        ax[3].set_ylabel('log-Likelihood')
+        ax[3].set_title("log-Likelihood")
+        xlim, ylim = ax[3].axes.get_xlim(), ax[3].axes.get_ylim()
+        xrange = xlim[1] - xlim[0]
+        yrange = ylim[1] - ylim[0]
+        ax[3].set_aspect((xrange / yrange), adjustable='box')
+        ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
 
     if ax is None:
         return fig
