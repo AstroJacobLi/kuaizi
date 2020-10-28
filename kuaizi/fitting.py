@@ -241,11 +241,15 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
     try:
         for e_rel in [1e-4, 1e-5, 1e-6]:
             blend.fit(150, e_rel)
-            recent_loss = np.mean(blend.loss[-5:])
-            min_loss = np.min(blend.loss[:-5])
+            if len(blend.loss) > 20:
+                recent_loss = np.mean(blend.loss[-10:])
+                min_loss = np.min(blend.loss[:-10])
+            else:
+                recent_loss = np.mean(blend.loss[-5:])
+                min_loss = np.min(blend.loss[:-5])
             if recent_loss < min_loss:
                 print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-            elif abs((recent_loss - min_loss) / min_loss) < 0.1:
+            elif abs((recent_loss - min_loss) / min_loss) < 0.02:
                 print(f'I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
                 break
             else:
