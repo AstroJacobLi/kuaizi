@@ -349,7 +349,7 @@ def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                                   verbose=False, visual=False,
                                   size_buffer=size_buffer)
     if gaia_stars is not None:
-        print(f'#{len(gaia_stars)} stars from GAIA are masked!')
+        print(f'# {len(gaia_stars)} stars from GAIA are masked!')
     else:
         print('No GAIA stars are masked.')
     # Make a mask image
@@ -369,3 +369,31 @@ def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         return gaia_stars, msk_star
 
     return None, msk_star
+
+
+def padding_PSF(psf_list):
+    '''
+    If the sizes of HSC PSF in all bands are not the same, this function pads the smaller PSFs.
+
+    Parameters:
+        psf_list: a list returned by `unagi.task.hsc_psf` function
+
+    Returns:
+        psf_pad: a list including padded PSFs. They now share the same size.
+    '''
+    # Padding PSF cutouts from HSC
+    max_len = max([max(psf[0].data.shape) for psf in psf_list])
+    psf_pad = []
+    for psf in psf_list:
+        y_len, x_len = psf[0].data.shape
+        dy = (max_len - y_len) // 2
+        dx = (max_len - x_len) // 2
+        temp = np.pad(psf[0].data.astype('float'), ((dy, dy), (dx, dx)), 'constant', constant_values=0)
+        if temp.shape == (max_len, max_len):
+            psf_pad.append(temp)
+        else:
+            raise ValueError('Wrong size!')
+    
+    return psf_pad
+
+
