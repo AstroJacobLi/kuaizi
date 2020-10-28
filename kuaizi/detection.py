@@ -195,7 +195,7 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, high_freq_lvl=1, s
         return obj_cat, segmap
 
     
-def makeCatalog(datas, mask=None, lvl=3, method='wavelet', match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
+def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5, match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
@@ -252,6 +252,10 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', match_gaia=True, show
         detect = detect_image.mean(axis=0)
     else:
         detect = detect_image
+
+    if convolve:
+        from astropy.convolution import convolve, Box2DKernel, Gaussian2DKernel
+        detect = convolve(detect.astype(float), Gaussian2DKernel(conv_radius))
 
     if method == 'wavelet':
         result = wavelet_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
