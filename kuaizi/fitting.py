@@ -30,13 +30,13 @@ plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
-def fitting_single_comp(lsbg, hsc_dr, prefix='LSBG', index=10, large_away_factor=5, compact_away_factor=0.5):
+def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=0, large_away_factor=3.5, compact_away_factor=0.4):
 
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
     lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
-    size_ang = 1.0 * u.arcmin
+    size_ang = cutout_halfsize * u.arcmin
     channels = 'griz'
 
     if not os.path.isdir('./Images'):
@@ -102,7 +102,7 @@ def fitting_single_comp(lsbg, hsc_dr, prefix='LSBG', index=10, large_away_factor
                                                         pixel_scale=0.168,
                                                         minarea=5,
                                                         deblend_nthresh=30,
-                                                        deblend_cont=0.005,
+                                                        deblend_cont=0.001,
                                                         sky_subtract=True)
 
     catalog_c = SkyCoord(obj_cat_ori['ra'], obj_cat_ori['dec'], unit='deg')
@@ -215,7 +215,7 @@ def fitting_single_comp(lsbg, hsc_dr, prefix='LSBG', index=10, large_away_factor
                                                     observation,
                                                     K=2,   # two components
                                                     thresh=0.01,
-                                                    shifting=True)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                    shifting=False)   # I don't use the manual `coadd` and `bg_cutoff` here.
     sources.append(new_source)
 
     # Visualize our data and mask and source
@@ -241,8 +241,8 @@ def fitting_single_comp(lsbg, hsc_dr, prefix='LSBG', index=10, large_away_factor
     try:
         for e_rel in [1e-4, 1e-5, 1e-6]:
             blend.fit(150, e_rel)
-            recent_loss = np.mean(blend.loss[-15:])
-            min_loss = np.min(blend.loss[:-15])
+            recent_loss = np.mean(blend.loss[-5:])
+            min_loss = np.min(blend.loss[:-5])
             if recent_loss < min_loss:
                 print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
             elif abs((recent_loss - min_loss) / min_loss) < 0.1:
