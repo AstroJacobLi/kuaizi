@@ -127,7 +127,7 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
     else:
         return obj_cat, segmap
 
-def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
+def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
@@ -171,7 +171,13 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, high_freq_lvl=1, s
     iw = Sw.image
 
     if high_freq_lvl != 0:
-        w[:, -1 * (high_freq_lvl), :, :] = 0 # remove low frequency features
+        #w[:, :4, :, :] = 0 # remove low frequency features
+        w[:, (high_freq_lvl):, :, :] = 0 # remove low frequency features
+
+    if low_freq_lvl != 0:
+        #w[:, :4, :, :] = 0 # remove low frequency features
+        w[:, :(low_freq_lvl), :, :] = 0 # remove low frequency features
+
     high_freq_image = Starlet(coefficients=w).image[0] # image with high-frequency features highlighted
 
     result = vanilla_detection(
