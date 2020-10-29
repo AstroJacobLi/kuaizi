@@ -1,6 +1,8 @@
 import numpy as np
 import scarlet
 import matplotlib.pyplot as plt
+import sep
+import os
 
 def max_pixel(component):
     """Determine pixel with maximum value
@@ -12,7 +14,7 @@ def max_pixel(component):
     """
     model = component.get_model()
     return tuple(
-        np.unravel_index(np.argmax(model), model.shape) + component.bbox.origin
+        np.array(np.unravel_index(np.argmax(model), model.shape)) + np.array(component.bbox.origin)
     )
 
 
@@ -25,6 +27,8 @@ def flux(components):
         Component to analyze
     """
     tot_flux = 0
+    if not isinstance(components, list):
+        components = [components]
     for comp in components:
         model = comp.get_model()
         tot_flux += model.sum(axis=(1, 2))
@@ -84,7 +88,9 @@ def winpos(components, observation=None):
     -------
         y, x: winpos in each channel
     """
-    import sep
+    if not isinstance(components, list):
+        components = [components]
+
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     blend = scarlet.Blend(components, observation) # Render model image
     model = blend.get_model()
@@ -137,7 +143,6 @@ def R_frac(components, observation=None, frac=0.5, weight_order=0):
         fraction of lights within this R.
 
     """
-    import sep
     from scipy.interpolate import interp1d, UnivariateSpline
 
     if not isinstance(components, list):
@@ -184,7 +189,8 @@ def kron_radius(components, observation=None, weight_order=0):
     observation
 
     """
-    import sep
+    if not isinstance(components, list):
+        components = [components]
 
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     s = shape(components, observation, show_fig=False, weight_order=weight_order)
@@ -307,6 +313,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
         Component to analyze
     observation
 
+    method: 'centroid' or 'winpos'
+
     """
     if not isinstance(components, list):
         components = [components]
@@ -332,24 +340,109 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5):
+def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168):
     measure_dict = {}
-    _cen = centroid(components)
+    _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
     measure_dict['y_cen'] = _cen[1]
-    _cen = winpos([components], observation)
+    _cen = winpos(components, observation)
     measure_dict['x_cen_winpos'] = _cen[1].mean()
     measure_dict['y_cen_winpos'] = _cen[0].mean()
 
     measure_dict['flux'] = flux(components)
-    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + 27.0
-    measure_dict['R50'] = R_frac(components, observation, frac=0.5) * 0.168
+    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
+    measure_dict['R50'] = R_frac(components, observation, frac=frac) * pixel_scale
     _shape = shape(components, observation)
     measure_dict['q'] = _shape['q']
     measure_dict['pa'] = _shape['pa']
-    measure_dict['SB0'] = mu_central(components, observation)
-    measure_dict['SB0_winpos'] = mu_central(components, observation, method='winpos')
+    measure_dict['SB0'] = mu_central(components, observation, method='centroid', 
+                                                zeropoint=zeropoint, pixel_scale=pixel_scale)
+    measure_dict['SB0_winpos'] = mu_central(components, observation, method='winpos', 
+                                                zeropoint=zeropoint, pixel_scale=pixel_scale)
+
     return measure_dict
+
+
+def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0, 
+                    zeropoint=27.0, pixel_scale=0.168, save_fig=True):
+    '''
+    Fit a single Sersic model to the rendered model. Using `pymfit` by Johnny Greco https://github.com/johnnygreco/pymfit
+
+    '''
+    from .utils import save_to_fits
+    import pymfit
+
+    if not os.path.isdir(file_dir):
+        os.mkdir(file_dir)
+
+    if isinstance(components, scarlet.Component):
+        # Single component
+        model = components.get_model()
+    else:
+        if observation is None:
+            raise ValueError('Please provide `Observation`.')
+        else:
+            # Multiple components
+            blend = scarlet.Blend(components, observation)
+            model = blend.get_model()
+
+    ## First, we measure the basic properties of the galaxy to get initial values for fitting
+    measure_dict = makeMeasurement(components, observation, frac=0.5, zeropoint=zeropoint, pixel_scale=pixel_scale)
+
+    ## Then, we save the scarlet model and the inverse-variance map into a FITS file
+    img_fn = os.path.join(file_dir, f'{prefix}-{index:04d}-scarlet-model.fits')
+    invvar_fn = os.path.join(file_dir, f'{prefix}-{index:04d}-scarlet-invvar.fits')
+
+    _ = save_to_fits(model.mean(axis=0), img_fn)
+
+    invvar = []  # Calculate inv-variance map for the scene
+    if isinstance(components, scarlet.Component):
+        # Single component
+        src = components
+        invvar.append(1 / np.sum(list(map(lambda a: a.std.data ** 2, src.parameters[1::2])), axis=0)) # boxed inv-variance
+        _ = save_to_fits(invvar[0], invvar_fn)
+    else:
+        # Multiple components
+        for src in components:
+            invvar.append(1 / np.sum(list(map(lambda a: 1 / a.std.data ** 2, src.parameters[1::2])), axis=0)) # boxed inv-variance
+        slices = tuple((src._model_frame_slices[1:], src._model_slices[1:])
+                        for src in components)
+        full_invvar = np.zeros(blend.frame.shape[1:], dtype=blend.frame.dtype)  # Inv-variance map in the full scene
+        full_invvar = scarlet.blend._add_models(*invvar, full_model=full_invvar, slices=slices)  # the inv-variance of background is 0???
+        _ = save_to_fits(full_invvar, invvar_fn)
+    
+
+    ## Fit a Sersic model using `pymfit`
+
+    # Initial params that are different from defaults.
+    # syntax is {parameter: [value, low, high]}
+    pa_init = - np.sign(measure_dict['pa'].mean()) * (90 - abs(measure_dict['pa'].mean()))
+    init_params = dict(PA=[pa_init, -90, 90],
+                    n=[1.0, 0.01, 5.0],) 
+                    #e=[1 - measure_dict['q'].mean(), 0, 1]) 
+    # create a config dictionary
+    config = pymfit.sersic_config(init_params, img_shape=img_fn)
+
+    # run imfit
+    # note that the image file is a multi-extension cube, which explains the '[#]' additions
+    # also note that this config will be written to config_fn. if you already have a 
+    # config file written, then use config=None (default) and skip the above step. 
+    sersic = pymfit.run(img_fn, config_fn=os.path.join(file_dir, 'config.txt'), 
+                        mask_fn=None, config=config, var_fn=invvar_fn,
+                        out_fn=os.path.join(file_dir, 'best-fit.dat'), 
+                        weights=True)
+    if isinstance(components, scarlet.Component):
+        # Single component:
+        sersic['X0_scene'] = sersic['X0'] + components.bbox.origin[2]
+        sersic['Y0_scene'] = sersic['Y0'] + components.bbox.origin[1]
+
+    sersic_model = pymfit.Sersic(sersic)
+
+    if save_fig:
+        pymfit.viz.img_mod_res(img_fn, sersic_model.params, figsize=(18, 6), 
+                               save_fn=os.path.join('./Figures/', f'{prefix}-{index:04d}-Sersic.png'), 
+                               fontsize=17)
+    return sersic_model
 
 # Sersic constant
 def bn(n):
