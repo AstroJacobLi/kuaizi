@@ -5,6 +5,7 @@ import scarlet
 import os
 import sep
 import time
+import pickle 
 
 import kuaizi as kz
 from kuaizi.detection import Data
@@ -35,15 +36,15 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
-    lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
-    size_ang = cutout_halfsize * u.arcmin
-    channels = 'griz'
+    lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
 
     if not os.path.isdir('./Images'):
         os.mkdir('./Images')
     if not os.path.isdir('./PSFs'):
         os.mkdir('./PSFs')
-    
+
+    size_ang = cutout_halfsize * u.arcmin
+    channels = 'griz'
     cutout = hsc_cutout(
         lsbg_coord,
         cutout_size=size_ang,
@@ -53,17 +54,18 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         archive=hsc_dr,
         use_saved=False,
         output_dir='./Images/',
+        prefix=f'LSBG_{lsbg["Seq"]:04d}_img',
         save_output=True)
     psf_list = hsc_psf(
         lsbg_coord,
         centered=True,
         filters=channels,
         img_type='coadd',
-        prefix=None,
         verbose=True,
         archive=hsc_dr,
         save_output=True,
         use_saved=False,
+        prefix=f'LSBG_{lsbg["Seq"]:04d}_img',
         output_dir='./PSFs/')
 
     channels_list = list(channels)
@@ -89,32 +91,43 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         factor_f=1.4)
 
     # This detection (after blurring the original images) finds out what is the central object and its (estimated) size
-    obj_cat_ori, segmap, bg_rms = kz.detection.makeCatalog([data],
-                                                        lvl=10,
-                                                        method='vanilla',
-                                                        convolve=True,
-                                                        conv_radius=5,
-                                                        match_gaia=False,
-                                                        show_fig=True,
-                                                        visual_gaia=False,
-                                                        b=128,  # subtract a smooth background
-                                                        f=3, 
-                                                        pixel_scale=0.168,
-                                                        minarea=5,
-                                                        deblend_nthresh=30,
-                                                        deblend_cont=0.001,
-                                                        sky_subtract=True)
+    obj_cat_ori, segmap, bg_rms = kz.detection.makeCatalog(
+        [data],
+        lvl=15,
+        method='wavelet',
+        convolve=False,
+        #conv_radius=2,
+        wavelet_lvl=5,
+        low_freq_lvl=3,
+        high_freq_lvl=0,
+        match_gaia=False,
+        show_fig=True,
+        visual_gaia=False,
+        b=128,
+        f=3,
+        pixel_scale=0.168,
+        minarea=20,
+        deblend_nthresh=30,
+        deblend_cont=0.01,
+        sky_subtract=True)
 
     catalog_c = SkyCoord(obj_cat_ori['ra'], obj_cat_ori['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
     cen_indx = obj_cat_ori[np.argsort(dist)[0]]['index']
     cen_obj = obj_cat_ori[cen_indx]
     #print(f'# Central object is #{cen_indx}.')
+    # Better position for cen_obj
+    x, y, _ = sep.winpos(data.images[0], cen_obj['x'], cen_obj['y'], 6)
+    ra, dec = data.wcs.wcs_pix2world(x, y, 0)
+    cen_obj['x'] = x
+    cen_obj['y'] = y
+    cen_obj['ra'] = ra
+    cen_obj['dec'] = dec
 
     # This step masks out high freq sources after wavelet transformation
     obj_cat, segmap, bg_rms = kz.detection.makeCatalog([data],
                                                     mask=msk_star,
-                                                    lvl=4,
+                                                    lvl=2.5,
                                                     method='wavelet',
                                                     high_freq_lvl=1,
                                                     wavelet_lvl=3,
@@ -172,7 +185,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         r=large_away_factor)  # don't mask the target galaxy too much
 
     for ind, obj in enumerate(obj_cat):
-        if arr[int(obj['x']), int(obj['y'])] == 1:
+        if arr[int(obj['y']), int(obj['x'])] == 1:
             segmap[segmap == ind + 1] = 0
 
     smooth_radius = 4
@@ -211,11 +224,20 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
 
     sources = []
     src = obj_cat_ori[cen_indx]
-    new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
-                                                    observation,
-                                                    K=2,   # two components
-                                                    thresh=0.01,
-                                                    shifting=False)   # I don't use the manual `coadd` and `bg_cutoff` here.
+    if HSC_zeropoint - 2.5 * np.log10(src['flux']) > 26.5:
+        # If too faint, single component
+        new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
+                                                        observation,
+                                                        thresh=0.01,
+                                                        shifting=False, 
+                                                        coadd=coadd, 
+                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+    else:
+        new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
+                                                        observation,
+                                                        K=2,  # Two components
+                                                        thresh=0.01,
+                                                        shifting=False)   # I don't use the manual `coadd` and `bg_cutoff` here.
     sources.append(new_source)
 
     # Visualize our data and mask and source
@@ -231,46 +253,62 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         show_mark=True,
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
-    plt.savefig(f'./Figures/{prefix}-{index}.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}.png', bbox_inches='tight')
 
 
     # Star fitting!
     start = time.time()
     blend = scarlet.Blend(sources, observation)
-
     try:
-        for e_rel in [1e-4, 1e-5, 1e-6]:
+        blend.fit(150, 1e-4)
+        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
+            pickle.dump([blend, {'e_rel': 1e-4}], fp)
+            fp.close()
+        last_loss = blend.loss[-1]
+        print(f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+
+        for i, e_rel in enumerate([5e-4, 1e-5, 1e-6]):
             blend.fit(150, e_rel)
-            if len(blend.loss) > 20:
+            if len(blend.loss) > 20: # must have more than 20 iterations
                 recent_loss = np.mean(blend.loss[-10:])
                 min_loss = np.min(blend.loss[:-10])
-            else:
-                recent_loss = np.mean(blend.loss[-5:])
-                min_loss = np.min(blend.loss[:-5])
-            if recent_loss < min_loss:
-                print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-            elif abs((recent_loss - min_loss) / min_loss) < 0.02:
-                print(f'I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                break
-            else:
-                continue
-        print("Scarlet ran for {0} iterations to logL = {1}".format(len(blend.loss), -blend.loss[-1]))
+                if recent_loss < min_loss:
+                    print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
+                    with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
+                        pickle.dump([blend, {'e_rel': e_rel}], fp)
+                        fp.close()
+                elif abs((recent_loss - min_loss) / min_loss) < 0.02:
+                    if recent_loss < last_loss: # better than the saved model
+                        print(f'I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
+                        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
+                            pickle.dump([blend, {'e_rel': e_rel}], fp)
+                            fp.close()
+                        break
+                else:
+                    print(f'Cannot achieve a global optimization with e_rel = {e_rel}.')
+
+        print("Scarlet ran for {1} iterations to logL = {2}".format(e_rel, len(blend.loss), -blend.loss[-1]))
         end = time.time()
         print(f'Elapsing time: {end - start} s')
 
+        with open(f"./Models/{prefix}-{index:04d}-trained-model.pkl", "rb") as fp:
+            blend = pickle.load(fp)[0]
+            fp.close()
+
         fig = kz.display.display_scarlet_model(
-            blend,
-            observation,
-            minimum=-0.3,
-            stretch=2,
-            channels=channels,
-            show_loss=True,
-            show_mask=True,
-            show_mark=False,
-            scale_bar=False)
-        plt.savefig(f'./Figures/{prefix}-{index}-fit.png', bbox_inches='tight')
+                    blend,
+                    minimum=-0.3,
+                    stretch=2,
+                    channels='griz',
+                    show_loss=True,
+                    show_mask=True,
+                    show_mark=False,
+                    scale_bar=False)
+        plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting.png', bbox_inches='tight')
 
         return blend, observation
-    except:
+
+    except Exception as e:
+        print(e)
         return blend, observation
     
