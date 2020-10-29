@@ -496,6 +496,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
             if hasattr(src, "center"):
                 y, x = src.center
                 plt.text(x, y, str(k), color=color)
+                plt.text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
             else:
                 raise ValueError('Wrong!')
 
@@ -546,7 +547,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         return fig
     return ax
 
-def display_scarlet_model(blend, observation, ax=None, show_loss=False, show_mask=False, show_ind=None, 
+def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show_ind=None, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
     scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
     scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
@@ -555,7 +556,6 @@ def display_scarlet_model(blend, observation, ax=None, show_loss=False, show_mas
 
     Arguments:
         blend (scarlet.blend): the blend of observation and sources
-        observation (scarlet.observation): the observation
         ax (matplotlib.axes object): input axes object
         show_loss (bool): whether displaying the loss curve
         show_mask (bool): whether displaying the mask encoded in `data.weights'
@@ -580,6 +580,10 @@ def display_scarlet_model(blend, observation, ax=None, show_loss=False, show_mas
         else:
             fig = plt.figure(figsize=(18, 6))
             ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+
+
+    # Observation
+    observation = blend.observations[0]
 
     # Sometimes we only want to show a few sources
     if show_ind is not None:
@@ -636,8 +640,11 @@ def display_scarlet_model(blend, observation, ax=None, show_loss=False, show_mas
             if hasattr(src, "center"):
                 y, x = src.center
                 ax[0].text(x, y, k, color=color)
+                ax[0].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
                 ax[1].text(x, y, k, color=color)
+                ax[1].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
                 ax[2].text(x, y, k, color=color)
+                ax[2].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
     
     (img_size_x, img_size_y) = images[0].shape
     if scale_bar:
