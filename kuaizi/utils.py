@@ -397,3 +397,48 @@ def padding_PSF(psf_list):
     return psf_pad
 
 
+# Save 2-D numpy array to `fits`
+def save_to_fits(img, fits_file, wcs=None, header=None, overwrite=True):
+    """
+    Save numpy 2-D arrays to `fits` file. (from `kungpao` https://github.com/dr-guangtou/kungpao)
+
+    Parameters:
+        img (numpy 2-D array): The 2-D array to be saved.
+        fits_file (str): File name of `fits` file.
+        wcs (``astropy.wcs.WCS`` object): World coordinate system (WCS) of this image.
+        header (``astropy.io.fits.header`` or str): header of this image.
+        overwrite (bool): Whether overwrite the file. Default is True.
+
+    Returns:
+        img_hdu (``astropy.fits.PrimaryHDU`` object)
+    """
+    img_hdu = fits.PrimaryHDU(img)
+
+    if header is not None:
+        img_hdu.header = header
+        if wcs is not None:
+            hdr = copy.deepcopy(header)
+            wcs_header = wcs.to_header()
+            import fnmatch
+            for i in hdr:
+                if i in wcs_header:
+                    hdr[i] = wcs_header[i]
+                if 'PC*' in wcs_header:
+                    if fnmatch.fnmatch(i, 'CD?_?'):
+                        hdr[i] = wcs_header['PC' + i.lstrip('CD')]
+            img_hdu.header = hdr
+    elif wcs is not None:
+        wcs_header = wcs.to_header()
+        wcs_header = fits.Header({'SIMPLE': True})
+        wcs_header.update(NAXIS1=img.shape[1], NAXIS2=img.shape[0])
+        for card in list(wcs.to_header().cards):
+            wcs_header.append(card)
+        img_hdu.header = wcs_header
+    else:
+        img_hdu = fits.PrimaryHDU(img)
+
+    if os.path.islink(fits_file):
+        os.unlink(fits_file)
+
+    img_hdu.writeto(fits_file, overwrite=overwrite)
+    return img_hdu
