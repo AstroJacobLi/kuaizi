@@ -442,3 +442,87 @@ def save_to_fits(img, fits_file, wcs=None, header=None, overwrite=True):
 
     img_hdu.writeto(fits_file, overwrite=overwrite)
     return img_hdu
+
+# Cutout image
+def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
+               pixel_unit=False, img_header=None, prefix='img_cutout', 
+               out_dir=None, save=True):
+    """
+    Generate image cutout with updated WCS information. (From ``kungpao`` https://github.com/dr-guangtou/kungpao) 
+    
+    Parameters:
+        img (numpy 2-D array): image array.
+        wcs (``astropy.wcs.WCS`` object): WCS of input image array.
+        coord_1 (float): ``ra`` or ``x`` of the cutout center.
+        coord_2 (float): ``dec`` or ``y`` of the cutout center.
+        size (array): image size, such as (800, 1000), in arcsec unit by default.
+        pixel_scale (float): pixel size, in the unit of "arcsec/pixel".
+        pixel_unit (bool):  When True, ``coord_1``, ``coord_2`` becomes ``X``, ``Y`` pixel coordinates. 
+            ``size`` will also be treated as in pixels.
+        img_header: The header of input image, typically ``astropy.io.fits.header`` object.
+            Provide the haeder in case you can save the infomation in this header to the new header.
+        prefix (str): Prefix of output files.
+        out_dir (str): Directory of output files. Default is the current folder.
+        save (bool): Whether save the cutout image.
+    
+    Returns: 
+        :
+            cutout (numpy 2-D array): the cutout image.
+
+            [cen_pos, dx, dy]: a list contains center position and ``dx``, ``dy``.
+
+            cutout_header: Header of cutout image.
+    """
+
+    from astropy.nddata import Cutout2D
+    if not pixel_unit:
+        # img_size in unit of arcsec
+        cutout_size = np.asarray(size) / pixel_scale
+        cen_x, cen_y = wcs.wcs_world2pix(coord_1, coord_2, 0)
+    else:
+        cutout_size = np.asarray(size)
+        cen_x, cen_y = coord_1, coord_2
+
+    cen_pos = (int(cen_x), int(cen_y))
+    dx = -1.0 * (cen_x - int(cen_x))
+    dy = -1.0 * (cen_y - int(cen_y))
+
+    # Generate cutout
+    cutout = Cutout2D(img, cen_pos, cutout_size, wcs=wcs, mode='partial', fill_value=0)
+
+    # Update the header
+    cutout_header = cutout.wcs.to_header()
+    if img_header is not None:
+        if 'COMMENT' in img_header:
+            del img_header['COMMENT']
+        intersect = [k for k in img_header if k not in cutout_header]
+        for keyword in intersect:
+            cutout_header.set(keyword, img_header[keyword], img_header.comments[keyword])
+    
+    if 'PC1_1' in dict(cutout_header).keys():
+        cutout_header['CD1_1'] = cutout_header['PC1_1']
+        #cutout_header['CD1_2'] = cutout_header['PC1_2']
+        #cutout_header['CD2_1'] = cutout_header['PC2_1']
+        cutout_header['CD2_2'] = cutout_header['PC2_2']
+        cutout_header['CDELT1'] = cutout_header['CD1_1']
+        cutout_header['CDELT2'] = cutout_header['CD2_2']
+        cutout_header.pop('PC1_1')
+        #cutout_header.pop('PC2_1')
+        #cutout_header.pop('PC1_2')
+        cutout_header.pop('PC2_2')
+        #cutout_header.pop('CDELT1')
+        #cutout_header.pop('CDELT2')
+    
+    # Build a HDU
+    hdu = fits.PrimaryHDU(header=cutout_header)
+    hdu.data = cutout.data
+    #hdu.data = np.flipud(cutout.data)
+    # Save FITS image
+    if save:
+        fits_file = prefix + '.fits'
+        if out_dir is not None:
+            fits_file = os.path.join(out_dir, fits_file)
+
+        hdu.writeto(fits_file, overwrite=True)
+
+    return cutout, [cen_pos, dx, dy], cutout_header
