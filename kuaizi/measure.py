@@ -3,6 +3,7 @@ import scarlet
 import matplotlib.pyplot as plt
 import sep
 import os
+import copy
 
 def max_pixel(component):
     """Determine pixel with maximum value
@@ -345,9 +346,17 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
     measure_dict['y_cen'] = _cen[1]
+    w = observation.frame.wcs
+    ra, dec = w.wcs_pix2world(measure_dict['x_cen'], measure_dict['y_cen'], 0)
+    measure_dict['ra_cen'] = float(ra)
+    measure_dict['dec_cen'] = float(dec)
+
     _cen = winpos(components, observation)
     measure_dict['x_cen_winpos'] = _cen[1].mean()
     measure_dict['y_cen_winpos'] = _cen[0].mean()
+    ra, dec = w.wcs_pix2world(measure_dict['x_cen_winpos'], measure_dict['y_cen_winpos'], 0)
+    measure_dict['ra_cen_winpos'] = float(ra)
+    measure_dict['dec_cen_winpos'] = float(dec)
 
     measure_dict['flux'] = flux(components)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
@@ -388,7 +397,7 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
         model = blend.get_model()
 
     ## First, we measure the basic properties of the galaxy to get initial values for fitting
-    measure_dict = makeMeasurement(components, observation, frac=0.5, zeropoint=zeropoint, pixel_scale=pixel_scale, weight_order=1)
+    measure_dict = makeMeasurement(components, observation, frac=0.5, zeropoint=zeropoint, pixel_scale=pixel_scale, weight_order=0)
 
     ## Then, we save the scarlet model and the inverse-variance map into a FITS file
     img_fn = os.path.join(file_dir, f'{prefix}-{index:04d}-scarlet-model.fits')
@@ -437,16 +446,33 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
         sersic['X0_scene'] = sersic['X0'] + components.bbox.origin[2]
         sersic['Y0_scene'] = sersic['Y0'] + components.bbox.origin[1]
 
+    w = observation.frame.wcs
+    ra, dec = w.wcs_pix2world(sersic['X0_scene'], sersic['Y0_scene'], 0)
+    sersic['RA0'] = float(ra)
+    sersic['DEC0'] = float(dec)
+
     sersic_model = pymfit.Sersic(sersic)
 
     if save_fig:
         if isinstance(components, scarlet.Component):
             # Single component
             blend = scarlet.Blend([components], observation)
-        display_pymfit_model(blend, sersic_model.params, figsize=(24, 6), cmap='turbo', 
-                             colorbar=True, fontsize=17, 
-                             save_fn=os.path.join('./Figures/', f'{prefix}-{index:04d}-Sersic.png'))
-    return sersic_model
+        display_pymfit_model(blend, sersic_model.params, figsize=(30, 6), cmap='Greys_r', 
+                             colorbar=True, fontsize=17, show=False,
+                             save_fn=os.path.join('./Figures/', f'{prefix}-{index:04d}-Sersic.png'));
+
+    ## Make a dictionary containing non-parametric measurements and Sersci fitting results
+    measurement = copy.deepcopy(measure_dict)
+    for key in sersic_model.params.keys():
+        measurement['_'.join(['sersic', key])] = sersic_model.params[key]
+    measurement['sersic_SB0'] = sersic_model.mu_0
+    measurement['sersic_SBe'] = sersic_model.mu_e
+    measurement['sersic_mag'] = sersic_model.m_tot
+
+    return sersic_model, measurement
+
+
+
 
 # Sersic constant
 def bn(n):

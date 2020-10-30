@@ -548,7 +548,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         return fig
     return ax
 
-def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show_ind=None, 
+def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_ind=None, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
     scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
     scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
@@ -557,6 +557,7 @@ def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show
 
     Arguments:
         blend (scarlet.blend): the blend of observation and sources
+        zoomin_size (float, in arcsec): the size of shown image, if not showing in full size
         ax (matplotlib.axes object): input axes object
         show_loss (bool): whether displaying the loss curve
         show_mask (bool): whether displaying the mask encoded in `data.weights'
@@ -592,15 +593,30 @@ def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show
         gal_sources = np.array(sources)[show_ind]
         blend = scarlet.Blend(gal_sources, observation)
     
-    # Image
-    images = observation.images
-    # Weights
-    weights = observation.weights
-    mask = (np.sum(weights == 0, axis=0) != 0)
-    # Compute model
-    model = blend.get_model()  # this model is under `model_frame`, i.e. under the modest PSF
+    if zoomin_size is not None:
+        x_cen = observation.frame.shape[2] // 2
+        y_cen = observation.frame.shape[1] // 2
+        size = int(zoomin_size / pixel_scale / 2) # half-size
+        # Image
+        images = observation.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        # Weights
+        weights = observation.weights[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        # Compute model
+        model = blend.get_model()[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        # this model is under `model_frame`, i.e. under the modest PSF
+    else:
+        # Image
+        images = observation.images
+        # Weights
+        weights = observation.weights
+        # Compute model
+        model = blend.get_model()
+        # this model is under `model_frame`, i.e. under the modest PSF
+    
     # Render it in the observed frame
     model_ = observation.render(model)
+    # Mask
+    mask = (np.sum(weights == 0, axis=0) != 0)
     # Compute residual
     residual = images - model_
 
@@ -609,7 +625,7 @@ def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show
     img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
     channel_map = scarlet.display.channels_to_rgb(len(channels))
     model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
-    norm = AsinhMapping(minimum=minimum, stretch=stretch / 2, Q=Q / 2)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
     residual_rgb = scarlet.display.img_to_rgb(residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
 
@@ -731,7 +747,7 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
 
     if subplots is None:
         subplot_kw = dict(xticks=[], yticks=[])
-        fig, axes = plt.subplots(1, 4, subplot_kw=subplot_kw, **kwargs)
+        fig, axes = plt.subplots(1, 5, subplot_kw=subplot_kw, **kwargs)
         fig.subplots_adjust(wspace=0.08)
     else:
         fig, axes = subplots
@@ -744,19 +760,20 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
         psf /= psf.sum()
         sersic_model = convolve(sersic_model, psf)
 
-    res = hsc_img - sersic_model
+    res1 = hsc_img - scarlet_model
+    res2 = scarlet_model - sersic_model
 
     vmin, vmax = zscale.get_limits(hsc_img)
 
     param_labels = {}
 
     if titles:
-        titles = ['HSC image', 'Scarlet', 'Model', 'Residual']
+        titles = ['HSC image', 'Scarlet', 'Sersic', 'HSC - Scarlet', 'Scarlet - Sersic']
     else:
-        titles = ['']*3
+        titles = ['']*5
 
 
-    for i, data in enumerate([hsc_img, scarlet_model, sersic_model, res]):
+    for i, data in enumerate([hsc_img, scarlet_model, sersic_model, res1, res2]):
         show = axes[i].imshow(data, vmin=vmin, vmax=vmax, origin='lower',
                               cmap=cmap, aspect='equal', rasterized=True)
         axes[i].set_title(titles[i], fontsize=fontsize + 4, y=1.01)
@@ -805,24 +822,24 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
 
     # Put a color bar on the image
     if colorbar:
-        ax_cbar = inset_axes(axes[3],
+        ax_cbar = inset_axes(axes[4],
                              width='75%',
                              height='5%',
                              loc=1)
-        cbar = plt.colorbar(show, ax=axes[3], cax=ax_cbar,
+        cbar = plt.colorbar(show, ax=axes[4], cax=ax_cbar,
                             orientation='horizontal')
 
         cbar.ax.xaxis.set_tick_params(color='w')
         cbar.ax.yaxis.set_tick_params(color='w')
         cbar.outline.set_edgecolor('w')
         plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'),
-                 color='k', fontsize=18)
+                 color='w', fontsize=18)
         plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'),
-                 color='k', fontsize=18)
-
-    if show:
-        plt.show()
+                 color='w', fontsize=18)
 
     if save_fn is not None:
         dpi = kwargs.pop('dpi', 200)
         fig.savefig(save_fn, bbox_inches='tight', dpi=dpi)
+
+    if not show:
+        plt.close()
