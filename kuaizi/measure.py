@@ -340,7 +340,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168):
+def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0):
     measure_dict = {}
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
@@ -352,7 +352,7 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
     measure_dict['flux'] = flux(components)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
     measure_dict['R50'] = R_frac(components, observation, frac=frac) * pixel_scale
-    _shape = shape(components, observation)
+    _shape = shape(components, observation, weight_order=weight_order)
     measure_dict['q'] = _shape['q']
     measure_dict['pa'] = _shape['pa']
     measure_dict['SB0'] = mu_central(components, observation, method='centroid', 
@@ -364,30 +364,31 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
 
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0, 
-                    zeropoint=27.0, pixel_scale=0.168, save_fig=True):
+                   zeropoint=27.0, pixel_scale=0.168, save_fig=True):
     '''
     Fit a single Sersic model to the rendered model. Using `pymfit` by Johnny Greco https://github.com/johnnygreco/pymfit
 
     '''
     from .utils import save_to_fits
+    from .display import display_pymfit_model
     import pymfit
 
     if not os.path.isdir(file_dir):
         os.mkdir(file_dir)
 
+    if observation is None:
+        raise ValueError('Please provide `Observation`.')
+
     if isinstance(components, scarlet.Component):
         # Single component
         model = components.get_model()
     else:
-        if observation is None:
-            raise ValueError('Please provide `Observation`.')
-        else:
-            # Multiple components
-            blend = scarlet.Blend(components, observation)
-            model = blend.get_model()
+        # Multiple components
+        blend = scarlet.Blend(components, observation)
+        model = blend.get_model()
 
     ## First, we measure the basic properties of the galaxy to get initial values for fitting
-    measure_dict = makeMeasurement(components, observation, frac=0.5, zeropoint=zeropoint, pixel_scale=pixel_scale)
+    measure_dict = makeMeasurement(components, observation, frac=0.5, zeropoint=zeropoint, pixel_scale=pixel_scale, weight_order=1)
 
     ## Then, we save the scarlet model and the inverse-variance map into a FITS file
     img_fn = os.path.join(file_dir, f'{prefix}-{index:04d}-scarlet-model.fits')
@@ -439,9 +440,12 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
     sersic_model = pymfit.Sersic(sersic)
 
     if save_fig:
-        pymfit.viz.img_mod_res(img_fn, sersic_model.params, figsize=(18, 6), 
-                               save_fn=os.path.join('./Figures/', f'{prefix}-{index:04d}-Sersic.png'), 
-                               fontsize=17)
+        if isinstance(components, scarlet.Component):
+            # Single component
+            blend = scarlet.Blend([components], observation)
+        display_pymfit_model(blend, sersic_model.params, figsize=(24, 6), cmap='turbo', 
+                             colorbar=True, fontsize=17, 
+                             save_fn=os.path.join('./Figures/', f'{prefix}-{index:04d}-Sersic.png'))
     return sersic_model
 
 # Sersic constant
