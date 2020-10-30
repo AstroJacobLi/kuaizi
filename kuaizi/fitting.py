@@ -31,11 +31,12 @@ plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
-def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=0, large_away_factor=3.5, compact_away_factor=0.4):
+def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_away_factor=3.5, compact_away_factor=0.4):
 
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
+    index = lsbg['Seq']
     lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
 
     if not os.path.isdir('./Images'):
@@ -52,9 +53,9 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         mask=True,
         variance=True,
         archive=hsc_dr,
-        use_saved=False,
+        use_saved=True,
         output_dir='./Images/',
-        prefix=f'LSBG_{lsbg["Seq"]:04d}_img',
+        prefix=f'LSBG_{index:04d}_img',
         save_output=True)
     psf_list = hsc_psf(
         lsbg_coord,
@@ -64,8 +65,8 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         verbose=True,
         archive=hsc_dr,
         save_output=True,
-        use_saved=False,
-        prefix=f'LSBG_{lsbg["Seq"]:04d}_img',
+        use_saved=True,
+        prefix=f'LSBG_{index:04d}_psf',
         output_dir='./PSFs/')
 
     channels_list = list(channels)
@@ -93,7 +94,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
     # This detection (after blurring the original images) finds out what is the central object and its (estimated) size
     obj_cat_ori, segmap, bg_rms = kz.detection.makeCatalog(
         [data],
-        lvl=15,
+        lvl=8,
         method='wavelet',
         convolve=False,
         #conv_radius=2,
@@ -117,7 +118,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
     cen_obj = obj_cat_ori[cen_indx]
     #print(f'# Central object is #{cen_indx}.')
     # Better position for cen_obj
-    x, y, _ = sep.winpos(data.images[0], cen_obj['x'], cen_obj['y'], 6)
+    x, y, _ = sep.winpos(data.images.mean(axis=0), cen_obj['x'], cen_obj['y'], 6)
     ra, dec = data.wcs.wcs_pix2world(x, y, 0)
     cen_obj['x'] = x
     cen_obj['y'] = y
@@ -228,7 +229,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         # If too faint, single component
         new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
-                                                        thresh=0.01,
+                                                        thresh=0.0,
                                                         shifting=False, 
                                                         coadd=coadd, 
                                                         coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
@@ -247,13 +248,13 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         data,
         sources,
         show_ind=None,
-        stretch=2,
+        stretch=1,
         Q=1,
         minimum=-0.3,
         show_mark=True,
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
-    plt.savefig(f'./Figures/{prefix}-{index:04d}.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}-img.png', bbox_inches='tight')
 
 
     # Star fitting!
@@ -267,7 +268,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         last_loss = blend.loss[-1]
         print(f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
 
-        for i, e_rel in enumerate([5e-4, 1e-5, 1e-6]):
+        for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
             if len(blend.loss) > 20: # must have more than 20 iterations
                 recent_loss = np.mean(blend.loss[-10:])
@@ -289,7 +290,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
 
         print("Scarlet ran for {1} iterations to logL = {2}".format(e_rel, len(blend.loss), -blend.loss[-1]))
         end = time.time()
-        print(f'Elapsing time: {end - start} s')
+        print(f'Elapsed time for fitting: {end - start} s')
 
         with open(f"./Models/{prefix}-{index:04d}-trained-model.pkl", "rb") as fp:
             blend = pickle.load(fp)[0]
@@ -298,7 +299,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
         fig = kz.display.display_scarlet_model(
                     blend,
                     minimum=-0.3,
-                    stretch=2,
+                    stretch=1,
                     channels='griz',
                     show_loss=True,
                     show_mask=True,
@@ -306,9 +307,9 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=0.6, prefix='LSBG', index=
                     scale_bar=False)
         plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting.png', bbox_inches='tight')
 
-        return blend, observation
+        return blend
 
     except Exception as e:
         print(e)
-        return blend, observation
+        return blend
     
