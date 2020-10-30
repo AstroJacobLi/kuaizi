@@ -9,6 +9,7 @@ from astropy.table import Table
 from astropy.visualization import (ZScaleInterval,
                                    AsymmetricPercentileInterval)
 from astropy.visualization import make_lupton_rgb
+from astropy.convolution import convolve
 from astropy.stats import sigma_clip, SigmaClip, sigma_clipped_stats
 
 from matplotlib import colors
@@ -704,3 +705,124 @@ def display_scarlet_model(blend, ax=None, show_loss=False, show_mask=False, show
     if ax is None:
         return fig
     return ax
+
+
+def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, colorbar=False,
+                        save_fn=None, show=True, band=None, subplots=None, 
+                        titles=True, pixscale=0.168, psf_fn=None, zpt=27., 
+                        fontsize=20, **kwargs):
+    """
+    Show imfit results: HSC image, scarlet model, Sersic model, and residual. Modified based on `pymfit`.
+    """
+    from pymfit import Sersic
+    from .utils import img_cutout
+    zscale = ZScaleInterval()
+
+    observation = blend.observations[0]
+    src = blend.sources[0]
+
+    hsc_img = observation.images.mean(axis=0)
+    w = blend.frame.wcs
+    scarlet_model = src.get_model().mean(axis=0)
+    hsc_img = img_cutout(hsc_img, w, src.center[1], src.center[0], 
+            size=src.bbox.shape[1:],
+            pixel_unit=True, save=False, img_header=None)
+    hsc_img = hsc_img[0].data
+
+    if subplots is None:
+        subplot_kw = dict(xticks=[], yticks=[])
+        fig, axes = plt.subplots(1, 4, subplot_kw=subplot_kw, **kwargs)
+        fig.subplots_adjust(wspace=0.08)
+    else:
+        fig, axes = subplots
+
+    s = Sersic(mod_params, pixscale=pixscale, zpt=zpt)
+    sersic_model = s.array(scarlet_model.shape)
+
+    if psf_fn is not None:
+        psf = fits.getdata(psf_fn)
+        psf /= psf.sum()
+        sersic_model = convolve(sersic_model, psf)
+
+    res = hsc_img - sersic_model
+
+    vmin, vmax = zscale.get_limits(hsc_img)
+
+    param_labels = {}
+
+    if titles:
+        titles = ['HSC image', 'Scarlet', 'Model', 'Residual']
+    else:
+        titles = ['']*3
+
+
+    for i, data in enumerate([hsc_img, scarlet_model, sersic_model, res]):
+        show = axes[i].imshow(data, vmin=vmin, vmax=vmax, origin='lower',
+                              cmap=cmap, aspect='equal', rasterized=True)
+        axes[i].set_title(titles[i], fontsize=fontsize + 4, y=1.01)
+
+    if mask_fn is not None:
+        mask = fits.getdata(mask_fn)
+        mask = mask.astype(float)
+        mask[mask==0.0] = np.nan
+        axes[0].imshow(mask, origin='lower', alpha=0.4,
+                       vmin=0, vmax=1, cmap='rainbow_r')
+
+    x = 0.05
+    y = 0.93
+    dy = 0.09
+    dx = 0.61
+    fs = fontsize
+    if band is not None:
+        m_tot = r'$m_'+band+' = '+str(round(s.m_tot, 1))+'$'
+    else:
+        m_tot = r'$m = '+str(round(s.m_tot, 1))+'$'
+    r_e = r'$r_\mathrm{eff}='+str(round(s.r_e*pixscale,1))+'^{\prime\prime}$'
+    mu_0 = r'$\mu_0='+str(round(s.mu_0,1))+'$'
+    mu_e = r'$\mu_e='+str(round(s.mu_e,1))+'$'
+    n = r'$n = '+str(round(s.n,2))+'$'
+
+    c = 'b'
+
+    axes[2].text(x, y, m_tot, transform=axes[2].transAxes,
+                 fontsize=fs, color=c)
+    axes[2].text(x, y-dy, mu_0, transform=axes[2].transAxes,
+                 fontsize=fs, color=c)
+    axes[2].text(x, y-2*dy, mu_e, transform=axes[2].transAxes,
+                 fontsize=fs, color=c)
+    axes[2].text(x+dx, y, n, transform=axes[2].transAxes,
+                 fontsize=fs, color=c)
+    axes[2].text(x+dx, y-dy, r_e, transform=axes[2].transAxes,
+                 fontsize=fs, color=c)
+    if band is not None:
+        axes[2].text(0.9, 0.05, band, color='r', transform=axes[2].transAxes,
+                     fontsize=25)
+    if 'reduced_chisq' in list(mod_params.keys()):
+        chisq = r'$\chi^2_\mathrm{dof} = '+\
+                str(round(mod_params['reduced_chisq'],2))+'$'
+        axes[2].text(x+dx, y-2*dy, chisq, transform=axes[2].transAxes,
+                     fontsize=fs, color=c)
+
+    # Put a color bar on the image
+    if colorbar:
+        ax_cbar = inset_axes(axes[3],
+                             width='75%',
+                             height='5%',
+                             loc=1)
+        cbar = plt.colorbar(show, ax=axes[3], cax=ax_cbar,
+                            orientation='horizontal')
+
+        cbar.ax.xaxis.set_tick_params(color='w')
+        cbar.ax.yaxis.set_tick_params(color='w')
+        cbar.outline.set_edgecolor('w')
+        plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'),
+                 color='k', fontsize=18)
+        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'),
+                 color='k', fontsize=18)
+
+    if show:
+        plt.show()
+
+    if save_fn is not None:
+        dpi = kwargs.pop('dpi', 200)
+        fig.savefig(save_fn, bbox_inches='tight', dpi=dpi)
