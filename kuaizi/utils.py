@@ -56,7 +56,6 @@ def set_matplotlib(usetex=True, fontsize=20):
     from matplotlib import rcParams
     plt.rc('text', usetex=usetex)
     plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
-    '''
     rcParams.update({'axes.linewidth': 1.3})
     rcParams.update({'xtick.direction': 'in'})
     rcParams.update({'ytick.direction': 'in'})
@@ -75,7 +74,6 @@ def set_matplotlib(usetex=True, fontsize=20):
     rcParams.update({'ytick.minor.size': 3.0})
     rcParams.update({'ytick.minor.width': 1.0})
     rcParams.update({'axes.titlepad': '10.0'})
-    '''
     rcParams.update({'font.size': fontsize})
 
 

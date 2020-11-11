@@ -11,6 +11,7 @@ from . import utils
 from . import display
 from . import measure
 from . import detection
+from .utils import set_env, set_matplotlib
 
 # Version
 from pkg_resources import get_distribution, DistributionNotFound
