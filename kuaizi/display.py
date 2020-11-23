@@ -586,6 +586,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
 
     # Observation
     observation = blend.observations[0]
+    loss = blend.loss
 
     # Sometimes we only want to show a few sources
     if show_ind is not None:
@@ -656,6 +657,9 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
                 color = 'yellow'
             if hasattr(src, "center"):
                 y, x = src.center
+                if zoomin_size is not None:
+                    y = y - y_cen + size
+                    x = x - x_cen + size
                 ax[0].text(x, y, k, color=color)
                 ax[0].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
                 ax[1].text(x, y, k, color=color)
@@ -708,7 +712,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
 
 
     if show_loss:
-        ax[3].plot(-np.array(blend.loss))
+        ax[3].plot(-np.array(loss))
         ax[3].set_xlabel('Iteration')
         ax[3].set_ylabel('log-Likelihood')
         ax[3].set_title("log-Likelihood")
