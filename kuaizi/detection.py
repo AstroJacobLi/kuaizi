@@ -171,12 +171,11 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
     iw = Sw.image
 
     if high_freq_lvl != 0:
-        #w[:, :4, :, :] = 0 # remove low frequency features
         w[:, (high_freq_lvl):, :, :] = 0 # remove low frequency features
+        # w: from high to low
 
     if low_freq_lvl != 0:
-        #w[:, :4, :, :] = 0 # remove low frequency features
-        w[:, :(low_freq_lvl), :, :] = 0 # remove low frequency features
+        w[:, :(low_freq_lvl), :, :] = 0 # remove high frequency features
 
     high_freq_image = Starlet(coefficients=w).image[0] # image with high-frequency features highlighted
 
