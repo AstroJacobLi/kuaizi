@@ -542,7 +542,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         # If too faint, single component
         new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
-                                                        thresh=0.005,
+                                                        thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
                                                         coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
@@ -550,7 +550,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         K=2,  # Two components
-                                                        thresh=0.005,
+                                                        thresh=0.01,
                                                         shifting=False,
                                                         coadd=coadd, 
                                                         coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
@@ -648,7 +648,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         near_cen_flag = [(segmap_conv == cen_indx_conv + 1)[int(src.center[1]), int(src.center[0])] for src in np.array(blend.sources)[sed_ind]]
         sed_ind = sed_ind[(~point_flag) & near_cen_flag] # & dist_flag]
         if not 0 in sed_ind:
-            np.array(list(set(sed_ind).union({0})))  # the central source must be included.
+            sed_ind = np.array(list(set(sed_ind).union({0})))  # the central source must be included.
         print(f'Components {sed_ind} are considered as the target galaxy.')
         with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
             pickle.dump([blend, {'e_rel': e_rel}, sed_ind], fp)
@@ -910,7 +910,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
         # If too faint, single component
         new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
-                                                        thresh=0.005,
+                                                        thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
                                                         coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
@@ -918,7 +918,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         K=2,  # Two components
-                                                        thresh=0.005,
+                                                        thresh=0.01,
                                                         shifting=False,
                                                         coadd=coadd, 
                                                         coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
