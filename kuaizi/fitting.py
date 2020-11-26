@@ -270,7 +270,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
-            if len(blend.loss) > 20: # must have more than 20 iterations
+            if len(blend.loss) > 50: # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
                 min_loss = np.min(blend.loss[:-10])
                 if recent_loss < min_loss:
@@ -582,7 +582,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         show_mark=True,
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
-    plt.savefig(f'./Figures/{prefix}-{index:04d}-img.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}-img-less.png', bbox_inches='tight')
     
     # Star fitting!
     start = time.time()
@@ -597,31 +597,31 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                 show_mask=True,
                 show_mark=True,
                 scale_bar=False)
-    plt.savefig(f'./Figures/{prefix}-{index:04d}-init.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}-init-less.png', bbox_inches='tight')
 
     try:
         blend.fit(150, 1e-4)
-        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-            pickle.dump([blend, {'e_rel': 1e-4}], fp)
+        with open(f'./Models/{prefix}-{index:04d}-trained-model-less.pkl', 'wb') as fp:
+            pickle.dump([blend, {'e_rel': 1e-4, 'loss': blend.loss[-1]}], fp)
             fp.close()
         last_loss = blend.loss[-1]
         print(f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
-            if len(blend.loss) > 20: # must have more than 20 iterations
+            if len(blend.loss) > 50: # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
                 min_loss = np.min(blend.loss[:-10])
                 if recent_loss < min_loss:
                     print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-                    with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-                        pickle.dump([blend, {'e_rel': e_rel}], fp)
+                    with open(f'./Models/{prefix}-{index:04d}-trained-model-less.pkl', 'wb') as fp:
+                        pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                         fp.close()
                 elif abs((recent_loss - min_loss) / min_loss) < 0.02:
                     if recent_loss < last_loss: # better than the saved model
                         print(f'I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-                            pickle.dump([blend, {'e_rel': e_rel}], fp)
+                        with open(f'./Models/{prefix}-{index:04d}-trained-model-less.pkl', 'wb') as fp:
+                            pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                             fp.close()
                         break
                 else:
@@ -636,22 +636,25 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         #     fp.close()
 
         # Find out what compose a galaxy
-        seds = np.array([np.copy(src.parameters[0]) for src in blend.sources])
-        corr = np.corrcoef(seds)
-        sed_ind = np.argsort(corr[0, :])[::-1] # np.where(corr[0, :] > 0.99)[0]#
-        # dist = np.array([
-        #     np.linalg.norm(src.center - blend.sources[0].center) * HSC_pixel_scale
-        #     for src in np.array(blend.sources)[sed_ind]
-        # ])
-        # dist_flag = (dist < 3 * np.sqrt(cen_obj['a'] * cen_obj['b']) * HSC_pixel_scale)
-        point_flag = np.array([isinstance(src, scarlet.source.PointSource) for src in np.array(blend.sources)[sed_ind]])
-        near_cen_flag = [(segmap_conv == cen_indx_conv + 1)[int(src.center[1]), int(src.center[0])] for src in np.array(blend.sources)[sed_ind]]
-        sed_ind = sed_ind[(~point_flag) & near_cen_flag] # & dist_flag]
-        if not 0 in sed_ind:
-            sed_ind = np.array(list(set(sed_ind).union({0})))  # the central source must be included.
+        if len(blend.sources) > 1:
+            seds = np.array([np.copy(src.parameters[0]) for src in blend.sources])
+            corr = np.corrcoef(seds)
+            sed_ind = np.argsort(corr[0, :])[::-1] # np.where(corr[0, :] > 0.99)[0]#
+            # dist = np.array([
+            #     np.linalg.norm(src.center - blend.sources[0].center) * HSC_pixel_scale
+            #     for src in np.array(blend.sources)[sed_ind]
+            # ])
+            # dist_flag = (dist < 3 * np.sqrt(cen_obj['a'] * cen_obj['b']) * HSC_pixel_scale)
+            point_flag = np.array([isinstance(src, scarlet.source.PointSource) for src in np.array(blend.sources)[sed_ind]])
+            near_cen_flag = [(segmap_conv == cen_indx_conv + 1)[int(src.center[1]), int(src.center[0])] for src in np.array(blend.sources)[sed_ind]]
+            sed_ind = sed_ind[(~point_flag) & near_cen_flag] # & dist_flag]
+            if not 0 in sed_ind:
+                sed_ind = np.array(list(set(sed_ind).union({0})))  # the central source must be included.
+        else:
+            sed_ind = np.array([0])
         print(f'Components {sed_ind} are considered as the target galaxy.')
-        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-            pickle.dump([blend, {'e_rel': e_rel}, sed_ind], fp)
+        with open(f'./Models/{prefix}-{index:04d}-trained-model-less.pkl', 'wb') as fp:
+            pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}, sed_ind], fp)
             fp.close()
 
         fig = kz.display.display_scarlet_model(
@@ -663,7 +666,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                     show_mask=True,
                     show_mark=False,
                     scale_bar=False)
-        plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting.png', bbox_inches='tight')
+        plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting-less.png', bbox_inches='tight')
         fig = kz.display.display_scarlet_model(
                     blend,
                     show_ind=sed_ind,
@@ -675,7 +678,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                     show_mask=True,
                     show_mark=False,
                     scale_bar=False)
-        plt.savefig(f'./Figures/{prefix}-{index:04d}-zoomin.png', bbox_inches='tight')
+        plt.savefig(f'./Figures/{prefix}-{index:04d}-zoomin-less.png', bbox_inches='tight')
         return blend
     except Exception as e:
         print(e)
@@ -950,7 +953,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
         show_mark=True,
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
-    plt.savefig(f'./Figures/{prefix}-{index:04d}-img.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}-img-sing.png', bbox_inches='tight')
     
     # Star fitting!
     start = time.time()
@@ -965,31 +968,31 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                 show_mask=True,
                 show_mark=True,
                 scale_bar=False)
-    plt.savefig(f'./Figures/{prefix}-{index:04d}-init.png', bbox_inches='tight')
+    plt.savefig(f'./Figures/{prefix}-{index:04d}-init-sing.png', bbox_inches='tight')
 
     try:
         blend.fit(150, 1e-4)
-        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-            pickle.dump([blend, {'e_rel': 1e-4}], fp)
+        with open(f'./Models/{prefix}-{index:04d}-trained-model-sing.pkl', 'wb') as fp:
+            pickle.dump([blend, {'e_rel': 1e-4, 'loss': blend.loss[-1]}], fp)
             fp.close()
         last_loss = blend.loss[-1]
         print(f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
-            if len(blend.loss) > 20: # must have more than 20 iterations
+            if len(blend.loss) > 50: # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
                 min_loss = np.min(blend.loss[:-10])
                 if recent_loss < min_loss:
                     print(f'Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-                    with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-                        pickle.dump([blend, {'e_rel': e_rel}], fp)
+                    with open(f'./Models/{prefix}-{index:04d}-trained-model-sing.pkl', 'wb') as fp:
+                        pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                         fp.close()
                 elif abs((recent_loss - min_loss) / min_loss) < 0.02:
                     if recent_loss < last_loss: # better than the saved model
                         print(f'I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-                            pickle.dump([blend, {'e_rel': e_rel}], fp)
+                        with open(f'./Models/{prefix}-{index:04d}-trained-model-sing.pkl', 'wb') as fp:
+                            pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                             fp.close()
                         break
                 else:
@@ -1021,8 +1024,8 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
         # with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
         #     pickle.dump([blend, {'e_rel': e_rel}, sed_ind], fp)
         #     fp.close()
-        with open(f'./Models/{prefix}-{index:04d}-trained-model.pkl', 'wb') as fp:
-            pickle.dump([blend, {'e_rel': e_rel}], fp)
+        with open(f'./Models/{prefix}-{index:04d}-trained-model-sing.pkl', 'wb') as fp:
+            pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
             fp.close()
 
         fig = kz.display.display_scarlet_model(
@@ -1034,7 +1037,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                     show_mask=True,
                     show_mark=False,
                     scale_bar=False)
-        plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting.png', bbox_inches='tight')
+        plt.savefig(f'./Figures/{prefix}-{index:04d}-fitting-sing.png', bbox_inches='tight')
         fig = kz.display.display_scarlet_model(
                     blend,
                     zoomin_size=50, 
@@ -1045,7 +1048,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                     show_mask=True,
                     show_mark=False,
                     scale_bar=False)
-        plt.savefig(f'./Figures/{prefix}-{index:04d}-zoomin.png', bbox_inches='tight')
+        plt.savefig(f'./Figures/{prefix}-{index:04d}-zoomin-sing.png', bbox_inches='tight')
         return blend
     except Exception as e:
         print(e)
