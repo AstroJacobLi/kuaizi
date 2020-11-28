@@ -159,7 +159,7 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     psf_obj: PSF object, defined by tractor.psf.PixelizedPSF() class.
     pixel_scale: float, pixel scale in unit arcsec/pixel.
     shape_method: if 'manual', then adopt manually measured shape. If 'decals', then adopt DECaLS shape from tractor files.
-    kfold: int, iteration time.
+    kfold: int, how many iterations you want to run.
     first_num: how many objects will be fit in the first run.
     fig_name: string, if not None, it will save the tractor subtracted image to the given path.
 
