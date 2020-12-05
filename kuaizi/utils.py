@@ -64,6 +64,7 @@ def set_matplotlib(style='JL', usetex=True, fontsize=15):
 
     if style == 'SM':
         rcParams.update({
+            "figure.figsize": "6, 6",
             "axes.linewidth": 0.6,
             "xtick.major.width": 0.5,
             "xtick.minor.width": 0.3,

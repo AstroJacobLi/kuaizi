@@ -665,7 +665,7 @@ savefig.bbox:       tight       # {tight, standard}
 #savefig.pad_inches:   0.1      # Padding to be used when bbox is set to 'tight'
 #savefig.directory:    ~        # default directory in savefig dialog box,
                                 # leave empty to always use current working directory
-savefig.transparent: True       # setting that controls whether figures are saved with a
+savefig.transparent: False       # setting that controls whether figures are saved with a
                                 # transparent background by default
 savefig.orientation: landscape  # Orientation of saved figure
 
