@@ -46,36 +46,53 @@ def set_env(project='HSC', name='HSC_LSBG'):
     return data_dir
 
 
-def set_matplotlib(usetex=True, fontsize=20):
+def set_matplotlib(style='JL', usetex=True, fontsize=15):
     '''
     Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
+
+    Parameters:
+        style (str): options are "JL", "SM" (supermongo-like).
     '''
 
     import matplotlib.pyplot as plt
     from matplotlib.colorbar import Colorbar
     from matplotlib import rcParams
-    plt.rc('text', usetex=usetex)
-    plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
-    rcParams.update({'axes.linewidth': 1.3})
-    rcParams.update({'xtick.direction': 'in'})
-    rcParams.update({'ytick.direction': 'in'})
-    rcParams.update({'xtick.minor.visible': 'True'})
-    rcParams.update({'ytick.minor.visible': 'True'})
-    rcParams.update({'xtick.major.pad': '7.0'})
-    rcParams.update({'xtick.major.size': 5.0})
-    rcParams.update({'xtick.major.width': '1.5'})
-    rcParams.update({'xtick.minor.pad': '7.0'})
-    rcParams.update({'xtick.minor.size': 3.0})
-    rcParams.update({'xtick.minor.width': 1.0})
-    rcParams.update({'ytick.major.pad': '7.0'})
-    rcParams.update({'ytick.major.size': 5.0})
-    rcParams.update({'ytick.major.width': '1.5'})
-    rcParams.update({'ytick.minor.pad': '7.0'})
-    rcParams.update({'ytick.minor.size': 3.0})
-    rcParams.update({'ytick.minor.width': 1.0})
-    rcParams.update({'axes.titlepad': '10.0'})
-    rcParams.update({'font.size': fontsize})
+    # Use JL as a template
+    plt.style.use('/Users/jiaxuanli/Research/Packages/kuaizi/kuaizi/mplstyle/JL.mplstyle')
+    rcParams.update({'font.size': fontsize, 
+                     'text.usetex': usetex})
 
+    if style == 'SM':
+        rcParams.update({
+            "axes.linewidth": 0.6,
+            "xtick.major.width": 0.5,
+            "xtick.minor.width": 0.3,
+            "ytick.major.width": 0.5,
+            "ytick.minor.width": 0.3,
+            "font.family": "monospace",
+            "font.stretch": "semi-expanded",
+            "scatter.edgecolors": "black",  # The default edge colors for scatter plots.
+            "mathtext.bf": "monospace:bold",
+            "mathtext.cal": "monospace:bold",
+            "mathtext.it": "monospace:italic",
+            "mathtext.rm": "monospace",
+            "mathtext.sf": "monospace",
+            "mathtext.tt": "monospace",
+            "mathtext.fallback": "cm",
+            "mathtext.default": 'it'
+        })
+
+        if usetex is True:
+            rcParams.update({
+                "text.latex.preamble": '\n'.join([
+                '\\usepackage{amsmath}'
+                '\\usepackage[T1]{fontenc}', 
+                '\\usepackage{courier}',
+                '\\usepackage[variablett]{lmodern}',
+                '\\usepackage[LGRgreek]{mathastext}',
+                '\\renewcommand{\\rmdefault}{\\ttdefault}'
+                ])
+            })
 
 def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
     deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 
