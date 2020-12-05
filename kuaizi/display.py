@@ -704,6 +704,11 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         else:
             ax.text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
 
+    from matplotlib.ticker import NullFormatter, MaxNLocator
+    for axx in ax:
+        axx.yaxis.set_major_locator(MaxNLocator(5))
+        axx.xaxis.set_major_locator(MaxNLocator(5))
+
     if ax is None:
         return fig
     return ax
@@ -881,6 +886,11 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         yrange = ylim[1] - ylim[0]
         ax[3].set_aspect((xrange / yrange), adjustable='box')
         ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+
+    from matplotlib.ticker import NullFormatter, MaxNLocator
+    for axx in ax:
+        axx.yaxis.set_major_locator(MaxNLocator(5))
+        axx.xaxis.set_major_locator(MaxNLocator(5))
 
     if ax is None:
         return fig

@@ -42,7 +42,6 @@ def set_env(project='HSC', name='HSC_LSBG'):
         raise Exception("Can not recognize this dataset!")
         
     os.chdir(data_dir)
-    
     return data_dir
 
 
@@ -58,7 +57,7 @@ def set_matplotlib(style='JL', usetex=True, fontsize=15):
     from matplotlib.colorbar import Colorbar
     from matplotlib import rcParams
     # Use JL as a template
-    plt.style.use('/Users/jiaxuanli/Research/Packages/kuaizi/kuaizi/mplstyle/JL.mplstyle')
+    plt.style.use('./mplstyle/JL.mplstyle')
     rcParams.update({'font.size': fontsize, 
                      'text.usetex': usetex})
 

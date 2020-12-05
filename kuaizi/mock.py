@@ -17,6 +17,10 @@ from astropy.units import Quantity
 from astropy.coordinates import SkyCoord
 
 from .display import display_single, SEG_CMAP, ORG
+from . import HSC_pixel_scale, HSC_zeropoint
+
+hsc_sky = {'g': 0.010, 'r': 0.014, 'i': 0.016, 'z': 0.022, 'y': 0.046} # muJy/arcsec^2
+# https://github.com/dr-guangtou/hsc_massive/blob/master/notebooks/selection/s18a_wide_sky_objects.ipynb
 
 # Class to provide compact input of instrument data and metadata
 class Data:
@@ -33,6 +37,7 @@ class Data:
         self.wcs = wcs
         self.psfs = psfs
         self.info = info
+        #self.pixel_scale = np.sqrt(np.abs(np.linalg.det(self.wcs.pixel_scale_matrix))) * 3600
 
     @property
     def images(self):
@@ -78,9 +83,12 @@ class MockGal:
     info
     
     """
-    def __init__(self, bkg, model):
+    def __init__(self, bkg):
         self.bkg = bkg
-        self.model = model
+        self.channels = bkg.channels
+
+    def __del__(self): 
+        print('Mock Galaxy deleted.') 
     
     @property
     def bkg(self):
@@ -88,6 +96,7 @@ class MockGal:
     @bkg.setter
     def bkg(self, bkg):
         self._bkg = bkg
+        self.channels = bkg.channels
 
     @property
     def model(self):
@@ -107,6 +116,224 @@ class MockGal:
     def mock(self):
         return self._mock
 
+
+    def gen_mock_lsbg(self, galaxy, zp=HSC_zeropoint, pixel_scale=HSC_pixel_scale):
+        '''
+        Generate mock low surface brightness galaxies. 
+        '''
+        import galsim
+        from galsim import degrees, Angle
+        from galsim.interpolant import Lanczos
+        from galsim import Image, InterpolatedImage
+        from galsim.fitswcs import AstropyWCS
+        big_fft_params = galsim.GSParams(maximum_fft_size=20000)
+
+        if not isinstance(galaxy['comp'], list):
+            galaxy['comp'] = list(galaxy['comp'])
+
+        if len(galaxy['comp']) == 1:
+            galaxy['flux_fraction'] = [1.0]
+
+        # print some information
+        print('# Total components: ', len(galaxy['comp']))
+        print('    - Types: ', [c['model'].__name__ for c in galaxy['comp']])
+        print('    - Flux fraction: ', galaxy['flux_fraction'])
+
+        # Empty canvas
+        field = np.empty_like(self.bkg.images[0])
+        model_images = np.empty_like(self.bkg.images)
+
+        # Calculate flux based on i-band mag and SED
+        i_band_loc = np.argwhere(np.array(list(self.channels)) == 'i')[0][0] # location of i-band in `channels`
+        seds = np.array([c['sed'] for c in galaxy['comp']])
+        seds /= seds[:, i_band_loc][:, np.newaxis] # Normalize SED w.r.t i-band
+        tot_sed = np.sum(
+            seds * np.array(galaxy['flux_fraction'])[:, np.newaxis], axis=0)
+        for i, band in enumerate(self.channels):
+            galaxy[f'{band}mag'] = -2.5 * np.log10(tot_sed[i]) + galaxy['imag']
+
+        print(f'    - Magnitude in {self.channels}: ', [round(galaxy[f'{band}mag'], 1) for band in self.channels])
+
+        #### Star generating mock galaxy in each band #### 
+        for i, band in enumerate(self.channels): # griz
+            # Random number seed
+            rng = galsim.BaseDeviate(23333) # This random number seed should be fixed across bands!!!
+            
+            # Sky background level
+            sky_SB = 29 # mag/arcsec^2
+            sky_level = 10**((zp - sky_SB) / 2.5) # counts / arcsec^2
+
+            # Define the PSF
+            interp_psf = InterpolatedImage(Image(self.bkg.psfs[i] / self.bkg.psfs[i].sum(), dtype=float),
+                                           scale=pixel_scale,
+                                           x_interpolant=Lanczos(3))
+
+            # Total flux for all components
+            mag = galaxy[f'{band}mag']
+            tot_flux = 10**((zp - galaxy[f'{band}mag']) / 2.5)
+            
+            gal_list = []
+            for k, comp in enumerate(galaxy['comp']):
+                gal = comp['model'](**comp['model_params'], gsparams=big_fft_params) # Define the galaxy
+                
+                gal_shape = galsim.Shear(**comp['shear_params']) # Shear the galaxy
+                gal = gal.shear(gal_shape)
+
+                if 'shift' in comp.keys(): # Shift the center
+                    gal = gal.shift(comp['shift'])
+
+                if 'n_knots' in comp.keys() and comp['n_knots'] > 0:  # Add star forming knots
+                    if not 'knots_frac' in comp.keys():
+                        raise KeyError('`knots_frac` must be provided to generate star forming knots!')
+                    else:
+                        if 'knots_sed' in comp.keys():
+                            knot_frac = comp['knots_frac'] * (comp['knots_sed'] / np.sum(comp['knots_sed']))[i]
+                        else:
+                            knot_frac = comp['knots_frac'] * 0.25 # flat SED
+                        knots = galsim.RandomKnots(comp['n_knots'], 
+                                                   half_light_radius=comp['model_params']['half_light_radius'], 
+                                                   flux=knot_frac, 
+                                                   rng=rng)
+                    gal = galsim.Add([gal, knots])
+                
+                gal = gal.withFlux(tot_flux * galaxy['flux_fraction'][k]) # Get Flux
+                gal_list.append(gal)
+
+            # Adding all components together
+            gal = galsim.Add(gal_list)
+            
+            # Convolve galaxy with PSF
+            final = galsim.Convolve([gal, interp_psf])
+            
+            # Draw the image with a particular pixel scale.
+            gal_image = final.drawImage(scale=pixel_scale, nx=field.shape[1], ny=field.shape[0])
+            
+            # Add noise
+            sky_sigma = hsc_sky[f'{band}'] / 3.631 * 10**((zp - 22.5) / 2.5) * pixel_scale**2
+            noise = galsim.GaussianNoise(rng, sigma=sky_sigma)
+            gal_image.addNoise(noise)
+            
+            # Generate mock image
+            model_img = gal_image.array
+            model_images[i] = model_img
+        
+
+        ## Generate variance map
+        mock_model = Data(model_images, None, None, self.channels, None, self.bkg.psfs, info=galaxy)
+        
+        ## Finished!!! 
+        self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`! 
+        self.set_mock() # mock has other things, including modified variances. 
+
+
+    def display(self, zoomin_size=None, ax=None, stretch=1, Q=0.1, minimum=-0.2, pixel_scale=0.168, scale_bar=True,
+        scale_bar_length=20.0, scale_bar_fontsize=15, scale_bar_y_offset=0.3, scale_bar_color='w',
+        scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+        '''
+        Display the background image, mock galaxy model, and mock image.
+        Inherited from `kuaizi.display.display_scarlet_model`.
+
+        Arguments:
+            zoomin_size (float, in arcsec): the size of shown image, if not showing in full size
+            ax (matplotlib.axes object): input axes object
+            show_loss (bool): whether displaying the loss curve
+            show_mask (bool): whether displaying the mask encoded in `data.weights'
+            show_ind (list): if not None, only objects with these indices are shown in the figure
+            stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
+            channels (str): names of the bands in `observation`
+            show_mark (bool): whether plot the indices of sources in the figure
+            pixel_scale (float): default is 0.168 arcsec/pixel
+
+        Returns: 
+            ax: if input `ax` is provided
+            fig: if no `ax` is provided as input
+
+        '''
+        import scarlet
+        
+        if ax is None:
+            fig = plt.figure(figsize=(18, 6))
+            ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+        
+        if zoomin_size is not None:
+            x_cen = self.bkg.images.shape[2] // 2
+            y_cen = self.bkg.images.shape[1] // 2
+            size = int(zoomin_size / pixel_scale / 2) # half-size
+            # Image
+            images = self.bkg.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+            # Model
+            model = self.model.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        else:
+            # Image
+            images = self.bkg.images
+            # Model
+            model = self.model.images
+
+        # Create RGB images
+        norm = scarlet.display.AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+
+        img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+        ax[0].imshow(img_rgb)
+        ax[0].set_title("Background")
+        img_rgb = scarlet.display.img_to_rgb(images + model, norm=norm)
+        ax[1].imshow(img_rgb)
+        ax[1].set_title("Mock Image")
+        img_rgb = scarlet.display.img_to_rgb(model, norm=norm)
+        ax[2].imshow(img_rgb)
+        ax[2].set_title("Model")
+
+
+        (img_size_x, img_size_y) = images[0].shape
+        if scale_bar:
+            if scale_bar_loc == 'left':
+                scale_bar_x_0 = int(img_size_x * 0.04)
+                scale_bar_x_1 = int(img_size_x * 0.04 +
+                                    (scale_bar_length / pixel_scale))
+            else:
+                scale_bar_x_0 = int(img_size_x * 0.95 -
+                                    (scale_bar_length / pixel_scale))
+                scale_bar_x_1 = int(img_size_x * 0.95)
+            scale_bar_y = int(img_size_y * 0.10)
+            scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+            scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+            
+            if scale_bar_length < 60:
+                scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+            elif 60 < scale_bar_length < 3600:
+                scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+            else: 
+                scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+            scale_bar_text_size = scale_bar_fontsize
+
+            ax[0].plot(
+                [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+                linewidth=3,
+                c=scale_bar_color,
+                alpha=1.0)
+            ax[0].text(
+                scale_bar_text_x,
+                scale_bar_text_y,
+                scale_bar_text,
+                fontsize=scale_bar_text_size,
+                horizontalalignment='center',
+                color=scale_bar_color)
+
+        if add_text is not None:
+            text_x_0 = int(img_size_x * 0.08)
+            text_y_0 = int(img_size_y * text_y_offset)
+            if usetex:
+                ax[0].text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+            else:
+                ax[0].text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
+        
+        from matplotlib.ticker import NullFormatter, MaxNLocator
+        for axx in ax:
+            axx.yaxis.set_major_locator(MaxNLocator(5))
+            axx.xaxis.set_major_locator(MaxNLocator(5))
+        
+        if ax is None:
+            return fig
+        return ax
 
 
     #### IO related ####
@@ -130,9 +357,7 @@ class MockGal:
             return gal
         else:
             raise ValueError('Other formats are not supported yet. Please use `pkl`.')
-        return
-
-    
+            return
 
 
 # Determine the coefficient when converting image flux to `sigma map` for HSC
@@ -197,9 +422,3 @@ def mock_variance(mock_img, images, variance):
     mock_sigma = sigma_map + A[:, np.newaxis, np.newaxis] * mock_img
     mock_variance = mock_sigma ** 2
     return mock_variance
-
-def gen_mock_lsbg():
-    '''
-    Generate mock low surface brightness galaxies. 
-
-    '''
