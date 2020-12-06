@@ -117,7 +117,7 @@ class MockGal:
         return self._mock
 
 
-    def gen_mock_lsbg(self, galaxy, zp=HSC_zeropoint, pixel_scale=HSC_pixel_scale):
+    def gen_mock_lsbg(self, galaxy, zp=HSC_zeropoint, pixel_scale=HSC_pixel_scale, verbose=True):
         '''
         Generate mock low surface brightness galaxies. 
         '''
@@ -135,13 +135,20 @@ class MockGal:
             galaxy['flux_fraction'] = [1.0]
 
         # print some information
-        print('# Total components: ', len(galaxy['comp']))
-        print('    - Types: ', [c['model'].__name__ for c in galaxy['comp']])
-        print('    - Flux fraction: ', galaxy['flux_fraction'])
+        if verbose:
+            print('# Generating mock galaxy.')
+            print('    - Total components: ', len(galaxy['comp']))
+            print('    - Types: ', [c['model'].__name__ for c in galaxy['comp']])
+            print('    - Flux fraction: ', galaxy['flux_fraction'])
 
         # Empty canvas
         field = np.empty_like(self.bkg.images[0])
         model_images = np.empty_like(self.bkg.images)
+
+        # Calculate RA, DEC of the mock galaxy
+        y_cen = self.bkg.images.shape[2] / 2
+        x_cen = self.bkg.images.shape[1] / 2
+        galaxy['ra'], galaxy['dec'] = self.bkg.wcs.wcs_pix2world(x_cen, y_cen, 0)
 
         # Calculate flux based on i-band mag and SED
         i_band_loc = np.argwhere(np.array(list(self.channels)) == 'i')[0][0] # location of i-band in `channels`
@@ -151,8 +158,9 @@ class MockGal:
             seds * np.array(galaxy['flux_fraction'])[:, np.newaxis], axis=0)
         for i, band in enumerate(self.channels):
             galaxy[f'{band}mag'] = -2.5 * np.log10(tot_sed[i]) + galaxy['imag']
-
-        print(f'    - Magnitude in {self.channels}: ', [round(galaxy[f'{band}mag'], 1) for band in self.channels])
+        
+        if verbose:
+            print(f'    - Magnitude in {self.channels}: ', [round(galaxy[f'{band}mag'], 1) for band in self.channels])
 
         #### Star generating mock galaxy in each band #### 
         for i, band in enumerate(self.channels): # griz
@@ -169,7 +177,6 @@ class MockGal:
                                            x_interpolant=Lanczos(3))
 
             # Total flux for all components
-            mag = galaxy[f'{band}mag']
             tot_flux = 10**((zp - galaxy[f'{band}mag']) / 2.5)
             
             gal_list = []

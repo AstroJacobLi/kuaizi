@@ -132,7 +132,8 @@ def cen_peak(component):
 
 def R_frac(components, observation=None, frac=0.5, weight_order=0):
     """
-    Determine the radius R (in pixels), the flux within R has a fraction of `frac` over the total flux.
+    Determine the radius R (in pixels, along semi-major axis), 
+    the flux within R has a fraction of `frac` over the total flux.
 
     Parameters
     ----------

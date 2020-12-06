@@ -228,7 +228,7 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
             e.set_edgecolor('red')
             ax[0].add_artist(e)
         ax[1] = display_single(segmap, scale='linear', cmap=SEG_CMAP , ax=ax[1], scale_bar_length=scale_bar_length)
-        plt.savefig('./extract_obj.png', bbox_inches='tight')
+        # plt.savefig('./extract_obj.png', bbox_inches='tight')
         return objects, segmap, fig
     return objects, segmap
 
