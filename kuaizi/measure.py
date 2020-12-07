@@ -5,6 +5,8 @@ import sep
 import os
 import copy
 
+# Measurements should be done before convolving any real PSF! So, don't render the scene!
+
 def max_pixel(component):
     """Determine pixel with maximum value
 

@@ -56,8 +56,10 @@ def set_matplotlib(style='JL', usetex=True, fontsize=15):
     import matplotlib.pyplot as plt
     from matplotlib.colorbar import Colorbar
     from matplotlib import rcParams
+    import kuaizi
     # Use JL as a template
-    plt.style.use('./mplstyle/JL.mplstyle')
+    pkg_path = kuaizi.__path__[0]
+    plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
     rcParams.update({'font.size': fontsize, 
                      'text.usetex': usetex})
 
