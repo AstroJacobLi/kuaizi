@@ -95,7 +95,7 @@ def winpos(components, observation=None):
         components = [components]
 
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
-    blend = scarlet.Blend(components, observation) # Render model image
+    blend = scarlet.Blend(components, observation) 
     model = blend.get_model()
 
     R50 = R_frac(components, observation, frac=0.5)
@@ -157,7 +157,7 @@ def R_frac(components, observation=None, frac=0.5, weight_order=0):
     q = s['q']
     theta = np.deg2rad(s['pa'])
 
-    blend = scarlet.Blend(components, observation) # Render model image
+    blend = scarlet.Blend(components, observation)
     model = blend.get_model()
     total_flux = model.sum(axis=(1, 2))
 
@@ -201,7 +201,7 @@ def kron_radius(components, observation=None, weight_order=0):
     q = s['q']
     theta = np.deg2rad(s['pa'])
 
-    blend = scarlet.Blend(components, observation) # Render model image
+    blend = scarlet.Blend(components, observation)
     model = blend.get_model()
 
     depth = model.shape[0]
@@ -329,7 +329,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     else:
         _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     
-    blend = scarlet.Blend(components, observation) # Render model image
+    blend = scarlet.Blend(components, observation)
     model = blend.get_model()
 
     depth = model.shape[0]
@@ -344,7 +344,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0):
+def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0, out_prefix=None):
     measure_dict = {}
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
@@ -363,7 +363,7 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
 
     measure_dict['flux'] = flux(components)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
-    measure_dict['R50'] = R_frac(components, observation, frac=frac) * pixel_scale
+    measure_dict['R50'] = R_frac(components, observation, frac=frac) * pixel_scale # arcsec
     _shape = shape(components, observation, weight_order=weight_order)
     measure_dict['q'] = _shape['q']
     measure_dict['pa'] = _shape['pa']
@@ -371,9 +371,13 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
                                                 zeropoint=zeropoint, pixel_scale=pixel_scale)
     measure_dict['SB0_winpos'] = mu_central(components, observation, method='winpos', 
                                                 zeropoint=zeropoint, pixel_scale=pixel_scale)
+    measure_dict_new = {}
+    if out_prefix is not None:
+        for key in measure_dict.keys():
+            measure_dict_new['_'.join([out_prefix, key])] = measure_dict[key]
+        measure_dict = measure_dict_new
 
     return measure_dict
-
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0, 
                    zeropoint=27.0, pixel_scale=0.168, save_fig=True):
