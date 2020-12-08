@@ -232,13 +232,13 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
                                                         thresh=0.0,
                                                         shifting=False, 
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     else:
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         K=2,  # Two components
                                                         thresh=0.01,
-                                                        shifting=False)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        shifting=False) 
     sources.append(new_source)
 
     # Visualize our data and mask and source
@@ -431,7 +431,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                                                    mask=msk_star,
                                                    lvl=2.5,
                                                    method='wavelet',
-                                                   high_freq_lvl=3,
+                                                   high_freq_lvl=2,
                                                    wavelet_lvl=4,
                                                    match_gaia=False,
                                                    show_fig=True,
@@ -545,7 +545,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                                                         thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     else:
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
@@ -553,7 +553,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
                                                         thresh=0.01,
                                                         shifting=False,
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     sources.append(new_source)
 
     for k, src in enumerate(obj_cat_cpct): # compact sources
@@ -802,7 +802,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                                                    mask=msk_star,
                                                    lvl=2.5,
                                                    method='wavelet',
-                                                   high_freq_lvl=3,
+                                                   high_freq_lvl=2,
                                                    wavelet_lvl=4,
                                                    match_gaia=False,
                                                    show_fig=True,
@@ -916,7 +916,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                                                         thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff)
     else:
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
@@ -924,7 +924,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
                                                         thresh=0.01,
                                                         shifting=False,
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     sources.append(new_source)
 
     # for k, src in enumerate(obj_cat_cpct): # compact sources
@@ -1054,14 +1054,14 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
         print(e)
         return blend
 
-def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.5, compact_away_factor=0.4, zp=HSC_zeropoint):
+def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0, compact_away_factor=0.4, zp=HSC_zeropoint):
     clear_output()
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
 
     from kuaizi.mock import MockGal
-    mgal = MockGal.read(f'./Models/MockGalModel/MockLSBG-{index:04d}.pkl')
-    
+    mgal = MockGal.read(f'./Models/MockGalModel/{prefix}-{index:04d}.pkl')
+    print(f'Opening ./Models/MockGalModel/{prefix}-{index:04d}.pkl')
     channels = mgal.channels
     channels_list = list(channels)
     filters = channels_list
@@ -1087,6 +1087,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
+        mask=msk_star,
         lvl=1.2,
         method='vanilla',
         convolve=False,
@@ -1116,6 +1117,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
     # This detection (after blurring the original images) finds out what is the central object and its (estimated) size
     obj_cat, segmap_conv, bg_rms = kz.detection.makeCatalog(
         [data],
+        mask=msk_star,
         lvl=8,
         method='wavelet',
         convolve=False,
@@ -1142,7 +1144,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
                                                    mask=msk_star,
                                                    lvl=2.5,
                                                    method='wavelet',
-                                                   high_freq_lvl=3,
+                                                   high_freq_lvl=2,
                                                    wavelet_lvl=4,
                                                    match_gaia=False,
                                                    show_fig=True,
@@ -1249,36 +1251,23 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
 
     sources = []
     src = obj_cat_ori[cen_indx]
-    if zp - 2.5 * np.log10(src['flux']) > 26.5:
+    if zp - 2.5 * np.log10(src['flux']) > 26.:
         # If too faint, single component
         new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     else:
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         K=2,  # Two components
-                                                        thresh=0.01,
+                                                        thresh=0.001,
                                                         shifting=False,
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     sources.append(new_source)
-
-    # for k, src in enumerate(obj_cat_cpct): # compact sources
-    #     if src['fwhm_custom'] < 5:  # src['b'] / src['a'] > 0.9 and
-    #         new_source = scarlet.source.PointSource(
-    #             model_frame, (src['ra'], src['dec']), observation)
-    #     else:
-    #         try:
-    #             new_source = scarlet.source.SingleExtendedSource(
-    #                 model_frame, (src['ra'], src['dec']), observation, coadd=coadd, coadd_rms=bg_cutoff)
-    #         except:
-    #             new_source = scarlet.source.SingleExtendedSource(
-    #                 model_frame, (src['ra'], src['dec']), observation)
-    #     sources.append(new_source)
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
@@ -1372,10 +1361,14 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
         print(e)
         return blend
 
-def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_factor=3.5, compact_away_factor=0.4, zp=HSC_zeropoint):
+def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0, compact_away_factor=0.4, zp=HSC_zeropoint):
     clear_output()
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
+
+    from kuaizi.mock import MockGal
+    mgal = MockGal.read(f'./Models/MockGalModel/{prefix}-{index:04d}.pkl')
+    print(f'Opening ./Models/MockGalModel/{prefix}-{index:04d}.pkl')
     channels = mgal.channels
     channels_list = list(channels)
     filters = channels_list
@@ -1401,6 +1394,7 @@ def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_facto
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
+        mask=msk_star,
         lvl=1.2,
         method='vanilla',
         convolve=False,
@@ -1430,6 +1424,7 @@ def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_facto
     # This detection (after blurring the original images) finds out what is the central object and its (estimated) size
     obj_cat, segmap_conv, bg_rms = kz.detection.makeCatalog(
         [data],
+        mask=msk_star,
         lvl=8,
         method='wavelet',
         convolve=False,
@@ -1456,7 +1451,7 @@ def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_facto
                                                    mask=msk_star,
                                                    lvl=2.5,
                                                    method='wavelet',
-                                                   high_freq_lvl=3,
+                                                   high_freq_lvl=2,
                                                    wavelet_lvl=4,
                                                    match_gaia=False,
                                                    show_fig=True,
@@ -1563,22 +1558,22 @@ def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_facto
 
     sources = []
     src = obj_cat_ori[cen_indx]
-    if HSC_zeropoint - 2.5 * np.log10(src['flux']) > 26.5:
+    if HSC_zeropoint - 2.5 * np.log10(src['flux']) > 26.:
         # If too faint, single component
         new_source = scarlet.source.SingleExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         thresh=0.001,
                                                         shifting=False, 
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     else:
         new_source = scarlet.source.MultiExtendedSource(model_frame, (src['ra'], src['dec']),
                                                         observation,
                                                         K=2,  # Two components
-                                                        thresh=0.01,
+                                                        thresh=0.001,
                                                         shifting=False,
                                                         coadd=coadd, 
-                                                        coadd_rms=bg_cutoff)   # I don't use the manual `coadd` and `bg_cutoff` here.
+                                                        coadd_rms=bg_cutoff) 
     sources.append(new_source)
 
     for k, src in enumerate(obj_cat_cpct): # compact sources
@@ -1662,17 +1657,26 @@ def fitting_less_comp_mockgal(mgal, index=0, prefix='MockLSBG', large_away_facto
 
         # Find out what compose a galaxy
         if len(blend.sources) > 1:
-            seds = np.array([np.copy(src.parameters[0]) for src in blend.sources])
-            corr = np.corrcoef(seds)
-            sed_ind = np.argsort(corr[0, :])[::-1] # np.where(corr[0, :] > 0.99)[0]#
-            # dist = np.array([
-            #     np.linalg.norm(src.center - blend.sources[0].center) * HSC_pixel_scale
-            #     for src in np.array(blend.sources)[sed_ind]
-            # ])
-            # dist_flag = (dist < 3 * np.sqrt(cen_obj['a'] * cen_obj['b']) * HSC_pixel_scale)
-            point_flag = np.array([isinstance(src, scarlet.source.PointSource) for src in np.array(blend.sources)[sed_ind]])
-            near_cen_flag = [(segmap_conv == cen_indx_conv + 1)[int(src.center[1]), int(src.center[0])] for src in np.array(blend.sources)[sed_ind]]
-            sed_ind = sed_ind[(~point_flag) & near_cen_flag] # & dist_flag]
+            mag_mat = np.array([-2.5 * np.log10(kz.measure.flux(src)) + 27 for src in sources])
+            color_mat = (- mag_mat + mag_mat[:, 0][:, np.newaxis])[:, 1:] # g - r, g - i, g - z
+            color_dist = np.linalg.norm(color_mat - color_mat[0], axis=1) / np.linalg.norm(color_mat[0])
+            sed_ind = np.where(color_dist < 0.2)[0] # np.argsort(color_dist)[:]  # 
+            dist = np.array([
+                np.linalg.norm(src.center - blend.sources[0].center) * HSC_pixel_scale
+                for src in np.array(blend.sources)[sed_ind]
+            ])
+            dist_flag = (dist < 3 * np.sqrt(cen_obj['a'] * cen_obj['b']) * HSC_pixel_scale)
+            point_flag = np.array([
+                isinstance(src, scarlet.source.PointSource)
+                for src in np.array(blend.sources)[sed_ind]
+            ])
+            near_cen_flag = [
+                (segmap_conv == cen_indx_conv +
+                1)[int(src.center[1]), int(src.center[0])]
+                for src in np.array(blend.sources)[sed_ind]
+            ]
+            sed_ind = sed_ind[(~point_flag) & near_cen_flag]
+            
             if not 0 in sed_ind:
                 sed_ind = np.array(list(set(sed_ind).union({0})))  # the central source must be included.
         else:
