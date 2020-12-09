@@ -118,7 +118,9 @@ class MockGal:
         # Set the `mock` object
         mock_img = self.model.images + self.bkg.images
         mock_var = mock_variance(self.model.images, self.bkg.images, self.bkg.variances)
-        self._mock = Data(mock_img, mock_var, self.bkg.masks, self.bkg.channels, self.bkg.wcs, self.bkg.psfs)
+        self._mock = Data(images=mock_img, variances=mock_var, 
+                          masks=self.bkg.masks, channels=self.channels, 
+                          wcs=self.bkg.wcs, weights=None, psfs=self.bkg.psfs)
     
     @property
     def mock(self):
@@ -210,7 +212,6 @@ class MockGal:
                                                    flux=knot_frac, 
                                                    rng=rng)
                     gal = galsim.Add([gal, knots])
-                    print(gal.flux)
                 
                 gal = gal.withFlux(tot_flux * galaxy['flux_fraction'][k]) # Get Flux
                 gal_list.append(gal)
@@ -235,7 +236,9 @@ class MockGal:
         
 
         ## Generate variance map
-        mock_model = Data(model_images, None, None, self.channels, None, self.bkg.psfs, info=galaxy)
+        mock_model = Data(images=model_images, variances=None, 
+                          masks=None, channels=self.channels, 
+                          wcs=None, weights=None, psfs=self.bkg.psfs, info=galaxy)
         
         ## Finished!!! 
         self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`! 
