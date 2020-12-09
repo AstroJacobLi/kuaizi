@@ -8,3 +8,4 @@ astroquery>=0.4.1
 palettable
 tqdm
 PyYAML
+galsim
