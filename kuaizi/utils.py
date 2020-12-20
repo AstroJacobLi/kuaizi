@@ -45,7 +45,7 @@ def set_env(project='HSC', name='HSC_LSBG'):
     return data_dir
 
 
-def set_matplotlib(style='JL', usetex=True, fontsize=15):
+def set_matplotlib(style='JL', usetex=True, fontsize=13):
     '''
     Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
 
@@ -95,6 +95,15 @@ def set_matplotlib(style='JL', usetex=True, fontsize=15):
                 '\\renewcommand{\\rmdefault}{\\ttdefault}'
                 ])
             })
+
+
+    if style == 'nature':
+        rcParams.update({
+            "font.family": "sans-serif",
+            "scatter.edgecolors": "black",  # The default edge colors for scatter plots.
+            "mathtext.fontset": "stixsans"
+        })
+
 
 def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
     deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 

@@ -9,36 +9,7 @@ from astropy import units as u
 from astropy.units import Quantity
 from astropy.coordinates import SkyCoord
 
-# Class to provide compact input of instrument data and metadata
-class Data:
-    """ This is a rudimentary class to set the necessary information for a scarlet run.
-
-    While it is possible for scarlet to run without wcs or psf,
-    it is strongly recommended not to, which is why these entry are not optional.
-    """
-    def __init__(self, images, weights, wcs, psfs, channels):
-        self._images = images
-        self._weights = weights
-        self.wcs = wcs
-        self.psfs = psfs
-        self.channels = channels
-
-    @property
-    def images(self):
-        return self._images
-
-    @images.setter
-    def images(self, images):
-        self._images = images
-
-    @property
-    def weights(self):
-        return self._weights
-
-    @weights.setter
-    def weights(self, weights):
-        self._weights = weights
-
+from kuaizi.mock import Data
 
 def interpolate(data_lr, data_hr):
     ''' Interpolate low resolution data to high resolution

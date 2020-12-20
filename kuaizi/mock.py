@@ -29,7 +29,7 @@ class Data:
     While it is possible for scarlet to run without wcs or psf,
     it is strongly recommended not to, which is why these entry are not optional.
     """
-    def __init__(self, images, variances, masks, channels, wcs, weights=None, psfs=None, info=None):
+    def __init__(self, images, variances=None, masks=None, channels=None, wcs=None, weights=None, psfs=None, info=None):
         self.images = images
         self.variances = variances
         self.weights = weights # weights and variances don't necessarily need to be the same.
@@ -380,8 +380,6 @@ class MockGal:
 
 
 
-"""
-
 # Determine the coefficient when converting image flux to `sigma map` for HSC
 def calc_sigma_coeff(images, variance_map):
     '''
@@ -514,3 +512,4 @@ def mock_variance(mock_img, images, variance):
     mock_sigma = sigma_map + A[:, np.newaxis, np.newaxis] * mock_img
     mock_variance = mock_sigma ** 2
     return mock_variance
+"""

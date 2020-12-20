@@ -6,22 +6,6 @@ __all__ = ["utils"]
 __name__ = 'kuaizi'
 __author__ = ['Jiaxuan Li']
 
-
-from . import utils
-from . import display
-from . import measure
-from . import detection
-from .utils import set_env, set_matplotlib
-
-# Version
-from pkg_resources import get_distribution, DistributionNotFound
-try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
-    # package is not installed
-    pass
-
-
 # Define pixel scale of different surveys, unit = arcsec / pixel
 HSC_pixel_scale = 0.168
 DECaLS_pixel_scale = 0.262
@@ -56,3 +40,17 @@ HSC_binray_mask_dict = {0: 'BAD',
                         14: 'CLIPPED',
                         15: 'SENSOR_EDGE',
                         16: 'INEXACT_PSF'}
+
+from . import utils
+from . import display
+from . import measure
+from . import detection
+from .utils import set_env, set_matplotlib
+
+# Version
+from pkg_resources import get_distribution, DistributionNotFound
+try:
+    __version__ = get_distribution(__name__).version
+except DistributionNotFound:
+    # package is not installed
+    pass
