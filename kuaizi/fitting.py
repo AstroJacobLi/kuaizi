@@ -77,7 +77,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
     filters = channels_list
     weights = 1 / np.array([hdu[3].data for hdu in cutout])
     psf_pad = padding_PSF(psf_list) # Padding PSF cutouts from HSC
-    psfs = scarlet.PSF(np.array(psf_pad))
+    psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights, wcs=w, psfs=psfs, channels=channels)
 
 
@@ -205,7 +205,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
 
     # Construct `scarlet` frames and observation
     from functools import partial
-    model_psf = scarlet.PSF(partial(scarlet.psf.gaussian, sigma=.8), shape=(None, 8, 8))
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(filters))
     model_frame = scarlet.Frame(
         data.images.shape,
         wcs=w, 
@@ -359,7 +359,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
     filters = channels_list
     weights = 1 / np.array([hdu[3].data for hdu in cutout])
     psf_pad = padding_PSF(psf_list) # Padding PSF cutouts from HSC
-    psfs = scarlet.PSF(np.array(psf_pad))
+    psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights, wcs=w, psfs=psfs, channels=channels)
 
 
@@ -518,7 +518,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
 
     # Construct `scarlet` frames and observation
     from functools import partial
-    model_psf = scarlet.PSF(partial(scarlet.psf.gaussian, sigma=.8), shape=(None, 8, 8))
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(filters))
     model_frame = scarlet.Frame(
         data.images.shape,
         wcs=w, 
@@ -740,7 +740,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
     filters = channels_list
     weights = 1 / np.array([hdu[3].data for hdu in cutout])
     psf_pad = padding_PSF(psf_list) # Padding PSF cutouts from HSC
-    psfs = scarlet.PSF(np.array(psf_pad))
+    psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights, wcs=w, psfs=psfs, channels=channels)
 
 
@@ -898,7 +898,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
 
     # Construct `scarlet` frames and observation
     from functools import partial
-    model_psf = scarlet.PSF(partial(scarlet.psf.gaussian, sigma=.8), shape=(None, 8, 8))
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(filters))
     model_frame = scarlet.Frame(
         data.images.shape,
         wcs=w, 
@@ -1081,7 +1081,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
     images = mgal.mock.images
     w = mgal.mock.wcs
     weights = 1 / mgal.mock.variances
-    psfs = scarlet.PSF(np.array(mgal.mock.psfs))
+    psfs = scarlet.ImagePSF(np.array(mgal.mock.psfs))
     data = Data(images=images, weights=weights, wcs=w, psfs=psfs, channels=channels)
 
     _, msk_star = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
@@ -1240,7 +1240,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
 
     # Construct `scarlet` frames and observation
     from functools import partial
-    model_psf = scarlet.PSF(partial(scarlet.psf.gaussian, sigma=.8), shape=(None, 8, 8))
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(filters))
     model_frame = scarlet.Frame(
         data.images.shape,
         wcs=w, 
@@ -1388,7 +1388,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
     images = mgal.mock.images
     w = mgal.mock.wcs
     weights = 1 / mgal.mock.variances
-    psfs = scarlet.PSF(np.array(mgal.mock.psfs))
+    psfs = scarlet.ImagePSF(np.array(mgal.mock.psfs))
     data = Data(images=images, weights=weights, wcs=w, psfs=psfs, channels=channels)
 
     _, msk_star = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
@@ -1548,7 +1548,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
     # Construct `scarlet` frames and observation
     from functools import partial
-    model_psf = scarlet.PSF(partial(scarlet.psf.gaussian, sigma=.8), shape=(None, 8, 8))
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(filters))
     model_frame = scarlet.Frame(
         data.images.shape,
         wcs=w, 

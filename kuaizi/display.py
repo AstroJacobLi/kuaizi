@@ -708,7 +708,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         return fig
     return ax
 
-def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_ind=None, 
+def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_ind=None, add_boxes=True, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
     scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
     scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
@@ -882,6 +882,30 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         ax[3].set_aspect((xrange / yrange), adjustable='box')
         ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
 
+    if add_boxes:
+        from matplotlib.patches import Rectangle
+        for k, src in enumerate(blend.sources):
+            panel = 0
+            box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
+            
+            if zoomin_size is not None:
+                extent = get_extent(src.bbox, [x_cen - size, y_cen - size])
+            else:
+                extent = get_extent(src.bbox)
+            #print(extent)
+            rect = Rectangle(
+                (extent[0], extent[2]),
+                extent[1] - extent[0],
+                extent[3] - extent[2],
+                **box_kwargs
+            )
+            #print(rect)
+            ax[0].add_patch(rect)
+            #ax[1].add_patch(rect)
+            #ax[2].add_patch(rect)
+            # for panel in range(len(ax)):
+            #     ax[panel].add_patch(rect)
+
     from matplotlib.ticker import NullFormatter, MaxNLocator
     for axx in ax:
         axx.yaxis.set_major_locator(MaxNLocator(5))
@@ -891,6 +915,11 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         return fig
     return ax
 
+def get_extent(bbox, new_cen=None):
+    if new_cen is not None:
+        return [bbox.start[-1] - new_cen[0], bbox.stop[-1] - new_cen[0], bbox.start[-2] - new_cen[1], bbox.stop[-2] - new_cen[1]]
+    else:
+        return [bbox.start[-1], bbox.stop[-1], bbox.start[-2], bbox.stop[-2]]
 
 def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, colorbar=False,
                         save_fn=None, show=True, band=None, subplots=None, 

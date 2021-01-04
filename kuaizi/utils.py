@@ -345,7 +345,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
     return None
 
 
-def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
+def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                    size_buffer=1.4, gaia_bright=18.0,
                    factor_b=1.3, factor_f=1.9):
     """Find stars using Gaia and mask them out if necessary. From https://github.com/dr-guangtou/kungpao.
@@ -370,17 +370,21 @@ def gaia_star_mask(img, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         msk_star (numpy 2-D array): the masked pixels are marked by one.
 
     """
-    gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
-                                  mask_a=mask_a, mask_b=mask_b,
-                                  verbose=False, visual=False,
-                                  size_buffer=size_buffer)
-    if gaia_stars is not None:
-        print(f'# {len(gaia_stars)} stars from GAIA are masked!')
+    if gaia_stars is None:
+        gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
+                                    mask_a=mask_a, mask_b=mask_b,
+                                    verbose=False, visual=False,
+                                    size_buffer=size_buffer)
+        if gaia_stars is not None:
+            print(f'# {len(gaia_stars)} stars from GAIA are masked!')
+        else:
+            print('No GAIA stars are masked.')
     else:
-        print('No GAIA stars are masked.')
+        print(f'# {len(gaia_stars)} stars from GAIA are masked!')
+    
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
-
+    
     if gaia_stars is not None:
         gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
         sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],
