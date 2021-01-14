@@ -2059,7 +2059,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                 show_mark=True,
                 scale_bar=False)
     plt.savefig(f'./Figures/{prefix}-{index:04d}-init-wavelet.png', bbox_inches='tight')
-    
+
     try:
         blend.fit(150, 1e-4)
         with open(f'./Models/{prefix}-{index:04d}-trained-model-wavelet.pkl', 'wb') as fp:
@@ -2124,17 +2124,20 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         
         # Generate a VERY AGGRESSIVE mask, named "footprint"
         footprint = np.zeros_like(segmap_highfreq, dtype=bool)
-        footprint[segmap_highfreq != 0] = 1
+        for ind in cpct['index']: # mask ExtendedSources which are modeled
+            footprint[segmap_highfreq == ind + 1] = 1
+
+        footprint[segmap_highfreq == cen_indx_highfreq + 1] = 0
         sed_ind_pix = np.array([item.center for item in np.array(sources)[sed_ind]]) # the y and x of sed_ind objects
             # if any objects in `sed_ind` is in `segmap_highfreq`
         sed_corr_indx = segmap_highfreq[sed_ind_pix[:, 0], sed_ind_pix[:, 1]]
         for ind in sed_corr_indx:
             footprint[segmap_highfreq == ind] = 0
-        footprint[segmap_highfreq == cen_indx_highfreq + 1] = 0
 
 
         footprint2 = np.zeros_like(segmap_big, dtype=bool)
-        footprint2[segmap_big != 0] = 1
+        for ind in big_cat['index']: # mask ExtendedSources which are modeled
+            footprint2[segmap_big == ind + 1] = 1
             # if any objects in `sed_ind` is in `segmap_big`
         sed_corr_indx = segmap_big[sed_ind_pix[:, 0], sed_ind_pix[:, 1]]
         for ind in sed_corr_indx:
@@ -2143,13 +2146,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
 
         footprint = footprint | footprint2
 
-        smooth_radius = 2
+        smooth_radius = 1.5
         gaussian_threshold = 0.02
         mask_conv = np.copy(footprint)
         mask_conv[mask_conv > 0] = 1
         mask_conv = convolve(mask_conv.astype(float), Gaussian2DKernel(smooth_radius))
         footprint = (mask_conv >= gaussian_threshold) 
-
 
         with open(f'./Models/{prefix}-{index:04d}-trained-model-wavelet.pkl', 'wb') as fp:
             pickle.dump([blend, {'e_rel': e_rel, 'loss': blend.loss[-1], 'sed_ind': sed_ind}, footprint], fp)

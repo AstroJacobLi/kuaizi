@@ -286,7 +286,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
     else:
         with suppress_stdout():
             from astroquery.gaia import Gaia
-
+    
             gaia_results = Gaia.query_object_async(
                 coordinate=img_cen_ra_dec,
                 width=img_search_x,
@@ -384,7 +384,7 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
     
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
-    
+
     if gaia_stars is not None:
         gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
         sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],

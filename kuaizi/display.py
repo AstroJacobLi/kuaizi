@@ -708,7 +708,8 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         return fig
     return ax
 
-def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_ind=None, add_boxes=True, 
+def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_gray_mask=True, 
+    show_ind=None, add_boxes=True, 
     stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
     scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
     scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
@@ -791,17 +792,30 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
     vmax = np.max(np.abs(residual_rgb))
 
     # Show the data, model, and residual
-    ax[0].imshow(img_rgb)
-    ax[0].set_title("Data")
-    ax[1].imshow(model_rgb)
-    ax[1].set_title("Model")
-    ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
-    ax[2].set_title("Residual")
-
     if show_mask:
+        ax[0].imshow(img_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
+        ax[0].set_title("Data")
+        ax[1].imshow(model_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
+        ax[1].set_title("Model")
+        ax[2].imshow(residual_rgb * (~np.tile(mask.T, (3, 1, 1))).T, vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].set_title("Residual")
+    elif show_gray_mask:
+        ax[0].imshow(img_rgb)
+        ax[0].set_title("Data")
+        ax[1].imshow(model_rgb)
+        ax[1].set_title("Model")
+        ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].set_title("Residual")
         ax[0].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
         ax[1].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
         ax[2].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+    else:
+        ax[0].imshow(img_rgb)
+        ax[0].set_title("Data")
+        ax[1].imshow(model_rgb)
+        ax[1].set_title("Model")
+        ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].set_title("Residual")
 
     if show_mark:
         for k, src in enumerate(blend.sources):
@@ -885,7 +899,6 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
     if add_boxes:
         from matplotlib.patches import Rectangle
         for k, src in enumerate(blend.sources):
-            panel = 0
             box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
             
             if zoomin_size is not None:
