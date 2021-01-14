@@ -21,7 +21,7 @@ def max_pixel(component):
     )
 
 
-def flux(components):
+def flux(components, observation):
     """Determine flux in every channel
 
     Parameters
@@ -32,9 +32,13 @@ def flux(components):
     tot_flux = 0
     if not isinstance(components, list):
         components = [components]
-    for comp in components:
-        model = comp.get_model()
-        tot_flux += model.sum(axis=(1, 2))
+
+    mask = (observation.weights == 0)
+    blend = scarlet.Blend(components, observation)
+    model = blend.get_model()
+
+    tot_flux = (model * ~mask).sum(axis=(1, 2))
+    
     return tot_flux
 
 def SED(component):
@@ -59,24 +63,16 @@ def centroid(components, observation=None):
     -------
         y, x
     """
-    
-    if isinstance(components, scarlet.Component):
-        # Single component
-        model = components.get_model()
-        indices = np.indices(model.shape)
-        centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
-        return centroid + components.bbox.origin
-    else:
-        if observation is None:
-            raise ValueError('Please provide `Observation`.')
-            return
-        else:
-            # Multiple components
-            blend = scarlet.Blend(components, observation)
-            model = blend.get_model()
-            indices = np.indices(model.shape)
-            centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
-            return centroid
+    if not isinstance(components, list):
+        components = [components]
+
+    blend = scarlet.Blend(components, observation)
+    model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
+    indices = np.indices(model.shape)
+    centroid = np.array([np.sum(ind * model) for ind in indices]) / model.sum()
+    return centroid
     
 def winpos(components, observation=None):
     """Calculate more accurate object centroids using ‘windowed’ algorithm.
@@ -95,8 +91,11 @@ def winpos(components, observation=None):
         components = [components]
 
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
-    blend = scarlet.Blend(components, observation) 
+    
+    blend = scarlet.Blend(components, observation)
     model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
 
     R50 = R_frac(components, observation, frac=0.5)
     sig = 2. / 2.35 * R50  # R50 is half-light radius for each channel
@@ -159,6 +158,9 @@ def R_frac(components, observation=None, frac=0.5, weight_order=0):
 
     blend = scarlet.Blend(components, observation)
     model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
+
     total_flux = model.sum(axis=(1, 2))
 
     depth = model.shape[0]
@@ -195,7 +197,7 @@ def kron_radius(components, observation=None, weight_order=0):
     """
     if not isinstance(components, list):
         components = [components]
-
+    
     _, y_cen, x_cen = centroid(components, observation=observation) # Determine the centroid, averaged through channels
     s = shape(components, observation, show_fig=False, weight_order=weight_order)
     q = s['q']
@@ -203,6 +205,8 @@ def kron_radius(components, observation=None, weight_order=0):
 
     blend = scarlet.Blend(components, observation)
     model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
 
     depth = model.shape[0]
     kron = []
@@ -237,17 +241,13 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
     weight_order: W(x, y) = I(x, y) ** (weight_order)
 
     """
-    if isinstance(components, scarlet.Component):
-        # Single component
-        model = components.get_model()
-    else:
-        if observation is None:
-            raise ValueError('Please provide `Observation`.')
-            return
-        else:
-            # Multiple components
-            blend = scarlet.Blend(components, observation)
-            model = blend.get_model()
+    if not isinstance(components, list):
+        components = [components]
+
+    blend = scarlet.Blend(components, observation)
+    model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
 
     if weight_order < 0:
         raise ValueError('Weight order cannot be negative, this will introduce infinity!') 
@@ -331,6 +331,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     
     blend = scarlet.Blend(components, observation)
     model = blend.get_model()
+    mask = (observation.weights == 0)
+    model = model * ~mask
 
     depth = model.shape[0]
     mu_cen = []
@@ -361,7 +363,7 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
     measure_dict['ra_cen_winpos'] = float(ra)
     measure_dict['dec_cen_winpos'] = float(dec)
 
-    measure_dict['flux'] = flux(components)
+    measure_dict['flux'] = flux(components, observation)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
     measure_dict['R50'] = R_frac(components, observation, frac=frac) * pixel_scale # arcsec
     _shape = shape(components, observation, weight_order=weight_order)
