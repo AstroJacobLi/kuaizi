@@ -1,5 +1,6 @@
 from __future__ import division, print_function
-import os, sys
+import os
+import sys
 import sep
 import copy
 import numpy as np
@@ -19,20 +20,25 @@ from astropy.coordinates import SkyCoord
 from .display import display_single, SEG_CMAP, ORG
 from . import HSC_pixel_scale, HSC_zeropoint
 
-hsc_sky = {'g': 0.010, 'r': 0.014, 'i': 0.016, 'z': 0.022, 'y': 0.046} # muJy/arcsec^2
+hsc_sky = {'g': 0.010, 'r': 0.014, 'i': 0.016,
+           'z': 0.022, 'y': 0.046}  # muJy/arcsec^2
 # https://github.com/dr-guangtou/hsc_massive/blob/master/notebooks/selection/s18a_wide_sky_objects.ipynb
 
 # Class to provide compact input of instrument data and metadata
+
+
 class Data:
     """ This is a rudimentary class to set the necessary information for a scarlet run.
 
     While it is possible for scarlet to run without wcs or psf,
     it is strongly recommended not to, which is why these entry are not optional.
     """
+
     def __init__(self, images, variances=None, masks=None, channels=None, wcs=None, weights=None, psfs=None, info=None):
         self.images = images
         self.variances = variances
-        self.weights = weights # weights and variances don't necessarily need to be the same.
+        # weights and variances don't necessarily need to be the same.
+        self.weights = weights
         self.masks = masks
         self.channels = channels
         self.wcs = wcs
@@ -43,6 +49,7 @@ class Data:
     @property
     def images(self):
         return self._images
+
     @images.setter
     def images(self, images):
         self._images = images
@@ -50,6 +57,7 @@ class Data:
     @property
     def variances(self):
         return self._variances
+
     @variances.setter
     def variances(self, variances):
         self._variances = variances
@@ -57,6 +65,7 @@ class Data:
     @property
     def weights(self):
         return self._weights
+
     @weights.setter
     def weights(self, weights):
         self._weights = weights
@@ -64,13 +73,15 @@ class Data:
     @property
     def masks(self):
         return self._masks
+
     @masks.setter
     def masks(self, masks):
         self._masks = masks
-    
+
     @property
     def info(self):
         return self._info
+
     @info.setter
     def info(self, info):
         self._info = info
@@ -79,7 +90,7 @@ class Data:
 class MockGal:
     """
     This is a class for mock galaxy.
-    
+
     bkg_image
     bkg_variance
     bkg_mask
@@ -89,18 +100,20 @@ class MockGal:
     variance
 
     info
-    
+
     """
+
     def __init__(self, bkg):
         self.bkg = bkg
         self.channels = bkg.channels
 
-    def __del__(self): 
-        print('Mock Galaxy deleted.') 
-    
+    def __del__(self):
+        print('Mock Galaxy deleted.')
+
     @property
     def bkg(self):
         return self._bkg
+
     @bkg.setter
     def bkg(self, bkg):
         self._bkg = bkg
@@ -109,23 +122,23 @@ class MockGal:
     @property
     def model(self):
         return self._model
+
     @model.setter
     def model(self, model):
         self._model = model
 
-
     def set_mock(self):
         # Set the `mock` object
         mock_img = self.model.images + self.bkg.images
-        mock_var = mock_variance(self.model.images, self.bkg.images, self.bkg.variances)
-        self._mock = Data(images=mock_img, variances=mock_var, 
-                          masks=self.bkg.masks, channels=self.channels, 
+        mock_var = mock_variance(
+            self.model.images, self.bkg.images, self.bkg.variances)
+        self._mock = Data(images=mock_img, variances=mock_var,
+                          masks=self.bkg.masks, channels=self.channels,
                           wcs=self.bkg.wcs, weights=None, psfs=self.bkg.psfs)
-    
+
     @property
     def mock(self):
         return self._mock
-
 
     def gen_mock_lsbg(self, galaxy, zp=HSC_zeropoint, pixel_scale=HSC_pixel_scale, verbose=True):
         '''
@@ -148,7 +161,8 @@ class MockGal:
         if verbose:
             print('# Generating mock galaxy.')
             print('    - Total components: ', len(galaxy['comp']))
-            print('    - Types: ', [c['model'].__name__ for c in galaxy['comp']])
+            print('    - Types: ',
+                  [c['model'].__name__ for c in galaxy['comp']])
             print('    - Flux fraction: ', galaxy['flux_fraction'])
 
         # Empty canvas
@@ -158,28 +172,33 @@ class MockGal:
         # Calculate RA, DEC of the mock galaxy
         y_cen = self.bkg.images.shape[2] / 2
         x_cen = self.bkg.images.shape[1] / 2
-        galaxy['ra'], galaxy['dec'] = self.bkg.wcs.wcs_pix2world(x_cen, y_cen, 0)
+        galaxy['ra'], galaxy['dec'] = self.bkg.wcs.wcs_pix2world(
+            x_cen, y_cen, 0)
 
         # Calculate flux based on i-band mag and SED
-        i_band_loc = np.argwhere(np.array(list(self.channels)) == 'i')[0][0] # location of i-band in `channels`
+        i_band_loc = np.argwhere(np.array(list(self.channels)) == 'i')[
+            0][0]  # location of i-band in `channels`
         seds = np.array([c['sed'] for c in galaxy['comp']])
-        seds /= seds[:, i_band_loc][:, np.newaxis] # Normalize SED w.r.t i-band
+        # Normalize SED w.r.t i-band
+        seds /= seds[:, i_band_loc][:, np.newaxis]
         tot_sed = np.sum(
             seds * np.array(galaxy['flux_fraction'])[:, np.newaxis], axis=0)
         for i, band in enumerate(self.channels):
             galaxy[f'{band}mag'] = -2.5 * np.log10(tot_sed[i]) + galaxy['imag']
-        
-        if verbose:
-            print(f'    - Magnitude in {self.channels}: ', [round(galaxy[f'{band}mag'], 1) for band in self.channels])
 
-        #### Star generating mock galaxy in each band #### 
-        for i, band in enumerate(self.channels): # griz
+        if verbose:
+            print(f'    - Magnitude in {self.channels}: ',
+                  [round(galaxy[f'{band}mag'], 1) for band in self.channels])
+
+        #### Star generating mock galaxy in each band ####
+        for i, band in enumerate(self.channels):  # griz
             # Random number seed
-            rng = galsim.BaseDeviate(23333) # This random number seed should be fixed across bands!!!
-            
+            # This random number seed should be fixed across bands!!!
+            rng = galsim.BaseDeviate(23333)
+
             # Sky background level
-            sky_SB = 29 # mag/arcsec^2
-            sky_level = 10**((zp - sky_SB) / 2.5) # counts / arcsec^2
+            sky_SB = 29  # mag/arcsec^2
+            sky_level = 10**((zp - sky_SB) / 2.5)  # counts / arcsec^2
 
             # Define the PSF
             interp_psf = InterpolatedImage(Image(self.bkg.psfs[i] / self.bkg.psfs[i].sum(), dtype=float),
@@ -188,66 +207,74 @@ class MockGal:
 
             # Total flux for all components
             tot_flux = 10**((zp - galaxy[f'{band}mag']) / 2.5)
-            
+
             gal_list = []
             for k, comp in enumerate(galaxy['comp']):
-                gal = comp['model'](**comp['model_params'], gsparams=big_fft_params) # Define the galaxy
-                
-                gal_shape = galsim.Shear(**comp['shear_params']) # Shear the galaxy
+                # Define the galaxy
+                gal = comp['model'](**comp['model_params'],
+                                    gsparams=big_fft_params)
+
+                gal_shape = galsim.Shear(
+                    **comp['shear_params'])  # Shear the galaxy
                 gal = gal.shear(gal_shape)
 
-                if 'shift' in comp.keys(): # Shift the center
+                if 'shift' in comp.keys():  # Shift the center
                     gal = gal.shift(comp['shift'])
 
-                if 'n_knots' in comp.keys() and comp['n_knots'] > 0:  # Add star forming knots
+                # Add star forming knots
+                if 'n_knots' in comp.keys() and comp['n_knots'] > 0:
                     if not 'knots_frac' in comp.keys():
-                        raise KeyError('`knots_frac` must be provided to generate star forming knots!')
+                        raise KeyError(
+                            '`knots_frac` must be provided to generate star forming knots!')
                     else:
                         if 'knots_sed' in comp.keys():
-                            knot_frac = comp['knots_frac'] * (comp['knots_sed'] / np.sum(comp['knots_sed']))[i]
+                            knot_frac = comp['knots_frac'] * \
+                                (comp['knots_sed'] /
+                                 np.sum(comp['knots_sed']))[i]
                         else:
-                            knot_frac = comp['knots_frac'] * 0.25 # flat SED
-                        knots = galsim.RandomKnots(comp['n_knots'], 
-                                                   half_light_radius=comp['model_params']['half_light_radius'], 
-                                                   flux=knot_frac, 
+                            knot_frac = comp['knots_frac'] * 0.25  # flat SED
+                        knots = galsim.RandomKnots(comp['n_knots'],
+                                                   half_light_radius=comp['model_params']['half_light_radius'],
+                                                   flux=knot_frac,
                                                    rng=rng)
                     gal = galsim.Add([gal, knots])
-                
-                gal = gal.withFlux(tot_flux * galaxy['flux_fraction'][k]) # Get Flux
+
+                gal = gal.withFlux(
+                    tot_flux * galaxy['flux_fraction'][k])  # Get Flux
                 gal_list.append(gal)
 
             # Adding all components together
             gal = galsim.Add(gal_list)
-            
+
             # Convolve galaxy with PSF
             final = galsim.Convolve([gal, interp_psf])
-            
+
             # Draw the image with a particular pixel scale.
-            gal_image = final.drawImage(scale=pixel_scale, nx=field.shape[1], ny=field.shape[0])
-            
+            gal_image = final.drawImage(
+                scale=pixel_scale, nx=field.shape[1], ny=field.shape[0])
+
             # Add noise
-            sky_sigma = hsc_sky[f'{band}'] / 3.631 * 10**((zp - 22.5) / 2.5) * pixel_scale**2
+            sky_sigma = hsc_sky[f'{band}'] / 3.631 * \
+                10**((zp - 22.5) / 2.5) * pixel_scale**2
             noise = galsim.GaussianNoise(rng, sigma=sky_sigma)
             gal_image.addNoise(noise)
-            
+
             # Generate mock image
             model_img = gal_image.array
             model_images[i] = model_img
-        
 
-        ## Generate variance map
-        mock_model = Data(images=model_images, variances=None, 
-                          masks=None, channels=self.channels, 
+        # Generate variance map
+        mock_model = Data(images=model_images, variances=None,
+                          masks=None, channels=self.channels,
                           wcs=None, weights=None, psfs=self.bkg.psfs, info=galaxy)
-        
-        ## Finished!!! 
-        self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`! 
-        self.set_mock() # mock has other things, including modified variances. 
 
+        # Finished!!!
+        self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`!
+        self.set_mock()  # mock has other things, including modified variances.
 
     def display(self, zoomin_size=None, ax=None, stretch=1, Q=0.1, minimum=-0.2, pixel_scale=0.168, scale_bar=True,
-        scale_bar_length=20.0, scale_bar_fontsize=15, scale_bar_y_offset=0.3, scale_bar_color='w',
-        scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+                scale_bar_length=20.0, scale_bar_fontsize=15, scale_bar_y_offset=0.3, scale_bar_color='w',
+                scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
         '''
         Display the background image, mock galaxy model, and mock image.
         Inherited from `kuaizi.display.display_scarlet_model`.
@@ -269,19 +296,21 @@ class MockGal:
 
         '''
         import scarlet
-        
+
         if ax is None:
             fig = plt.figure(figsize=(18, 6))
             ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
-        
+
         if zoomin_size is not None:
             x_cen = self.bkg.images.shape[2] // 2
             y_cen = self.bkg.images.shape[1] // 2
-            size = int(zoomin_size / pixel_scale / 2) # half-size
+            size = int(zoomin_size / pixel_scale / 2)  # half-size
             # Image
-            images = self.bkg.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+            images = self.bkg.images[:, y_cen - size:y_cen +
+                                     size + 1, x_cen - size:x_cen + size + 1]
             # Model
-            model = self.model.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+            model = self.model.images[:, y_cen - size:y_cen +
+                                      size + 1, x_cen - size:x_cen + size + 1]
         else:
             # Image
             images = self.bkg.images
@@ -289,7 +318,8 @@ class MockGal:
             model = self.model.images
 
         # Create RGB images
-        norm = scarlet.display.AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+        norm = scarlet.display.AsinhMapping(
+            minimum=minimum, stretch=stretch, Q=Q)
 
         img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
         ax[0].imshow(img_rgb)
@@ -300,7 +330,6 @@ class MockGal:
         img_rgb = scarlet.display.img_to_rgb(model, norm=norm)
         ax[2].imshow(img_rgb)
         ax[2].set_title("Model")
-
 
         (img_size_x, img_size_y) = images[0].shape
         if scale_bar:
@@ -315,12 +344,12 @@ class MockGal:
             scale_bar_y = int(img_size_y * 0.10)
             scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
             scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
-            
+
             if scale_bar_length < 60:
                 scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
             elif 60 < scale_bar_length < 3600:
                 scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
-            else: 
+            else:
                 scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
             scale_bar_text_size = scale_bar_fontsize
 
@@ -341,21 +370,23 @@ class MockGal:
             text_x_0 = int(img_size_x * 0.08)
             text_y_0 = int(img_size_y * text_y_offset)
             if usetex:
-                ax[0].text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                ax[0].text(
+                    text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
             else:
-                ax[0].text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
-        
+                ax[0].text(text_x_0, text_y_0, add_text,
+                           fontsize=text_fontsize, color=text_color)
+
         from matplotlib.ticker import NullFormatter, MaxNLocator
         for axx in ax:
             axx.yaxis.set_major_locator(MaxNLocator(5))
             axx.xaxis.set_major_locator(MaxNLocator(5))
-        
+
         if ax is None:
             return fig
         return ax
 
-
     #### IO related ####
+
     def write(self, filename, format='pkl', overwrite=False):
         if format == 'pkl':
             if overwrite is False and os.path.isfile(filename):
@@ -365,7 +396,8 @@ class MockGal:
                     pickle.dump(self, fp)
                     fp.close()
         else:
-            raise ValueError('Other formats are not supported yet. Please use `pkl`.')
+            raise ValueError(
+                'Other formats are not supported yet. Please use `pkl`.')
 
     @classmethod
     def read(cls, filename, format='pkl'):
@@ -375,9 +407,9 @@ class MockGal:
                 fp.close()
             return gal
         else:
-            raise ValueError('Other formats are not supported yet. Please use `pkl`.')
+            raise ValueError(
+                'Other formats are not supported yet. Please use `pkl`.')
             return
-
 
 
 # Determine the coefficient when converting image flux to `sigma map` for HSC
@@ -385,7 +417,7 @@ def calc_sigma_coeff(images, variance_map):
     '''
     This function empirically calculate the coefficient used to convert `image flux` to `sigma map`.
     This only works for single band now. 
-    
+
     `sigma map = coeff * sqrt(image_flux)`, where `sigma map = sqrt(variance map)`. 
 
     Parameters:
@@ -399,19 +431,22 @@ def calc_sigma_coeff(images, variance_map):
     from kuaizi.utils import extract_obj
     from astropy.convolution import convolve, Gaussian2DKernel
 
-    if len(images.shape) == 2: # single band
+    if len(images.shape) == 2:  # single band
         images = images[np.newaxis, :, :]
         variance_map = variance_map[np.newaxis, :, :]
 
     sigma_map = np.sqrt(variance_map)
     # Generate a mask, which only includes bright objects
-    obj_cat, segmap = extract_obj(images.mean(axis=0), b=32, f=2, sigma=3, show_fig=False, verbose=False)
+    obj_cat, segmap = extract_obj(images.mean(
+        axis=0), b=32, f=2, sigma=3, show_fig=False, verbose=False)
     mask = segmap > 0
     mask = convolve(mask, Gaussian2DKernel(2)) > 0.2
-    ### Calculate the loss between `sigma_map` and `images`. `A` is a coefficient.
-    sigma_map -= np.median(sigma_map, axis=(1, 2))[:, np.newaxis, np.newaxis] # remove a background
-    mask = np.repeat(mask[np.newaxis, :, :], len(images), axis=0) # len(images) is the number of bands
-    
+    # Calculate the loss between `sigma_map` and `images`. `A` is a coefficient.
+    sigma_map -= np.median(sigma_map, axis=(1, 2)
+                           )[:, np.newaxis, np.newaxis]  # remove a background
+    # len(images) is the number of bands
+    mask = np.repeat(mask[np.newaxis, :, :], len(images), axis=0)
+
     A_set = np.linspace(0, 0.01, 200)
     loss = np.zeros([len(images), len(A_set)])
     for i, A in enumerate(A_set):
@@ -423,6 +458,7 @@ def calc_sigma_coeff(images, variance_map):
     A_best = A_set[np.argmin(loss, axis=1)]
 
     return A_best
+
 
 def mock_variance(mock_img, images, variance):
     '''

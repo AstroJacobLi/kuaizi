@@ -66,6 +66,7 @@ def random_cmap(ncolors=256, background_color='white'):
 
     return colors.ListedColormap(rgb)
 
+
 # About the Colormaps
 IMG_CMAP = plt.get_cmap('viridis')
 IMG_CMAP.set_bad(color='black')
@@ -79,36 +80,37 @@ BLU = Blues_9.mpl_colormap
 GRN = YlGn_9.mpl_colormap
 PUR = Purples_9.mpl_colormap
 
+
 def _display_single(img,
-                   pixel_scale=0.168,
-                   physical_scale=None,
-                   xsize=8,
-                   ysize=8,
-                   ax=None,
-                   stretch='arcsinh',
-                   scale='zscale',
-                   scale_manual=None,
-                   contrast=0.25,
-                   no_negative=False,
-                   lower_percentile=1.0,
-                   upper_percentile=99.0,
-                   cmap=IMG_CMAP,
-                   scale_bar=True,
-                   scale_bar_length=5.0,
-                   scale_bar_fontsize=20,
-                   scale_bar_y_offset=0.5,
-                   scale_bar_color='w',
-                   scale_bar_loc='left',
-                   color_bar=False,
-                   color_bar_loc=1,
-                   color_bar_width='75%',
-                   color_bar_height='5%',
-                   color_bar_fontsize=18,
-                   color_bar_color='w',
-                   add_text=None,
-                   text_fontsize=30,
-                   text_y_offset=0.80,
-                   text_color='w'):
+                    pixel_scale=0.168,
+                    physical_scale=None,
+                    xsize=8,
+                    ysize=8,
+                    ax=None,
+                    stretch='arcsinh',
+                    scale='zscale',
+                    scale_manual=None,
+                    contrast=0.25,
+                    no_negative=False,
+                    lower_percentile=1.0,
+                    upper_percentile=99.0,
+                    cmap=IMG_CMAP,
+                    scale_bar=True,
+                    scale_bar_length=5.0,
+                    scale_bar_fontsize=20,
+                    scale_bar_y_offset=0.5,
+                    scale_bar_color='w',
+                    scale_bar_loc='left',
+                    color_bar=False,
+                    color_bar_loc=1,
+                    color_bar_width='75%',
+                    color_bar_height='5%',
+                    color_bar_fontsize=18,
+                    color_bar_color='w',
+                    add_text=None,
+                    text_fontsize=30,
+                    text_y_offset=0.80,
+                    text_color='w'):
 
     if ax is None:
         fig = plt.figure(figsize=(xsize, ysize))
@@ -135,7 +137,8 @@ def _display_single(img,
     # Scale option
     if scale.strip() == 'zscale':
         try:
-            zmin, zmax = ZScaleInterval(contrast=contrast).get_limits(img_scale)
+            zmin, zmax = ZScaleInterval(
+                contrast=contrast).get_limits(img_scale)
         except IndexError:
             # TODO: Deal with problematic image
             zmin, zmax = -1.0, 1.0
@@ -149,7 +152,7 @@ def _display_single(img,
             zmin, zmax = -1.0, 1.0
     else:
         zmin, zmax = np.nanmin(img_scale), np.nanmax(img_scale)
-    
+
     if scale_manual is not None:
         assert len(scale_manual) == 2, '# length of manual scale must be two!'
         zmin, zmax = scale_manual
@@ -164,7 +167,7 @@ def _display_single(img,
         axis=u'both',
         which=u'both',
         length=0)
-    #ax1.axis('off')
+    # ax1.axis('off')
 
     # Put scale bar on the image
     (img_size_x, img_size_y) = img.shape
@@ -185,7 +188,8 @@ def _display_single(img,
         scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
         if physical_scale is not None:
             if scale_bar_length > 1000:
-                scale_bar_text = r'$%d\ \mathrm{Mpc}$' % int(scale_bar_length / 1000)
+                scale_bar_text = r'$%d\ \mathrm{Mpc}$' % int(
+                    scale_bar_length / 1000)
             else:
                 scale_bar_text = r'$%d\ \mathrm{kpc}$' % int(scale_bar_length)
         else:
@@ -193,7 +197,7 @@ def _display_single(img,
                 scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
             elif 60 < scale_bar_length < 3600:
                 scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
-            else: 
+            else:
                 scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
         scale_bar_text_size = scale_bar_fontsize
 
@@ -212,7 +216,8 @@ def _display_single(img,
     if add_text is not None:
         text_x_0 = int(img_size_x*0.08)
         text_y_0 = int(img_size_y*text_y_offset)
-        ax1.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        ax1.text(text_x_0, text_y_0,
+                 r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
 
     # Put a color bar on the image
     if color_bar:
@@ -238,6 +243,7 @@ def _display_single(img,
     if ax is None:
         return fig, zmin, zmax
     return ax1, zmin, zmax
+
 
 def display_single(img,
                    pixel_scale=0.168,
@@ -330,7 +336,8 @@ def display_single(img,
     # Scale option
     if scale.strip() == 'zscale':
         try:
-            zmin, zmax = ZScaleInterval(contrast=contrast).get_limits(img_scale)
+            zmin, zmax = ZScaleInterval(
+                contrast=contrast).get_limits(img_scale)
         except IndexError:
             # TODO: Deal with problematic image
             zmin, zmax = -1.0, 1.0
@@ -344,7 +351,7 @@ def display_single(img,
             zmin, zmax = -1.0, 1.0
     else:
         zmin, zmax = np.nanmin(img_scale), np.nanmax(img_scale)
-    
+
     show = ax1.imshow(img_scale, origin='lower', cmap=cmap,
                       vmin=zmin, vmax=zmax)
 
@@ -355,7 +362,7 @@ def display_single(img,
         axis=u'both',
         which=u'both',
         length=0)
-    #ax1.axis('off')
+    # ax1.axis('off')
 
     # Put scale bar on the image
     (img_size_x, img_size_y) = img.shape
@@ -375,7 +382,8 @@ def display_single(img,
         scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
         if physical_scale is not None:
             if scale_bar_length > 1000:
-                scale_bar_text = r'$%d\ \mathrm{Mpc}$' % int(scale_bar_length / 1000)
+                scale_bar_text = r'$%d\ \mathrm{Mpc}$' % int(
+                    scale_bar_length / 1000)
             else:
                 scale_bar_text = r'$%d\ \mathrm{kpc}$' % int(scale_bar_length)
         else:
@@ -383,7 +391,7 @@ def display_single(img,
                 scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
             elif 60 < scale_bar_length < 3600:
                 scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
-            else: 
+            else:
                 scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
         scale_bar_text_size = scale_bar_fontsize
 
@@ -403,9 +411,11 @@ def display_single(img,
         text_x_0 = int(img_size_x*0.08)
         text_y_0 = int(img_size_y*text_y_offset)
         if usetex:
-            ax.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+            ax.text(text_x_0, text_y_0,
+                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
         else:
-            ax.text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
+            ax.text(text_x_0, text_y_0, add_text,
+                    fontsize=text_fontsize, color=text_color)
 
     # Put a color bar on the image
     if color_bar:
@@ -432,6 +442,7 @@ def display_single(img,
         return fig
     return ax1
 
+
 def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
     """
     Display multiple images together using the same strecth and scale.
@@ -447,19 +458,24 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
 
     """
     if ax is None:
-        fig, axes = plt.subplots(1, len(data_array), figsize=(len(data_array) * 4, 8))
+        fig, axes = plt.subplots(
+            1, len(data_array), figsize=(len(data_array) * 4, 8))
     else:
         axes = ax
 
     if text is None:
-        _, zmin, zmax = _display_single(data_array[0], ax=axes[0], scale_bar=scale_bar, **kwargs)
+        _, zmin, zmax = _display_single(
+            data_array[0], ax=axes[0], scale_bar=scale_bar, **kwargs)
     else:
-        _, zmin, zmax = _display_single(data_array[0], add_text=text[0], ax=axes[0], scale_bar=scale_bar, **kwargs)
+        _, zmin, zmax = _display_single(
+            data_array[0], add_text=text[0], ax=axes[0], scale_bar=scale_bar, **kwargs)
     for i in range(1, len(data_array)):
         if text is None:
-            _display_single(data_array[i], ax=axes[i], scale_manual=[zmin, zmax], scale_bar=False, **kwargs)
+            _display_single(data_array[i], ax=axes[i], scale_manual=[
+                            zmin, zmax], scale_bar=False, **kwargs)
         else:
-            _display_single(data_array[i], add_text=text[i], ax=axes[i], scale_manual=[zmin, zmax], scale_bar=False, **kwargs)
+            _display_single(data_array[i], add_text=text[i], ax=axes[i], scale_manual=[
+                            zmin, zmax], scale_bar=False, **kwargs)
 
     plt.subplots_adjust(wspace=0.0)
     if ax is None:
@@ -467,7 +483,8 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
     else:
         return axes
 
-def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle_size=30, 
+
+def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle_size=30,
                  pixel_scale=0.168, color='r', **kwargs):
     """
     Draw circles on an image according to a catalogue. 
@@ -490,7 +507,7 @@ def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle
     """
     if ax is None:
         fig = plt.figure(figsize=(12, 12))
-        fig.subplots_adjust(left=0.0, right=1.0, 
+        fig.subplots_adjust(left=0.0, right=1.0,
                             bottom=0.0, top=1.0,
                             wspace=0.00, hspace=0.00)
         gs = gridspec.GridSpec(2, 2)
@@ -499,27 +516,28 @@ def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle
     else:
         ax1 = ax
 
-    #ax1.yaxis.set_major_formatter(NullFormatter())
-    #ax1.xaxis.set_major_formatter(NullFormatter())
+    # ax1.yaxis.set_major_formatter(NullFormatter())
+    # ax1.xaxis.set_major_formatter(NullFormatter())
     ax1.axis('off')
-    
+
     from matplotlib.patches import Ellipse, Rectangle
-    if np.any([item.lower() == 'ra' for item in colnames]): 
+    if np.any([item.lower() == 'ra' for item in colnames]):
         if header is None:
-            raise ValueError('# Header containing WCS must be provided to convert sky coordinates into image coordinates.')
+            raise ValueError(
+                '# Header containing WCS must be provided to convert sky coordinates into image coordinates.')
             return
         else:
             w = wcs.WCS(header)
-            x, y = w.wcs_world2pix(Table(catalog)[colnames[0]].data.data, 
+            x, y = w.wcs_world2pix(Table(catalog)[colnames[0]].data.data,
                                    Table(catalog)[colnames[1]].data.data, 0)
     else:
         x, y = catalog[colnames[0]], catalog[colnames[1]]
     display_single(img, ax=ax1, pixel_scale=pixel_scale, **kwargs)
     for i in range(len(catalog)):
         e = Ellipse(xy=(x[i], y[i]),
-                        height=circle_size,
-                        width=circle_size,
-                        angle=0)
+                    height=circle_size,
+                    width=circle_size,
+                    angle=0)
         e.set_facecolor('none')
         e.set_edgecolor(color)
         e.set_alpha(0.7)
@@ -528,7 +546,8 @@ def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle
     if ax is not None:
         return ax
 
-def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rectangle_size=[30, 30], 
+
+def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rectangle_size=[30, 30],
                     pixel_scale=0.168, color='r', **kwargs):
     """
     Draw rectangles on an image according to a catalogue. 
@@ -547,11 +566,11 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
 
     Returns:
         ax: If the input ``ax`` is not ``None``.
-        
+
     """
     if ax is None:
         fig = plt.figure(figsize=(12, 12))
-        fig.subplots_adjust(left=0.0, right=1.0, 
+        fig.subplots_adjust(left=0.0, right=1.0,
                             bottom=0.0, top=1.0,
                             wspace=0.00, hspace=0.00)
         gs = gridspec.GridSpec(2, 2)
@@ -560,28 +579,29 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     else:
         ax1 = ax
 
-    #ax1.yaxis.set_major_formatter(NullFormatter())
-    #ax1.xaxis.set_major_formatter(NullFormatter())
-    #ax1.axis('off')
-    
+    # ax1.yaxis.set_major_formatter(NullFormatter())
+    # ax1.xaxis.set_major_formatter(NullFormatter())
+    # ax1.axis('off')
+
     from matplotlib.patches import Rectangle
-    if np.any([item.lower() == 'ra' for item in colnames]): 
+    if np.any([item.lower() == 'ra' for item in colnames]):
         if header is None:
-            raise ValueError('# Header containing WCS must be provided to convert sky coordinates into image coordinates.')
+            raise ValueError(
+                '# Header containing WCS must be provided to convert sky coordinates into image coordinates.')
             return
         else:
             w = wcs.WCS(header)
-            x, y = w.wcs_world2pix(Table(catalog)[colnames[0]].data.data, 
+            x, y = w.wcs_world2pix(Table(catalog)[colnames[0]].data.data,
                                    Table(catalog)[colnames[1]].data.data, 0)
     else:
         x, y = catalog[colnames[0]], catalog[colnames[1]]
     display_single(img, ax=ax1, pixel_scale=pixel_scale, **kwargs)
     for i in range(len(catalog)):
-        e = Rectangle(xy=(x[i] - rectangle_size[0] // 2, 
+        e = Rectangle(xy=(x[i] - rectangle_size[0] // 2,
                           y[i] - rectangle_size[1] // 2),
-                        height=rectangle_size[0],
-                        width=rectangle_size[1],
-                        angle=0)
+                      height=rectangle_size[0],
+                      width=rectangle_size[1],
+                      angle=0)
         e.set_facecolor('none')
         e.set_edgecolor(color)
         e.set_alpha(0.7)
@@ -590,10 +610,11 @@ def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rec
     if ax is not None:
         return ax
 
-def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=None, 
-    stretch=2, Q=1, minimum=0.0, show_mark=True, pixel_scale=0.168, scale_bar=True,
-    scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
-    scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+
+def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=None,
+                            stretch=2, Q=1, minimum=0.0, show_mark=True, pixel_scale=0.168, scale_bar=True,
+                            scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
+                            scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
     '''
     Display the scene, including image, mask, and sources.
 
@@ -631,7 +652,8 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
     plt.imshow(img_rgb)
 
     if show_mask:
-        plt.imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+        plt.imshow(mask.astype(float), origin='lower',
+                   alpha=0.1, cmap='Greys_r')
 
     ax.tick_params(
         labelbottom=False,
@@ -639,7 +661,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         axis=u'both',
         which=u'both',
         length=0)
-    #ax.axis('off')
+    # ax.axis('off')
 
     if show_mark:
         # Mark all of the sources from the detection cataog
@@ -657,7 +679,8 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
             if hasattr(src, "center"):
                 y, x = src.center
                 plt.text(x, y, str(k), color=color)
-                plt.text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
+                plt.text(x, y, '+', color=color,
+                         horizontalalignment='center', verticalalignment='center')
             else:
                 raise ValueError('Wrong!')
 
@@ -674,12 +697,12 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         scale_bar_y = int(img_size_y * 0.10)
         scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
         scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
-        
+
         if scale_bar_length < 60:
             scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
         elif 60 < scale_bar_length < 3600:
             scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
-        else: 
+        else:
             scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
         scale_bar_text_size = scale_bar_fontsize
 
@@ -700,19 +723,22 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         text_x_0 = int(img_size_x * 0.08)
         text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
-            ax.text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+            ax.text(text_x_0, text_y_0,
+                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
         else:
-            ax.text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
+            ax.text(text_x_0, text_y_0, add_text,
+                    fontsize=text_fontsize, color=text_color)
 
     if ax is None:
         return fig
     return ax
 
-def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_gray_mask=True, 
-    show_ind=None, add_boxes=True, 
-    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
-    scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
-    scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+
+def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_gray_mask=True,
+                          show_ind=None, add_boxes=True,
+                          stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
+                          scale_bar_length=5.0, scale_bar_fontsize=20, scale_bar_y_offset=0.5, scale_bar_color='w',
+                          scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
     '''
     Display the scene, including image, mask, and the models.
 
@@ -735,7 +761,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
     '''
     from scarlet.display import AsinhMapping
     import scarlet
-    
+
     if ax is None:
         if show_loss:
             fig = plt.figure(figsize=(24, 6))
@@ -743,7 +769,6 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         else:
             fig = plt.figure(figsize=(18, 6))
             ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
-
 
     # Observation
     observation = blend.observations[0]
@@ -754,17 +779,20 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         sources = np.copy(blend.sources)
         gal_sources = np.array(sources)[show_ind]
         blend = scarlet.Blend(gal_sources, observation)
-    
+
     if zoomin_size is not None:
         x_cen = observation.frame.shape[2] // 2
         y_cen = observation.frame.shape[1] // 2
-        size = int(zoomin_size / pixel_scale / 2) # half-size
+        size = int(zoomin_size / pixel_scale / 2)  # half-size
         # Image
-        images = observation.images[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        images = observation.images[:, y_cen - size:y_cen +
+                                    size + 1, x_cen - size:x_cen + size + 1]
         # Weights
-        weights = observation.weights[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        weights = observation.weights[:, y_cen -
+                                      size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
         # Compute model
-        model = blend.get_model()[:, y_cen - size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        model = blend.get_model()[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
         # this model is under `model_frame`, i.e. under the modest PSF
     else:
         # Image
@@ -774,7 +802,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         # Compute model
         model = blend.get_model()
         # this model is under `model_frame`, i.e. under the modest PSF
-    
+
     # Render it in the observed frame
     model_ = observation.render(model)
     # Mask
@@ -787,8 +815,9 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
     img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
     channel_map = scarlet.display.channels_to_rgb(len(channels))
     model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
-    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
-    residual_rgb = scarlet.display.img_to_rgb(residual, norm=norm, channel_map=channel_map)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    residual_rgb = scarlet.display.img_to_rgb(
+        residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
 
     # Show the data, model, and residual
@@ -797,7 +826,8 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         ax[0].set_title("Data")
         ax[1].imshow(model_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
         ax[1].set_title("Model")
-        ax[2].imshow(residual_rgb * (~np.tile(mask.T, (3, 1, 1))).T, vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].imshow(residual_rgb * (~np.tile(mask.T, (3, 1, 1))).T,
+                     vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
     elif show_gray_mask:
         ax[0].imshow(img_rgb)
@@ -806,9 +836,12 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         ax[1].set_title("Model")
         ax[2].imshow(residual_rgb, vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
-        ax[0].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
-        ax[1].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
-        ax[2].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+        ax[0].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
+        ax[1].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
+        ax[2].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
     else:
         ax[0].imshow(img_rgb)
         ax[0].set_title("Data")
@@ -835,12 +868,15 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
                     y = y - y_cen + size
                     x = x - x_cen + size
                 ax[0].text(x, y, k, color=color)
-                ax[0].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
+                ax[0].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
                 ax[1].text(x, y, k, color=color)
-                ax[1].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
+                ax[1].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
                 ax[2].text(x, y, k, color=color)
-                ax[2].text(x, y, '+', color=color, horizontalalignment='center', verticalalignment='center')
-    
+                ax[2].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+
     (img_size_x, img_size_y) = images[0].shape
     if scale_bar:
         if scale_bar_loc == 'left':
@@ -854,12 +890,12 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         scale_bar_y = int(img_size_y * 0.10)
         scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
         scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
-        
+
         if scale_bar_length < 60:
             scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
         elif 60 < scale_bar_length < 3600:
             scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
-        else: 
+        else:
             scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
         scale_bar_text_size = scale_bar_fontsize
 
@@ -880,10 +916,11 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         text_x_0 = int(img_size_x * 0.08)
         text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
-            ax[0].text(text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+            ax[0].text(
+                text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
         else:
-            ax[0].text(text_x_0, text_y_0, add_text, fontsize=text_fontsize, color=text_color)
-
+            ax[0].text(text_x_0, text_y_0, add_text,
+                       fontsize=text_fontsize, color=text_color)
 
     if show_loss:
         ax[3].plot(-np.array(loss))
@@ -894,28 +931,28 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         xrange = xlim[1] - xlim[0]
         yrange = ylim[1] - ylim[0]
         ax[3].set_aspect((xrange / yrange), adjustable='box')
-        ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+        ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
 
     if add_boxes:
         from matplotlib.patches import Rectangle
         for k, src in enumerate(blend.sources):
             box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
-            
+
             if zoomin_size is not None:
                 extent = get_extent(src.bbox, [x_cen - size, y_cen - size])
             else:
                 extent = get_extent(src.bbox)
-            #print(extent)
+            # print(extent)
             rect = Rectangle(
                 (extent[0], extent[2]),
                 extent[1] - extent[0],
                 extent[3] - extent[2],
                 **box_kwargs
             )
-            #print(rect)
+            # print(rect)
             ax[0].add_patch(rect)
-            #ax[1].add_patch(rect)
-            #ax[2].add_patch(rect)
+            # ax[1].add_patch(rect)
+            # ax[2].add_patch(rect)
             # for panel in range(len(ax)):
             #     ax[panel].add_patch(rect)
 
@@ -924,9 +961,22 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         axx.yaxis.set_major_locator(MaxNLocator(5))
         axx.xaxis.set_major_locator(MaxNLocator(5))
 
+    # Show the size of PSF. FWHM is 1 arcsec.
+    from matplotlib.patches import Circle
+    circ1 = Circle((40, 40),
+                   radius=1 / 0.168,
+                   linewidth=1.,
+                   hatch='/////',
+                   fc='None',
+                   ec='white')
+    ax[1].add_patch(circ1)
+
+    plt.subplots_adjust(wspace=0.2)
+
     if ax is None:
         return fig
     return ax
+
 
 def get_extent(bbox, new_cen=None):
     if new_cen is not None:
@@ -934,10 +984,11 @@ def get_extent(bbox, new_cen=None):
     else:
         return [bbox.start[-1], bbox.stop[-1], bbox.start[-2], bbox.stop[-2]]
 
+
 def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, colorbar=False,
-                        save_fn=None, show=True, band=None, subplots=None, 
-                        titles=True, pixscale=0.168, psf_fn=None, zpt=27., 
-                        fontsize=20, **kwargs):
+                         save_fn=None, show=True, band=None, subplots=None,
+                         titles=True, pixscale=0.168, psf_fn=None, zpt=27.,
+                         fontsize=20, **kwargs):
     """
     Show imfit results: HSC image, scarlet model, Sersic model, and residual. Modified based on `pymfit`.
     """
@@ -951,9 +1002,9 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
     hsc_img = observation.images.mean(axis=0)
     w = blend.frame.wcs
     scarlet_model = src.get_model().mean(axis=0)
-    hsc_img = img_cutout(hsc_img, w, src.center[1], src.center[0], 
-            size=src.bbox.shape[1:],
-            pixel_unit=True, save=False, img_header=None)
+    hsc_img = img_cutout(hsc_img, w, src.center[1], src.center[0],
+                         size=src.bbox.shape[1:],
+                         pixel_unit=True, save=False, img_header=None)
     hsc_img = hsc_img[0].data
 
     if subplots is None:
@@ -979,10 +1030,10 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
     param_labels = {}
 
     if titles:
-        titles = ['HSC image', 'Scarlet', 'Sersic', 'HSC - Scarlet', 'Scarlet - Sersic']
+        titles = ['HSC image', 'Scarlet', 'Sersic',
+                  'HSC - Scarlet', 'Scarlet - Sersic']
     else:
         titles = ['']*5
-
 
     for i, data in enumerate([hsc_img, scarlet_model, sersic_model, res1, res2]):
         show = axes[i].imshow(data, vmin=vmin, vmax=vmax, origin='lower',
@@ -992,7 +1043,7 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
     if mask_fn is not None:
         mask = fits.getdata(mask_fn)
         mask = mask.astype(float)
-        mask[mask==0.0] = np.nan
+        mask[mask == 0.0] = np.nan
         axes[0].imshow(mask, origin='lower', alpha=0.4,
                        vmin=0, vmax=1, cmap='rainbow_r')
 
@@ -1005,10 +1056,10 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
         m_tot = r'$m_'+band+' = '+str(round(s.m_tot, 1))+'$'
     else:
         m_tot = r'$m = '+str(round(s.m_tot, 1))+'$'
-    r_e = r'$r_\mathrm{eff}='+str(round(s.r_e*pixscale,1))+'^{\prime\prime}$'
-    mu_0 = r'$\mu_0='+str(round(s.mu_0,1))+'$'
-    mu_e = r'$\mu_e='+str(round(s.mu_e,1))+'$'
-    n = r'$n = '+str(round(s.n,2))+'$'
+    r_e = r'$r_\mathrm{eff}='+str(round(s.r_e*pixscale, 1))+'^{\prime\prime}$'
+    mu_0 = r'$\mu_0='+str(round(s.mu_0, 1))+'$'
+    mu_e = r'$\mu_e='+str(round(s.mu_e, 1))+'$'
+    n = r'$n = '+str(round(s.n, 2))+'$'
 
     c = 'b'
 
@@ -1026,8 +1077,8 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
         axes[2].text(0.9, 0.05, band, color='r', transform=axes[2].transAxes,
                      fontsize=25)
     if 'reduced_chisq' in list(mod_params.keys()):
-        chisq = r'$\chi^2_\mathrm{dof} = '+\
-                str(round(mod_params['reduced_chisq'],2))+'$'
+        chisq = r'$\chi^2_\mathrm{dof} = ' +\
+                str(round(mod_params['reduced_chisq'], 2))+'$'
         axes[2].text(x+dx, y-2*dy, chisq, transform=axes[2].transAxes,
                      fontsize=fs, color=c)
 

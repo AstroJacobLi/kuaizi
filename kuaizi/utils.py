@@ -1,5 +1,6 @@
 from __future__ import division, print_function
-import os, sys
+import os
+import sys
 import sep
 import copy
 import numpy as np
@@ -15,6 +16,7 @@ from astropy.units import Quantity
 from astropy.coordinates import SkyCoord
 
 from .display import display_single, SEG_CMAP, ORG
+
 
 @contextmanager
 def suppress_stdout():
@@ -33,14 +35,14 @@ def suppress_stdout():
 
 def set_env(project='HSC', name='HSC_LSBG'):
     import os
-    
+
     # Master directory
     try:
         data_dir = os.path.join(
             os.getenv('HOME'), 'Research/Data/', project, name)
     except:
         raise Exception("Can not recognize this dataset!")
-        
+
     os.chdir(data_dir)
     return data_dir
 
@@ -60,7 +62,7 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
     # Use JL as a template
     pkg_path = kuaizi.__path__[0]
     plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
-    rcParams.update({'font.size': fontsize, 
+    rcParams.update({'font.size': fontsize,
                      'text.usetex': usetex})
 
     if style == 'SM':
@@ -73,7 +75,8 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
             "ytick.minor.width": 0.3,
             "font.family": "monospace",
             "font.stretch": "semi-expanded",
-            "scatter.edgecolors": "black",  # The default edge colors for scatter plots.
+            # The default edge colors for scatter plots.
+            "scatter.edgecolors": "black",
             "mathtext.bf": "monospace:bold",
             "mathtext.cal": "monospace:bold",
             "mathtext.it": "monospace:italic",
@@ -87,28 +90,28 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
         if usetex is True:
             rcParams.update({
                 "text.latex.preamble": '\n'.join([
-                '\\usepackage{amsmath}'
-                '\\usepackage[T1]{fontenc}', 
-                '\\usepackage{courier}',
-                '\\usepackage[variablett]{lmodern}',
-                '\\usepackage[LGRgreek]{mathastext}',
-                '\\renewcommand{\\rmdefault}{\\ttdefault}'
+                    '\\usepackage{amsmath}'
+                    '\\usepackage[T1]{fontenc}',
+                    '\\usepackage{courier}',
+                    '\\usepackage[variablett]{lmodern}',
+                    '\\usepackage[LGRgreek]{mathastext}',
+                    '\\renewcommand{\\rmdefault}{\\ttdefault}'
                 ])
             })
-
 
     if style == 'nature':
         rcParams.update({
             "font.family": "sans-serif",
-            "scatter.edgecolors": "black",  # The default edge colors for scatter plots.
+            # The default edge colors for scatter plots.
+            "scatter.edgecolors": "black",
             "mathtext.fontset": "stixsans"
         })
 
 
-def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
-    deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0, 
-    sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False, 
-    verbose=True, logger=None):
+def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
+                deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0,
+                sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False,
+                verbose=True, logger=None):
     '''
     Extract objects for a given image using ``sep`` (a Python-wrapped ``SExtractor``). 
     For more details, please check http://sep.readthedocs.io and documentation of SExtractor.
@@ -144,9 +147,9 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     except ValueError as e:
         img = img.byteswap().newbyteorder()
         bkg = sep.Background(img, bw=b, bh=b, fw=f, fh=f)
-    
+
     data_sub = img - bkg.back()
-    
+
     sigma = sigma
     if sky_subtract:
         input_data = data_sub
@@ -154,16 +157,16 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
         input_data = img
 
     objects, segmap = sep.extract(input_data,
-                                sigma,
-                                mask=mask,
-                                err=bkg.globalrms,
-                                segmentation_map=True,
-                                filter_type='matched',
-                                deblend_nthresh=deblend_nthresh,
-                                deblend_cont=deblend_cont,
-                                clean=True,
-                                clean_param=clean_param,
-                                minarea=minarea)
+                                  sigma,
+                                  mask=mask,
+                                  err=bkg.globalrms,
+                                  segmentation_map=True,
+                                  filter_type='matched',
+                                  deblend_nthresh=deblend_nthresh,
+                                  deblend_cont=deblend_cont,
+                                  clean=True,
+                                  clean_param=clean_param,
+                                  minarea=minarea)
 
     if verbose:
         if logger is not None:
@@ -173,15 +176,16 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     objects = Table(objects)
     objects.add_column(Column(data=np.arange(len(objects)), name='index'))
     # Maximum flux, defined as flux within 6 * `a` (semi-major axis) in radius.
-    objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], 
-                                    6. * objects['a'])[0], name='flux_max'))
-    # Add FWHM estimated from 'a' and 'b'. 
+    objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'],
+                                                  6. * objects['a'])[0], name='flux_max'))
+    # Add FWHM estimated from 'a' and 'b'.
     # This is suggested here: https://github.com/kbarbary/sep/issues/34
-    objects.add_column(Column(data=2* np.sqrt(np.log(2) * (objects['a']**2 + objects['b']**2)), 
+    objects.add_column(Column(data=2 * np.sqrt(np.log(2) * (objects['a']**2 + objects['b']**2)),
                               name='fwhm_custom'))
-    
+
     # Measure R30, R50, R80
-    temp = sep.flux_radius(input_data, objects['x'], objects['y'], 6. * objects['a'], [0.3, 0.5, 0.8])[0]
+    temp = sep.flux_radius(
+        input_data, objects['x'], objects['y'], 6. * objects['a'], [0.3, 0.5, 0.8])[0]
     objects.add_column(Column(data=temp[:, 0], name='R30'))
     objects.add_column(Column(data=temp[:, 1], name='R50'))
     objects.add_column(Column(data=temp[:, 2], name='R80'))
@@ -189,11 +193,11 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     # Use Kron radius to calculate FLUX_AUTO in SourceExtractor.
     # Here PHOT_PARAMETER = 2.5, 3.5
     if flux_auto:
-        kronrad, krflag = sep.kron_radius(input_data, objects['x'], objects['y'], 
-                                          objects['a'], objects['b'], 
+        kronrad, krflag = sep.kron_radius(input_data, objects['x'], objects['y'],
+                                          objects['a'], objects['b'],
                                           objects['theta'], 6.0)
-        flux, fluxerr, flag = sep.sum_circle(input_data, objects['x'], objects['y'], 
-                                            2.5 * (kronrad), subpix=1)
+        flux, fluxerr, flag = sep.sum_circle(input_data, objects['x'], objects['y'],
+                                             2.5 * (kronrad), subpix=1)
         flag |= krflag  # combine flags into 'flag'
 
         r_min = 1.75  # minimum diameter = 3.5
@@ -205,29 +209,31 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
         flag[use_circle] = cflag
         objects.add_column(Column(data=flux, name='flux_auto'))
         objects.add_column(Column(data=kronrad, name='kron_rad'))
-        
+
     if flux_aper is not None:
         if len(flux_aper) != 2:
             raise ValueError('"flux_aper" must be a list with length = 2.')
-        objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], flux_aper[0])[0], 
+        objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], flux_aper[0])[0],
                                   name='flux_aper_1'))
-        objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], flux_aper[1])[0], 
-                                  name='flux_aper_2')) 
-        objects.add_column(Column(data=sep.sum_circann(input_data, objects['x'], objects['y'], 
-                                       flux_aper[0], flux_aper[1])[0], name='flux_ann'))
+        objects.add_column(Column(data=sep.sum_circle(input_data, objects['x'], objects['y'], flux_aper[1])[0],
+                                  name='flux_aper_2'))
+        objects.add_column(Column(data=sep.sum_circann(input_data, objects['x'], objects['y'],
+                                                       flux_aper[0], flux_aper[1])[0], name='flux_ann'))
 
     # plot background-subtracted image
     if show_fig:
-        fig, ax = plt.subplots(1,2, figsize=(12,6))
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
         if min(input_data.shape) * pixel_scale < 30:
             scale_bar_length = 5
         elif min(input_data.shape) * pixel_scale > 100:
             scale_bar_length = 61
         else:
             scale_bar_length = 10
-        ax[0] = display_single(input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
+        ax[0] = display_single(
+            input_data, ax=ax[0], scale_bar_length=scale_bar_length, pixel_scale=pixel_scale)
         if mask is not None:
-            ax[0].imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+            ax[0].imshow(mask.astype(float), origin='lower',
+                         alpha=0.1, cmap='Greys_r')
         from matplotlib.patches import Ellipse
         # plot an ellipse for each object
         for obj in objects:
@@ -238,7 +244,8 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
             e.set_facecolor('none')
             e.set_edgecolor('red')
             ax[0].add_artist(e)
-        ax[1] = display_single(segmap, scale='linear', cmap=SEG_CMAP , ax=ax[1], scale_bar_length=scale_bar_length)
+        ax[1] = display_single(segmap, scale='linear', cmap=SEG_CMAP,
+                               ax=ax[1], scale_bar_length=scale_bar_length)
         # plt.savefig('./extract_obj.png', bbox_inches='tight')
         return objects, segmap, fig
     return objects, segmap
@@ -257,7 +264,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         mask_a (float): a scaling factor for the size of the plotted star, larger value means larger circle will be plotted.
         mask_b (float): a scale size for the plotted star, larger value gives larger circle. 
         visual (bool): whether display the matched Gaia stars.
-        
+
     Return: 
         gaia_results (`astropy.table.Table` object): a catalog of matched stars.
     """
@@ -269,8 +276,10 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         ra_cen, dec_cen, unit=('deg', 'deg'), frame='icrs')
 
     # Width and height of the search box
-    img_search_x = Quantity(pixel_scale * (image.shape)[0] * size_buffer, u.arcsec)
-    img_search_y = Quantity(pixel_scale * (image.shape)[1] * size_buffer, u.arcsec)
+    img_search_x = Quantity(pixel_scale * (image.shape)
+                            [0] * size_buffer, u.arcsec)
+    img_search_y = Quantity(pixel_scale * (image.shape)
+                            [1] * size_buffer, u.arcsec)
 
     # Search for stars
     if tap_url is not None:
@@ -286,7 +295,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
     else:
         with suppress_stdout():
             from astroquery.gaia import Gaia
-    
+
             gaia_results = Gaia.query_object_async(
                 coordinate=img_cen_ra_dec,
                 width=img_search_x,
@@ -349,7 +358,7 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
                    size_buffer=1.4, gaia_bright=18.0,
                    factor_b=1.3, factor_f=1.9):
     """Find stars using Gaia and mask them out if necessary. From https://github.com/dr-guangtou/kungpao.
-    
+
     Using the stars found in the GAIA TAP catalog, we build a bright star mask following
     similar procedure in Coupon et al. (2017).
 
@@ -365,36 +374,36 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
         gaia_bright (float): a threshold above which are classified as bright stars.
         factor_b (float): a scale size of mask for bright stars. Larger value gives smaller mask size.
         factor_f (float): a scale size of mask for faint stars. Larger value gives smaller mask size.
-        
+
     Return: 
         msk_star (numpy 2-D array): the masked pixels are marked by one.
 
     """
     if gaia_stars is None:
         gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
-                                    mask_a=mask_a, mask_b=mask_b,
-                                    verbose=False, visual=False,
-                                    size_buffer=size_buffer)
+                                      mask_a=mask_a, mask_b=mask_b,
+                                      verbose=False, visual=False,
+                                      size_buffer=size_buffer)
         if gaia_stars is not None:
             print(f'# {len(gaia_stars)} stars from GAIA are masked!')
         else:
             print('No GAIA stars are masked.')
     else:
         print(f'# {len(gaia_stars)} stars from GAIA are masked!')
-    
+
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
 
     if gaia_stars is not None:
         gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
         sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],
-                        gaia_b['rmask_arcsec'] / factor_b / pixel_scale,
-                        gaia_b['rmask_arcsec'] / factor_b / pixel_scale, 0.0, r=1.0)
+                         gaia_b['rmask_arcsec'] / factor_b / pixel_scale,
+                         gaia_b['rmask_arcsec'] / factor_b / pixel_scale, 0.0, r=1.0)
 
         gaia_f = gaia_stars[gaia_stars['phot_g_mean_mag'] > gaia_bright]
         sep.mask_ellipse(msk_star, gaia_f['x_pix'], gaia_f['y_pix'],
-                        gaia_f['rmask_arcsec'] / factor_f / pixel_scale,
-                        gaia_f['rmask_arcsec'] / factor_f / pixel_scale, 0.0, r=1.0)
+                         gaia_f['rmask_arcsec'] / factor_f / pixel_scale,
+                         gaia_f['rmask_arcsec'] / factor_f / pixel_scale, 0.0, r=1.0)
 
         return gaia_stars, msk_star
 
@@ -418,12 +427,13 @@ def padding_PSF(psf_list):
         y_len, x_len = psf[0].data.shape
         dy = (max_len - y_len) // 2
         dx = (max_len - x_len) // 2
-        temp = np.pad(psf[0].data.astype('float'), ((dy, dy), (dx, dx)), 'constant', constant_values=0)
+        temp = np.pad(psf[0].data.astype('float'), ((dy, dy),
+                                                    (dx, dx)), 'constant', constant_values=0)
         if temp.shape == (max_len, max_len):
             psf_pad.append(temp)
         else:
             raise ValueError('Wrong size!')
-    
+
     return psf_pad
 
 
@@ -474,12 +484,14 @@ def save_to_fits(img, fits_file, wcs=None, header=None, overwrite=True):
     return img_hdu
 
 # Cutout image
+
+
 def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
-               pixel_unit=False, img_header=None, prefix='img_cutout', 
+               pixel_unit=False, img_header=None, prefix='img_cutout',
                out_dir=None, save=True):
     """
     Generate image cutout with updated WCS information. (From ``kungpao`` https://github.com/dr-guangtou/kungpao) 
-    
+
     Parameters:
         img (numpy 2-D array): image array.
         wcs (``astropy.wcs.WCS`` object): WCS of input image array.
@@ -494,7 +506,7 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
         prefix (str): Prefix of output files.
         out_dir (str): Directory of output files. Default is the current folder.
         save (bool): Whether save the cutout image.
-    
+
     Returns: 
         :
             cutout (numpy 2-D array): the cutout image.
@@ -518,7 +530,8 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
     dy = -1.0 * (cen_y - int(cen_y))
 
     # Generate cutout
-    cutout = Cutout2D(img, cen_pos, cutout_size, wcs=wcs, mode='partial', fill_value=0)
+    cutout = Cutout2D(img, cen_pos, cutout_size, wcs=wcs,
+                      mode='partial', fill_value=0)
 
     # Update the header
     cutout_header = cutout.wcs.to_header()
@@ -527,8 +540,9 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
             del img_header['COMMENT']
         intersect = [k for k in img_header if k not in cutout_header]
         for keyword in intersect:
-            cutout_header.set(keyword, img_header[keyword], img_header.comments[keyword])
-    
+            cutout_header.set(
+                keyword, img_header[keyword], img_header.comments[keyword])
+
     if 'PC1_1' in dict(cutout_header).keys():
         cutout_header['CD1_1'] = cutout_header['PC1_1']
         #cutout_header['CD1_2'] = cutout_header['PC1_2']
@@ -537,12 +551,12 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
         cutout_header['CDELT1'] = cutout_header['CD1_1']
         cutout_header['CDELT2'] = cutout_header['CD2_2']
         cutout_header.pop('PC1_1')
-        #cutout_header.pop('PC2_1')
-        #cutout_header.pop('PC1_2')
+        # cutout_header.pop('PC2_1')
+        # cutout_header.pop('PC1_2')
         cutout_header.pop('PC2_2')
-        #cutout_header.pop('CDELT1')
-        #cutout_header.pop('CDELT2')
-    
+        # cutout_header.pop('CDELT1')
+        # cutout_header.pop('CDELT2')
+
     # Build a HDU
     hdu = fits.PrimaryHDU(header=cutout_header)
     hdu.data = cutout.data
@@ -559,6 +573,8 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
 
 ################# HDF5 related ##################
 # Print attributes of a HDF5 file
+
+
 def h5_print_attrs(f):
     '''
     Print all attributes of a HDF5 file.
@@ -579,6 +595,8 @@ def h5_print_attrs(f):
     f.visititems(print_attrs)
 
 # Rewrite dataset
+
+
 def h5_rewrite_dataset(mother_group, key, new_data):
     '''
     Rewrite the given dataset of a HDF5 group.
@@ -597,6 +615,8 @@ def h5_rewrite_dataset(mother_group, key, new_data):
     return dt
 
 # Create New group
+
+
 def h5_new_group(mother_group, key):
     '''
     Create a new data_group
@@ -614,6 +634,8 @@ def h5_new_group(mother_group, key):
     return new_grp
 
 # String to dictionary
+
+
 def str2dic(string):
     '''
     This function is used to load string dictionary and convert it into python dictionary.
