@@ -1,24 +1,24 @@
 from __future__ import division, print_function
-import os
-import sys
-import sep
+
 import copy
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse as mpl_ellip
+import os
+import pickle
+import sys
 from contextlib import contextmanager
 
-import pickle
-
-from astropy.io import fits
-from astropy import wcs
-from astropy.table import Table, Column
+import matplotlib.pyplot as plt
+import numpy as np
+import sep
 from astropy import units as u
-from astropy.units import Quantity
+from astropy import wcs
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.table import Column, Table
+from astropy.units import Quantity
+from matplotlib.patches import Ellipse as mpl_ellip
 
-from .display import display_single, SEG_CMAP, ORG
 from . import HSC_pixel_scale, HSC_zeropoint
+from .display import ORG, SEG_CMAP, display_single
 
 hsc_sky = {'g': 0.010, 'r': 0.014, 'i': 0.016,
            'z': 0.022, 'y': 0.046}  # muJy/arcsec^2
@@ -145,10 +145,9 @@ class MockGal:
         Generate mock low surface brightness galaxies. 
         '''
         import galsim
-        from galsim import degrees, Angle
-        from galsim.interpolant import Lanczos
-        from galsim import Image, InterpolatedImage
+        from galsim import Angle, Image, InterpolatedImage, degrees
         from galsim.fitswcs import AstropyWCS
+        from galsim.interpolant import Lanczos
         big_fft_params = galsim.GSParams(maximum_fft_size=20000)
 
         if not isinstance(galaxy['comp'], list):
@@ -376,7 +375,7 @@ class MockGal:
                 ax[0].text(text_x_0, text_y_0, add_text,
                            fontsize=text_fontsize, color=text_color)
 
-        from matplotlib.ticker import NullFormatter, MaxNLocator
+        from matplotlib.ticker import MaxNLocator, NullFormatter
         for axx in ax:
             axx.yaxis.set_major_locator(MaxNLocator(5))
             axx.xaxis.set_major_locator(MaxNLocator(5))
@@ -428,8 +427,9 @@ def calc_sigma_coeff(images, variance_map):
     Return:
         A_best (numpy array): coeff in each band
     '''
+    from astropy.convolution import Gaussian2DKernel, convolve
+
     from kuaizi.utils import extract_obj
-    from astropy.convolution import convolve, Gaussian2DKernel
 
     if len(images.shape) == 2:  # single band
         images = images[np.newaxis, :, :]

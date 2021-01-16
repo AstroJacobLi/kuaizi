@@ -1,32 +1,29 @@
 # Import packages
-import numpy as np
-import matplotlib.pyplot as plt
-import scarlet
 import os
-import sep
-import time
 import pickle
-
-import kuaizi as kz
-from kuaizi.detection import Data
-from kuaizi.display import display_single, SEG_CMAP
-from kuaizi import HSC_pixel_scale, HSC_zeropoint
-
-# Initialize `unagi`
-from unagi import hsc, config
-from unagi import plotting
-from unagi.task import hsc_cutout, hsc_psf
-
+import time
 
 import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+import scarlet
+import sep
 from astropy import wcs
-from astropy.io import fits
-from astropy.table import Table, Column
+from astropy.convolution import Box2DKernel, Gaussian2DKernel, convolve
 from astropy.coordinates import SkyCoord, match_coordinates_sky
+from astropy.io import fits
+from astropy.table import Column, Table
 #from astropy.visualization import make_lupton_rgb
-from astropy.utils.data import download_file, clear_download_cache
-from astropy.convolution import convolve, Box2DKernel, Gaussian2DKernel
+from astropy.utils.data import clear_download_cache, download_file
 from IPython.display import clear_output
+# Initialize `unagi`
+from unagi import config, hsc, plotting
+from unagi.task import hsc_cutout, hsc_psf
+
+import kuaizi as kz
+from kuaizi import HSC_pixel_scale, HSC_zeropoint
+from kuaizi.detection import Data
+from kuaizi.display import SEG_CMAP, display_single
 
 plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
@@ -552,6 +549,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
 
     # Add sources
     from scarlet.initialization import build_initialization_coadd
+
     # Filtered coadd removes noise! Very useful for faint objects (but slow)
     coadd, bg_cutoff = build_initialization_coadd(
         observation, filtered_coadd=True)
@@ -960,6 +958,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
 
     # Add sources
     from scarlet.initialization import build_initialization_coadd
+
     # Filtered coadd removes noise! Very useful for faint objects (but slow)
     coadd, bg_cutoff = build_initialization_coadd(
         observation, filtered_coadd=True)
@@ -1324,6 +1323,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
 
     # Add sources
     from scarlet.initialization import build_initialization_coadd
+
     # Filtered coadd removes noise! Very useful for faint objects (but slow)
     coadd, bg_cutoff = build_initialization_coadd(
         observation, filtered_coadd=True)
@@ -1654,6 +1654,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
     # Add sources
     from scarlet.initialization import build_initialization_coadd
+
     # Filtered coadd removes noise! Very useful for faint objects (but slow)
     coadd, bg_cutoff = build_initialization_coadd(
         observation, filtered_coadd=True)

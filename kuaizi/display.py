@@ -1,30 +1,25 @@
 from __future__ import division, print_function
+
 import os
 
-import numpy as np
-
-from astropy.io import fits
-from astropy import wcs
-from astropy.table import Table
-from astropy.visualization import (ZScaleInterval,
-                                   AsymmetricPercentileInterval)
-from astropy.visualization import make_lupton_rgb
-from astropy.convolution import convolve
-from astropy.stats import sigma_clip, SigmaClip, sigma_clipped_stats
-
-from matplotlib import colors
-from matplotlib import rcParams
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy import wcs
+from astropy.convolution import convolve
+from astropy.io import fits
+from astropy.stats import SigmaClip, sigma_clip, sigma_clipped_stats
+from astropy.table import Table
+from astropy.visualization import (AsymmetricPercentileInterval,
+                                   ZScaleInterval, make_lupton_rgb)
+from matplotlib import colors, rcParams
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.ticker import NullFormatter, MaxNLocator, FormatStrFormatter, AutoMinorLocator
 from matplotlib.patches import Ellipse, Rectangle
+from matplotlib.ticker import (AutoMinorLocator, FormatStrFormatter,
+                               MaxNLocator, NullFormatter)
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from palettable.colorbrewer.sequential import (Greys_9,
-                                               OrRd_9,
-                                               Blues_9,
-                                               Purples_9,
-                                               YlGn_9)
+from palettable.colorbrewer.sequential import (Blues_9, Greys_9, OrRd_9,
+                                               Purples_9, YlGn_9)
 
 
 def random_cmap(ncolors=256, background_color='white'):
@@ -633,8 +628,8 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         fig: if no `ax` is provided as input
 
     '''
-    from scarlet.display import AsinhMapping
     import scarlet
+    from scarlet.display import AsinhMapping
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
@@ -759,8 +754,8 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         fig: if no `ax` is provided as input
 
     '''
-    from scarlet.display import AsinhMapping
     import scarlet
+    from scarlet.display import AsinhMapping
 
     if ax is None:
         if show_loss:
@@ -956,7 +951,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
             # for panel in range(len(ax)):
             #     ax[panel].add_patch(rect)
 
-    from matplotlib.ticker import NullFormatter, MaxNLocator
+    from matplotlib.ticker import MaxNLocator, NullFormatter
     for axx in ax:
         axx.yaxis.set_major_locator(MaxNLocator(5))
         axx.xaxis.set_major_locator(MaxNLocator(5))
@@ -993,6 +988,7 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
     Show imfit results: HSC image, scarlet model, Sersic model, and residual. Modified based on `pymfit`.
     """
     from pymfit import Sersic
+
     from .utils import img_cutout
     zscale = ZScaleInterval()
 
