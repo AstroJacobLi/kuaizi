@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-import warnings
-warnings.simplefilter('ignore')
-
-__all__ = ["utils"]
-__name__ = 'kuaizi'
-__author__ = ['Jiaxuan Li']
 
 # Define pixel scale of different surveys, unit = arcsec / pixel
 HSC_pixel_scale = 0.168
@@ -33,7 +27,7 @@ HSC_binray_mask_dict = {0: 'BAD',
                         7:  'SUSPECT (suspicious pixel)',
                         8:  'NO_DATA',
                         9:  'BRIGHT_OBJECT (bright star mask, not available in S18A yet)',
-                        10: 'CROSSTALK', 
+                        10: 'CROSSTALK',
                         11: 'NOT_DEBLENDED (For objects that are too big to run deblender)',
                         12: 'UNMASKEDNAN',
                         13: 'REJECTED',
@@ -41,13 +35,21 @@ HSC_binray_mask_dict = {0: 'BAD',
                         15: 'SENSOR_EDGE',
                         16: 'INEXACT_PSF'}
 
-from . import utils
-from . import display
-#from . import detection
+from pkg_resources import get_distribution, DistributionNotFound
 from .utils import set_env, set_matplotlib
+from . import measure
+from . import detection
+from . import display
+from . import utils
+import warnings
+warnings.simplefilter('ignore')
+
+__all__ = ["utils"]
+__name__ = 'kuaizi'
+__author__ = ['Jiaxuan Li']
+
 
 # Version
-from pkg_resources import get_distribution, DistributionNotFound
 try:
     __version__ = get_distribution(__name__).version
 except DistributionNotFound:
