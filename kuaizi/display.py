@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 
 import os
+import copy
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -63,7 +64,7 @@ def random_cmap(ncolors=256, background_color='white'):
 
 
 # About the Colormaps
-IMG_CMAP = plt.get_cmap('viridis')
+IMG_CMAP = copy.copy(mpl.cm.get_cmap("viridis"))
 IMG_CMAP.set_bad(color='black')
 SEG_CMAP = random_cmap(ncolors=512, background_color=u'white')
 SEG_CMAP.set_bad(color='white')
