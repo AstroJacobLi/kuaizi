@@ -256,7 +256,7 @@ class MockGal:
             sky_sigma = hsc_sky[f'{band}'] / 3.631 * \
                 10**((zp - 22.5) / 2.5) * pixel_scale**2
             noise = galsim.GaussianNoise(rng, sigma=sky_sigma)
-            gal_image.addNoise(noise)
+            # gal_image.addNoise(noise)
 
             # Generate mock image
             model_img = gal_image.array
