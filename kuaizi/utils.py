@@ -33,13 +33,13 @@ def suppress_stdout():
             sys.stdout = old_stdout
 
 
-def set_env(project='HSC', name='HSC_LSBG'):
+def set_env(project='HSC', name='HSC_LSBG', data_dir='Research/Data/'):
     import os
 
     # Master directory
     try:
         data_dir = os.path.join(
-            os.getenv('HOME'), 'Research/Data/', project, name)
+            os.getenv('HOME'), data_dir, project, name)
     except:
         raise Exception("Can not recognize this dataset!")
 
