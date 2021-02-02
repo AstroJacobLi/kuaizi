@@ -103,7 +103,7 @@ def winpos(components, observation=None):
     mask = (observation.weights == 0)
     model = model * ~mask
 
-    R50 = R_frac(components, observation, frac=0.5)
+    R50 = flux_radius(components, observation, frac=0.5)
     sig = 2. / 2.35 * R50  # R50 is half-light radius for each channel
 
     depth = model.shape[0]
@@ -139,7 +139,7 @@ def cen_peak(component):
 '''
 
 
-def R_frac(components, observation=None, frac=0.5, weight_order=0):
+def flux_radius(components, observation=None, frac=0.5, weight_order=0):
     """
     Determine the radius R (in pixels, along semi-major axis), 
     the flux within R has a fraction of `frac` over the total flux.
@@ -303,13 +303,13 @@ def shape(components, observation=None, show_fig=False, weight_order=0):
 
     if show_fig:
         fig, ax = plt.subplots()
-        norm = scarlet.display.AsinhMapping(minimum=0, stretch=0.5, Q=1)
+        norm = scarlet.display.AsinhMapping(minimum=-0.1, stretch=0.5, Q=1)
         ax.imshow(scarlet.display.img_to_rgb(model, norm=norm))
 
         def make_lines(eigvals, eigvecs, mean, i):
             """Make lines a length of 2 stddev."""
             std = np.sqrt(eigvals[i])
-            vec = 1 * std * eigvecs[:, i] / np.hypot(*eigvecs[:, i])
+            vec = 1.5 * std * eigvecs[:, i] / np.hypot(*eigvecs[:, i])
             x, y = np.vstack((mean - vec, mean, mean + vec)).T
             return x, y
 
@@ -372,7 +372,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0, out_prefix=None):
+def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0, out_prefix=None, show_fig=False):
     measure_dict = {}
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
@@ -392,9 +392,10 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
 
     measure_dict['flux'] = flux(components, observation)
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
-    measure_dict['R50'] = R_frac(
+    measure_dict['R50'] = flux_radius(
         components, observation, frac=frac) * pixel_scale  # arcsec
-    _shape = shape(components, observation, weight_order=weight_order)
+    _shape = shape(components, observation,
+                   weight_order=weight_order, show_fig=show_fig)
     measure_dict['q'] = _shape['q']
     measure_dict['pa'] = _shape['pa']
     measure_dict['SB0'] = mu_central(components, observation, method='centroid',
