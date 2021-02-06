@@ -252,8 +252,7 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
 
 
 def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
-                     verbose=False, visual=False, size_buffer=1.4,
-                     tap_url=None):
+                     verbose=False, visual=False, size_buffer=1.4, tap_url=None):
     """
     Search for bright stars using GAIA catalog. From https://github.com/dr-guangtou/kungpao.
 
