@@ -1839,7 +1839,8 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
         return blend
 
 
-def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint, prefix='mockgal', index=0, model_dir='./Model', figure_dir='./Figure'):
+def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint, prefix='mockgal', 
+                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True):
     '''
     This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
 
@@ -1847,6 +1848,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
     from scarlet import Starlet
 
     lsbg_coord = coord
+
     print('# Query GAIA stars...')
     gaia_cat, msk_star = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
         data.images.mean(axis=0),  # averaged image
@@ -1856,7 +1858,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         mask_a=694.7,
         mask_b=3.8,
         factor_b=1.0,
-        factor_f=0.6)
+        factor_f=1.5)
 
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
@@ -1866,7 +1868,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         method='vanilla',
         convolve=False,
         match_gaia=False,
-        show_fig=True,
+        show_fig=show_figure,
         visual_gaia=False,
         b=128,
         f=3,
@@ -1911,7 +1913,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                                            observation,
                                            min_grad=-0.4,  # the initial guess of box size is as large as possible
                                            starlet_thresh=1)
-    starlet_extent = kz.display.get_extent(starlet_source.bbox)
+    starlet_extent = kz.display.get_extent(starlet_source.bbox)  # [x1, x2, y1, y2]
 
     # Show the Starlet initial box
     fig = display_single(data.images.mean(axis=0))
@@ -1957,7 +1959,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                                                                 high_freq_lvl=2,  # 3
                                                                 wavelet_lvl=4,
                                                                 match_gaia=False,
-                                                                show_fig=True,
+                                                                show_fig=show_figure,
                                                                 visual_gaia=False,
                                                                 b=24,
                                                                 f=3,
@@ -1978,7 +1980,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                     for item in list(zip(obj_cat['y'].astype(int), obj_cat['x'].astype(int)))]
     # box_flat is for objects which fall in the initial Starlet box
     box_flag = np.unique(
-        segmap[starlet_extent[0]:starlet_extent[1], starlet_extent[2]:starlet_extent[3]]) - 1
+        segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
     box_flag = np.delete(np.sort(box_flag), 0)
     overlap_flag = np.array(overlap_flag)
     overlap_flag[box_flag] = True
@@ -2004,10 +2006,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
     # This step masks out bright and large contamination, which is not well-masked in previous step
     obj_cat, segmap_big, bg_rms = kz.detection.makeCatalog(
         [data],
-        lvl=4,  # relative agressive threshold
+        lvl=4.5,  # relative agressive threshold
         method='vanilla',
         match_gaia=False,
-        show_fig=True,
+        show_fig=show_figure,
         visual_gaia=False,
         b=45,
         f=3,
@@ -2024,7 +2026,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
     # mask out big objects that are not identified in the high_freq step
     segmap = segmap_big.copy()
     box_flag = np.unique(
-        segmap[starlet_extent[0]:starlet_extent[1], starlet_extent[2]:starlet_extent[3]]) - 1
+        segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
     box_flag = np.delete(np.sort(box_flag), 0)
 
     for ind in box_flag:
@@ -2053,19 +2055,23 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
     catalog_c = SkyCoord(obj_cat_cpct['ra'], obj_cat_cpct['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
     obj_cat_cpct.remove_rows(np.where(dist < 2 * u.arcsec)[0])
-    # Remove objects that are already masked!
+        # Remove objects that are already masked!
     inside_flag = [
         seg_mask_large[item] for item in list(
             zip(obj_cat_cpct['y'].astype(int), obj_cat_cpct['x'].astype(int)))
     ]
     obj_cat_cpct.remove_rows(np.where(inside_flag)[0])
-    # Remove objects that are already masked!
+        # Remove big objects that are toooo near to the target
+    catalog_c = SkyCoord(obj_cat_big['ra'], obj_cat_big['dec'], unit='deg')
+    dist = lsbg_coord.separation(catalog_c)
+    obj_cat_big.remove_rows(np.where(dist < 2 * u.arcsec)[0])
+        # Remove objects that are already masked!
     inside_flag = [
         (layer == 0)[item] for item in list(
             zip(obj_cat_big['y'].astype(int), obj_cat_big['x'].astype(int)))
     ]
     obj_cat_big.remove_rows(np.where(inside_flag)[0])
-
+        
     # Construct `scarlet` frames and observation
     from functools import partial
     model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(data.channels))
@@ -2109,16 +2115,24 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
 
     # Only model "real compact" sources
     if len(obj_cat_big) > 0:
-        cpct = SkyCoord(
+        # remove intersection between cpct and big objects
+        cpct_coor = SkyCoord(
             ra=np.array(obj_cat_cpct['ra']) * u.degree,
             dec=np.array(obj_cat_cpct['dec']) * u.degree)
-        big = SkyCoord(ra=obj_cat_big['ra'] * u.degree,
-                       dec=obj_cat_big['dec'] * u.degree)
-        tempid, sep2d, _ = match_coordinates_sky(big, cpct)
-        cpct = obj_cat_cpct[np.setdiff1d(
-            np.arange(len(obj_cat_cpct)), tempid[np.where(sep2d < 2 * u.arcsec)])]
+        big = SkyCoord(ra=obj_cat_big['ra'] * u.degree, dec=obj_cat_big['dec'] * u.degree)
+        tempid, sep2d, _ = match_coordinates_sky(big, cpct_coor)
+        cpct = obj_cat_cpct[np.setdiff1d(np.arange(len(obj_cat_cpct)), tempid[np.where(sep2d < 2 * u.arcsec)])]
     else:
         cpct = obj_cat_cpct
+        
+    if len(star_cat) > 0:
+        # remove intersection between cpct and stars
+        star = SkyCoord(ra=star_cat['ra'], dec=star_cat['dec'], unit='deg')
+        cpct_coor = SkyCoord(
+            ra=np.array(cpct['ra']) * u.degree,
+            dec=np.array(cpct['dec']) * u.degree)
+        tempid, sep2d, _ = match_coordinates_sky(star, cpct_coor)
+        cpct = cpct[np.setdiff1d(np.arange(len(cpct)), tempid[np.where(sep2d < 2 * u.arcsec)])]
 
     for k, src in enumerate(cpct):
         if src['fwhm_custom'] < 5:
@@ -2141,13 +2155,13 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
 
         # [np.where(sep2d > 2 * u.arcsec)[0]]
         for k, src in enumerate(big_cat):
-            if src['fwhm_custom'] > 12:
+            if src['fwhm_custom'] > 15:
                 new_source = scarlet.source.ExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, K=2)
+                    model_frame, (src['ra'], src['dec']), observation, K=2, shifting=True)
             else:
                 # try:
                 new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, thresh=2)
+                    model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=True)
         #         except:
         #             new_source = scarlet.source.SingleExtendedSource(
         #                 model_frame, (src['ra'], src['dec']), observation, coadd=coadd, coadd_rms=bg_cutoff)
@@ -2177,6 +2191,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         add_text=f'{prefix}-{index}')
     plt.savefig(
         os.path.join(figure_dir, f'{prefix}-{index:04d}-src-wavelet.png'), bbox_inches='tight')
+    if not show_figure:
+        plt.close()
 
     # Star fitting!
     start = time.time()
@@ -2192,6 +2208,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         scale_bar=False)
     plt.savefig(
         os.path.join(figure_dir, f'{prefix}-{index:04d}-init-wavelet.png'), bbox_inches='tight')
+    if not show_figure:
+        plt.close()
 
     try:
         blend.fit(150, 1e-4)
@@ -2255,7 +2273,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             ])
             near_cen_flag = [
                 (segmap_ori == cen_indx_ori +
-                 1)[int(src.center[1]), int(src.center[0])]
+                 1)[int(src.center[0]), int(src.center[1])]  # src.center: [y, x]
                 for src in np.array(blend.sources)[sed_ind]
             ]
             sed_ind = sed_ind[(~point_flag) & near_cen_flag]
@@ -2265,7 +2283,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                 sed_ind = np.array(list(set(sed_ind).union({0})))
         else:
             sed_ind = np.array([0])
-        print(f'Components {sed_ind} are considered as the target galaxy.')
+        print(f'     - Components {sed_ind} are considered as the target galaxy.')
 
         # Generate a VERY AGGRESSIVE mask, named "footprint"
         footprint = np.zeros_like(segmap_highfreq, dtype=bool)
@@ -2274,7 +2292,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
 
         footprint[segmap_highfreq == cen_indx_highfreq + 1] = 0
         sed_ind_pix = np.array([item.center for item in np.array(
-            sources)[sed_ind]])  # the y and x of sed_ind objects
+            sources)[sed_ind]]).astype(int)  # the y and x of sed_ind objects
         # if any objects in `sed_ind` is in `segmap_highfreq`
         sed_corr_indx = segmap_highfreq[sed_ind_pix[:, 0], sed_ind_pix[:, 1]]
         for ind in sed_corr_indx:
@@ -2288,6 +2306,21 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             float), Gaussian2DKernel(smooth_radius))
         footprint = (mask_conv >= gaussian_threshold)
 
+        ### Mask star within the box
+        if len(star_cat) > 0:
+            _, star_mask = kz.utils.gaia_star_mask(  # Generate GAIA mask only for stars outside of the Starlet box
+                    data.images.mean(axis=0),
+                    data.wcs,
+                    gaia_stars=star_cat,
+                    pixel_scale=0.168,
+                    gaia_bright=18.,
+                    mask_a=694.7, 
+                    mask_b=3.8,
+                    factor_b=1.0,
+                    factor_f=2.0)
+            footprint = footprint | star_mask
+
+        ### Mask big objects
         if len(obj_cat_big) > 0:
             footprint2 = np.zeros_like(segmap_big, dtype=bool)
             for ind in big_cat['index']:  # mask ExtendedSources which are modeled
@@ -2298,7 +2331,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                 footprint2[segmap_big == ind] = 0
             footprint2[segmap_big == cen_indx_big + 1] = 0
 
-            smooth_radius = 4
+            smooth_radius = 2
             gaussian_threshold = 0.02
             mask_conv = np.copy(footprint2)
             mask_conv[mask_conv > 0] = 1
@@ -2325,6 +2358,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             scale_bar=False)
         plt.savefig(
             os.path.join(figure_dir, f'{prefix}-{index:04d}-fitting-wavelet.png'), bbox_inches='tight')
+        if not show_figure:
+            plt.close()
 
         # Save zoomin figure (non-agressively-masked, target galaxy only)
         fig = kz.display.display_scarlet_model(
@@ -2340,7 +2375,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             scale_bar=False)
         plt.savefig(
             os.path.join(figure_dir, f'{prefix}-{index:04d}-zoomin-wavelet.png'), bbox_inches='tight')
-        
+        if not show_figure:
+            plt.close()
+
         # Save zoomin figure (agressively-masked, target galaxy only)
         new_weights = data.weights.copy()
         for layer in new_weights:
@@ -2367,6 +2404,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             scale_bar=False)
         plt.savefig(
             os.path.join(figure_dir, f'{prefix}-{index:04d}-zoomin-mask-wavelet.png'), bbox_inches='tight')
+        if not show_figure:
+            plt.close()
 
         # Save high-freq-removed figure
         ## remove high-frequency features from the Starlet objects
@@ -2385,7 +2424,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                 new_src = copy.deepcopy(src)
                 new_morph.__init__(morph.frame, img_, coeffs=c, bbox=morph.bbox)
                 src.children[1] = new_morph
-        #blend2 = scarlet.Blend(sources, observation2)
+        
         fig = kz.display.display_scarlet_model(
             blend2,
             show_ind=sed_ind,
@@ -2399,6 +2438,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             scale_bar=False)
         plt.savefig(
             os.path.join(figure_dir, f'{prefix}-{index:04d}-zoomin-blur-wavelet.png'), bbox_inches='tight')
+        if not show_figure:
+            plt.close()
 
         return blend
     except Exception as e:
@@ -2407,7 +2448,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
 
 
 def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', pixel_scale=HSC_pixel_scale,
-                                zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure'):
+                                zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure', show_figure=False):
     clear_output()
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
@@ -2464,12 +2505,12 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG'
     
     blend = _fitting_wavelet(
         data, lsbg_coord, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir)
+        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
     return blend
 
 
 def fitting_wavelet_mockgal(index=0, prefix='MockLSBG', pixel_scale=HSC_pixel_scale,
-                            zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure'):
+                            zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure', show_figure=False):
     clear_output()
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
@@ -2495,5 +2536,5 @@ def fitting_wavelet_mockgal(index=0, prefix='MockLSBG', pixel_scale=HSC_pixel_sc
 
     blend = _fitting_wavelet(
         data, lsbg_coord, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir)
+        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
     return blend
