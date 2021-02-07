@@ -176,6 +176,7 @@ def flux_radius(components, observation=None, frac=0.5, weight_order=0):
     depth = model.shape[0]
     r_frac = []
 
+    ## sep.sum_ellipse is very slow! Try to improve!
     if depth > 1:
         for i in range(depth):
             r_max = max(model.shape)
@@ -372,7 +373,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, weight_order=0, out_prefix=None, show_fig=False):
+def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, 
+                    weight_order=0, out_prefix=None, show_fig=False):
     measure_dict = {}
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
