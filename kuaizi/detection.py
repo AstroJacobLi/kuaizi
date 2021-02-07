@@ -98,7 +98,8 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
     else:
         return obj_cat, segmap
 
-def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
+def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1, 
+    sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
     deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
@@ -171,7 +172,8 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
         return obj_cat, segmap
 
     
-def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5, match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
+def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5, 
+                match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
@@ -236,7 +238,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     if method == 'wavelet':
         result = wavelet_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
     else:
-        result = vanilla_detection(detect, mask=mask, sigma=lvl, **kwargs)
+        result = vanilla_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
 
     obj_cat = result[0]
     segmap = result[1]
