@@ -12,13 +12,27 @@ from matplotlib.ticker import NullFormatter, MaxNLocator, FormatStrFormatter
 from matplotlib.patches import Ellipse
 
 from ..display import display_single, IMG_CMAP, SEG_CMAP
+import kuaizi
+
+
+import os
+import sys
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 #########################################################################
 ########################## The Tractor related ##########################
 #########################################################################
 
 # Add sources to tractor
-def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
+def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
     '''
     Add tractor sources to the sources list.
 
@@ -27,9 +41,10 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
     obj_cat: astropy Table, objects catalogue.
     sources: list, to which we will add objects.
     w: wcs object.
-    shape_method: string, 'manual' or 'decals'. If 'manual', it will adopt the 
-                manually measured shapes. If 'decals', it will adopt shapes in 'DECaLS' 
-                tractor catalog.
+    shape_method: string, 'manual' or 'decals' or 'hsc'. 
+        If 'manual', it will adopt the manually measured shapes. 
+        If 'decals', it will adopt shapes in 'DECaLS' tractor catalog.
+        If 'hsc', it will adopt shapes in HSC CModel catalog.
 
     Returns:
     --------
@@ -41,6 +56,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
     from tractor.ellipses import EllipseE
     from tractor.sersic import SersicGalaxy, SersicIndex
 
+    #if shape_method is 'manual' or 'decals':
     obj_type = np.array(list(map(lambda st: st.rstrip(' '), obj_cat['type'])))
     comp_galaxy = obj_cat[obj_type == 'COMP']
     dev_galaxy = obj_cat[obj_type == 'DEV']
@@ -49,59 +65,115 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
     ser_galaxy = obj_cat[obj_type == 'SER']
     psf_galaxy = obj_cat[np.logical_or(obj_type =='PSF', obj_type=='   ')]
 
+    # elif shape_method is 'hsc':
+    #     star_mask = obj_cat['{}_extendedness'.format(band)] < 0.5
+    #     psf_galaxy = obj_cat[star_mask]
+
+    #     fracdev = obj_cat['cmodel_fracdev'].values
+    #     dev_galaxy = obj_cat[(fracdev >= 0.5) & (~star_mask)]
+    #     exp_galaxy = obj_cat[(fracdev < 0.5) & (~star_mask)]
+    # else:
+    #     raise ValueError('Only "manual", "decals", or "hsc" is supported now.')
+
     if shape_method is 'manual':
         # Using manually measured shapes
         if sources is None:
             sources = []
-        for obj in obj_cat:
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
-            if obj['type'].rstrip(' ') == 'COMP':
-                sources.append(
-                    CompositeGalaxy(
-                        PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
-                        GalaxyShape(obj['a_arcsec'] * 0.8, 0.9,
-                                    90.0 + obj['theta'] * 180.0 / np.pi),
-                        Flux(0.6 * obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], obj['b_arcsec'] / obj['a_arcsec'],
-                                    90.0 + obj['theta'] * 180.0 / np.pi)))
-            elif obj['type'].rstrip(' ') == 'DEV':
-                sources.append(
-                    DevGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
-            elif obj['type'].rstrip(' ') == 'EXP':
-                sources.append(
-                    ExpGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
-            elif obj['type'].rstrip(' ') == 'SER':
-                sources.append(
-                    SersicGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi)), 
-                        SersicIndex(2.0)
-                        )
-                )
-            elif obj['type'].rstrip(' ') == 'REX':
-                sources.append(
-                    ExpGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
-            elif obj['type'].rstrip(' ') == 'PSF' or obj['type'].rstrip(' ') == '   ':
-                sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
+        
+        for obj in comp_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(
+                CompositeGalaxy(
+                    PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
+                    GalaxyShape(obj['a_arcsec'] * 0.8, 0.9,
+                                90.0 + obj['theta'] * 180.0 / np.pi),
+                    Flux(0.6 * obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], obj['b_arcsec'] / obj['a_arcsec'],
+                                90.0 + obj['theta'] * 180.0 / np.pi)))
+        for obj in dev_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(
+                DevGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi))))
+        for obj in exp_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(
+                ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi))))
+        for obj in ser_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(
+                SersicGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi)), 
+                    SersicIndex(2.0)
+                    )
+            )
+        for obj in rex_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(
+                ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi))))
+        for obj in psf_galaxy:
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+            sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
 
-        print("Now you have %d sources" % len(sources))
+        # for obj in obj_cat:
+        #     pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+        #     if obj['type'].rstrip(' ') == 'COMP':
+        #         sources.append(
+        #             CompositeGalaxy(
+        #                 PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'] * 0.8, 0.9,
+        #                             90.0 + obj['theta'] * 180.0 / np.pi),
+        #                 Flux(0.6 * obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'], obj['b_arcsec'] / obj['a_arcsec'],
+        #                             90.0 + obj['theta'] * 180.0 / np.pi)))
+        #     elif obj['type'].rstrip(' ') == 'DEV':
+        #         sources.append(
+        #             DevGalaxy(
+        #                 PixPos(pos_x, pos_y), Flux(obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+        #                             (90.0 + obj['theta'] * 180.0 / np.pi))))
+        #     elif obj['type'].rstrip(' ') == 'EXP':
+        #         sources.append(
+        #             ExpGalaxy(
+        #                 PixPos(pos_x, pos_y), Flux(obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+        #                             (90.0 + obj['theta'] * 180.0 / np.pi))))
+        #     elif obj['type'].rstrip(' ') == 'SER':
+        #         sources.append(
+        #             SersicGalaxy(
+        #                 PixPos(pos_x, pos_y), Flux(obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+        #                             (90.0 + obj['theta'] * 180.0 / np.pi)), 
+        #                 SersicIndex(2.0)
+        #                 )
+        #         )
+        #     elif obj['type'].rstrip(' ') == 'REX':
+        #         sources.append(
+        #             ExpGalaxy(
+        #                 PixPos(pos_x, pos_y), Flux(obj['flux']),
+        #                 GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+        #                             (90.0 + obj['theta'] * 180.0 / np.pi))))
+        #     elif obj['type'].rstrip(' ') == 'PSF' or obj['type'].rstrip(' ') == '   ':
+        #         sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
+
+        print(" - Now you have %d sources" % len(sources))
 
     elif shape_method is 'decals':
         ## Using DECaLS shapes
         if sources is None:
             sources = []
         for obj in comp_galaxy:
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(
                 CompositeGalaxy(
                     PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
@@ -110,14 +182,14 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
                     EllipseE(obj['shapedev_r'], obj['shapedev_e1'],
                              obj['shapedev_e2'])))
         for obj in dev_galaxy:
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(
                 DevGalaxy(
                     PixPos(pos_x, pos_y), Flux(obj['flux']),
                     EllipseE(obj['shapedev_r'], obj['shapedev_e1'],
                              -obj['shapedev_e2'])))
         for obj in exp_galaxy:
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(
                 ExpGalaxy(
                     PixPos(pos_x, pos_y), Flux(obj['flux']),
@@ -127,7 +199,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
             #if obj['point_source'] > 0.0:
             #            sources.append(PointSource(PixPos(w.wcs_world2pix([[obj['ra'], obj['dec']]],1)[0]),
             #                                               Flux(obj['flux'])))
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(
                 ExpGalaxy(
                     PixPos(pos_x, pos_y), Flux(obj['flux']),
@@ -135,10 +207,78 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
                              -obj['shapeexp_e2'])))
 
         for obj in psf_galaxy:
-            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 1)[0]
+            pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
 
-        print("Now you have %d sources" % len(sources))
+        print(" - Now you have %d sources" % len(sources))
+
+    elif shape_method is 'hsc':
+        from unagi import catalog
+        ## Using HSC CModel catalog
+        if sources is None:
+            sources = []
+        
+        for obj in ser_galaxy:
+            pos_x, pos_y = obj['x'], obj['y']
+            flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+            r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                                        obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                                        to_pixel=False, update=False) # arcsec, degree
+            sources.append(
+                SersicGalaxy(
+                    PixPos(pos_x, pos_y), Flux(flux),
+                    GalaxyShape(r_gal, ba_gal, pa_gal + 90),
+                    SersicIndex(1.0)
+                    )
+                )
+
+        for obj in dev_galaxy:
+            pos_x, pos_y = obj['x'], obj['y']
+            flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+            r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                                        obj, shape_type='cmodel_dev_ellipse', axis_ratio=True,
+                                        to_pixel=False, update=False) # arcsec, degree
+            sources.append(
+                DevGalaxy(
+                    PixPos(pos_x, pos_y), Flux(flux),
+                    GalaxyShape(r_gal, ba_gal, pa_gal + 90), 
+                    )
+            )
+        
+        for obj in exp_galaxy:
+            pos_x, pos_y = obj['x'], obj['y']
+            flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+            r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                                        obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                                        to_pixel=False, update=False) # arcsec, degree
+            sources.append(
+                ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(flux),
+                    GalaxyShape(r_gal, ba_gal, pa_gal + 90)
+                    )
+                )
+
+
+        for obj in rex_galaxy:
+            pos_x, pos_y = obj['x'], obj['y']
+            flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+            r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                                        obj, shape_type='cmodel_ellipse', axis_ratio=True,
+                                        to_pixel=False, update=False) # arcsec, degree
+            sources.append(
+                ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(flux),
+                    GalaxyShape(r_gal, ba_gal, pa_gal)
+                    )
+                )
+
+        for obj in psf_galaxy:
+            pos_x, pos_y = obj['x'], obj['y']
+            flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+
+            sources.append(PointSource(PixPos(pos_x, pos_y), Flux(flux)))
+        
+        print(" - Now you have %d sources" % len(sources))
     else:
          raise ValueError('Cannot use this shape method') 
     return sources
@@ -146,7 +286,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual'):
 # Do tractor iteration
 def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale, 
                       shape_method='manual', freeze_pos=False,
-                      kfold=4, first_num=50, fig_name=None):
+                      kfold=4, first_num=50, fig_name=None, verbose=False):
     '''
     Run tractor iteratively.
 
@@ -182,29 +322,31 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             obj_small_cat = obj_cat[first_num + step * (i - 1) : first_num + step * (i)]
             sources = add_tractor_sources(obj_small_cat, sources, w, shape_method=shape_method)
 
-        tim = Image(data=img_data,
-                    invvar=invvar,
-                    psf=psf_obj,
-                    wcs=NullWCS(pixscale=pixel_scale),
-                    sky=ConstantSky(0.0),
-                    photocal=NullPhotoCal()
-                    )
-        trac_obj = Tractor([tim], sources)
-        trac_mod = trac_obj.getModelImage(0, minsb=0.0)
+        with HiddenPrints():
+            tim = Image(data=img_data,
+                        invvar=invvar,
+                        psf=psf_obj,
+                        wcs=NullWCS(pixscale=pixel_scale),
+                        sky=ConstantSky(0.0),
+                        photocal=NullPhotoCal()
+                        )
+            trac_obj = Tractor([tim], sources)
+            trac_mod = trac_obj.getModelImage(0, minsb=0.0)
 
-        # Optimization
-        if freeze_pos:
-            for src in sources[1:]:
-                src.freezeParam('pos')
-
-        trac_obj.freezeParam('images')
-        trac_obj.optimize_loop()
+            if freeze_pos:
+                for src in sources:
+                    src.freezeParam('pos')
+            trac_obj.freezeParam('images')
+            trac_obj.optimize_loop()
+        
+        
         ########################
         plt.rc('font', size=20)
-        if i % 2 == 1 or i == (kfold-1) :
+        if i % 2 == 1 or i == (kfold - 1) :
             fig, [ax1, ax2, ax3] = plt.subplots(1, 3, figsize=(18,8))
 
-            trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[:])
+            with HiddenPrints():
+                trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[:])
 
             ax1 = display_single(img_data, ax=ax1, scale_bar=False)
             ax1.set_title('raw image')
@@ -213,14 +355,17 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             ax3 = display_single(abs(img_data - trac_mod_opt), ax=ax3, scale_bar=False, color_bar=True, contrast=0.05)
             ax3.set_title('residual')
 
-            if i == (kfold-1):
+            if i == (kfold - 1):
                 if fig_name is not None:
                     plt.savefig(fig_name, dpi=200, bbox_inches='tight')
                     plt.show()
-                    print('The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))))
-            else:
+                    print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+            elif verbose:
                 plt.show()
-                print('The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+                print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+            else:
+                plt.close()
+                print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
 
         #trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[1:])
         #ax4 = display_single(img_data - trac_mod_opt, ax=ax4, scale_bar=False, color_bar=True, contrast=0.05)
