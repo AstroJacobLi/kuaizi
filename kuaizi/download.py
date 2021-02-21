@@ -95,7 +95,7 @@ def download_decals_tractor_catalog(bricknames, layer='dr8', output_dir='./', ov
                                         reporthook=t.update_to, data=None)
             print('# Downloading ' + filename + ' finished! ')                            
         elif os.path.isfile(filename) and not overwrite:
-            print('!!!The image "' + filename + '" already exists!!!')
+            print('!!!The file "' + filename + '" already exists!!!')
     if return_table:
         from astropy.table import Table, vstack
         return vstack([Table.read(os.path.join(output_dir, f'tractor-{brick}.fits')) for brick in bricknames])
