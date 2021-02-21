@@ -4,6 +4,7 @@ import numpy as np
 
 from astropy import wcs
 from astropy.table import Table
+from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -286,7 +287,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
 # Do tractor iteration
 def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale, 
                       shape_method='manual', freeze_pos=False,
-                      kfold=4, first_num=50, fig_name=None, verbose=False):
+                      kfold=4, first_num=50, band_name=None, fig_name=None, verbose=False):
     '''
     Run tractor iteratively.
 
@@ -349,7 +350,10 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[:])
 
             ax1 = display_single(img_data, ax=ax1, scale_bar=False)
-            ax1.set_title('raw image')
+            if band_name is not None:
+                ax1.set_title(f'{band_name}-band raw image')
+            else:
+                ax1.set_title('raw image')
             ax2 = display_single(trac_mod_opt, ax=ax2, scale_bar=False, contrast=0.02)
             ax2.set_title('tractor model')
             ax3 = display_single(abs(img_data - trac_mod_opt), ax=ax3, scale_bar=False, color_bar=True, contrast=0.05)
@@ -373,3 +377,122 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
 
 
     return sources, trac_obj, fig
+
+
+def tractor_hsc(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use_cmodel_filt=None, freeze_pos=True, verbose=False):
+    '''
+    Run `the tractor` on HSC images, for Merian survey.
+
+    Parameters:
+        obj_name (str): name of the object. 
+        coord (astropy.coordinate.SkyCoord): Coordinate of the object.
+        s_ang (astropy.units.arcsec): searching (angular) radius.
+        filt (str): filter name, such as 'r'.
+        channels (str): all filters, such as 'grizy'.
+        data (kuaizi.detection.Data): an data structure which contains images, weights, wcs, PSFs, etc.
+        hsc_dr: archive of HSC data, such as using `pdr2 = hsc.Hsc(dr='pdr2', rerun='pdr2_wide')`.
+        use_cmodel_filt (str): if not None (such as `use_cmodel_filt='i'`), 
+            models in all bands will be initialized using the CModel catalog in this band. 
+        freeze_pos (bool): whether freezing the positions of objects during fitting.
+        verbose (bool): whether being verbose.
+
+    Return: 
+
+    '''
+    print("### `" + obj_name + f"` {filt}-band")
+    layer_ind = channels.index(filt)
+    
+    if use_cmodel_filt is not None:
+        cmodel_filt = use_cmodel_filt
+    else:
+        cmodel_filt = filt
+
+
+    ## Initialize `unagi`
+    from unagi import hsc, config
+    from unagi import plotting
+    from unagi import task, catalog
+
+    # Retrieve HSC catalog
+    cutout_objs = task.hsc_box_search(
+        coord, box_size=s_ang * 1.1, archive=hsc_dr,
+        verbose=True, psf=True, cmodel=True, aper=True, shape=True,
+        meas=cmodel_filt, flux=False, aper_type='3_20')
+    
+    cutout_clean, clean_mask = catalog.select_clean_objects(
+        cutout_objs, return_catalog=True, verbose=False) # Select "clean" images
+    
+    x, y = data.wcs.wcs_world2pix(cutout_clean['ra'], cutout_clean['dec'], 0)
+    cutout_clean['x'] = x
+    cutout_clean['y'] = y
+
+    # sort by magnitude
+    cutout_clean.sort('cmodel_mag')
+
+    # Remove weird objects: abs(i_psf_mag - i_cmodel_mag) > 1
+    cutout_clean = cutout_clean[(cutout_clean['psf_mag'] - cutout_clean['cmodel_mag']) < 2.5]
+    
+    # Plot HSC CModel catalog on top of the rgb image
+    if filt == 'i':
+        stretch = 1
+        Q = 0.5
+        channel_map = scarlet.display.channels_to_rgb(len(channels))
+
+        img_rgb = scarlet.display.img_to_rgb(
+            data.images,
+            norm=scarlet.display.AsinhMapping(minimum=-0.2, stretch=stretch, Q=Q),
+            channel_map=channel_map)
+    
+        _ = plotting.cutout_show_objects(
+            img_rgb, cutout_clean, cutout_wcs=data.wcs, xsize=8, show_weighted=True) # Exp is brown. Dev is dashed-white.
+        plt.savefig(obj_name + '_cmodel_i.png', bbox_inches='tight')
+    
+    # Find out target galaxy
+    catalog_c = SkyCoord(cutout_clean['ra'], cutout_clean['dec'], unit='deg')
+    dist = coord.separation(catalog_c)
+    cen_obj_ind = np.argsort(dist)[0]
+    cen_obj = cutout_clean[cen_obj_ind]
+
+    ## Assign types to each object
+    obj_type = np.empty_like(cutout_clean['object_id'], dtype='S4')
+    star_mask = cutout_clean['{}_extendedness'.format(filt)] < 0.5
+    obj_type[star_mask] = 'PSF'
+
+    fracdev = cutout_clean['cmodel_fracdev']
+    obj_type[(fracdev >= 0.5) & (~star_mask)] = 'DEV' # dev_galaxy
+    obj_type[(fracdev < 0.5) & (~star_mask)] = 'EXP' # exp_galaxy
+    obj_type[cen_obj_ind] = 'SER'
+    
+    cutout_clean['type'] = obj_type
+    
+    psf_obj = PixelizedPSF(data.psfs[layer_ind]) # Construct PSF
+    
+    
+    kfold = 4
+    while True:
+        try:
+            if kfold == 1:
+                break 
+            sources, trac_obj, fig = tractor_iteration(
+                cutout_clean,
+                data.wcs,
+                data.images[layer_ind],
+                data.weights[layer_ind],
+                psf_obj,
+                kuaizi.HSC_pixel_scale,
+                shape_method='hsc',
+                freeze_pos=freeze_pos,
+                kfold=kfold,
+                first_num=cen_obj_ind + 1,
+                band_name=filt, 
+                fig_name=obj_name + '_tractor_' + filt, 
+                verbose=verbose)
+            
+        except Exception as e:
+            print('   ' + str(e))
+            kfold -= 1
+            pass
+        else:
+            break
+        
+    return trac_obj

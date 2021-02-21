@@ -573,7 +573,6 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
 ################# HDF5 related ##################
 # Print attributes of a HDF5 file
 
-
 def h5_print_attrs(f):
     '''
     Print all attributes of a HDF5 file.
@@ -595,7 +594,6 @@ def h5_print_attrs(f):
 
 # Rewrite dataset
 
-
 def h5_rewrite_dataset(mother_group, key, new_data):
     '''
     Rewrite the given dataset of a HDF5 group.
@@ -615,7 +613,6 @@ def h5_rewrite_dataset(mother_group, key, new_data):
 
 # Create New group
 
-
 def h5_new_group(mother_group, key):
     '''
     Create a new data_group
@@ -633,7 +630,6 @@ def h5_new_group(mother_group, key):
     return new_grp
 
 # String to dictionary
-
 
 def str2dic(string):
     '''
