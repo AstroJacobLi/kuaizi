@@ -13,7 +13,7 @@ with open('requirements.txt') as infd:
     print(INSTALL_REQUIRES)
 
 setup(name='kuaizi', 
-	description='Handy code to use',
+	description='Picking low surface brightness galaxies in HSC data with kuaizi (chopsticks in Chinese)',
 	long_description=readme(),
 	long_description_content_type="text/markdown",
 	classifiers=[
