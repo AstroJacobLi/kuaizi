@@ -663,7 +663,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
     if show_mark:
         # Mark all of the sources from the detection cataog
         for k, src in enumerate(sources):
-            if isinstance(src, scarlet.source.PointSource):
+            if isinstance(src, scarlet.source.PointSource) or isinstance(src, scarlet.source.CompactExtendedSource):
                 color = 'white'
             elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
@@ -778,11 +778,11 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         blend = scarlet.Blend(gal_sources, observation)
 
     if zoomin_size is not None:
-        x_cen = observation.frame.shape[2] // 2
-        y_cen = observation.frame.shape[1] // 2
+        x_cen = observation.model_frame.shape[2] // 2
+        y_cen = observation.model_frame.shape[1] // 2
         size = int(zoomin_size / pixel_scale / 2)  # half-size
         # Image
-        images = observation.images[:, y_cen - size:y_cen +
+        images = observation.data[:, y_cen - size:y_cen +
                                     size + 1, x_cen - size:x_cen + size + 1]
         # Weights
         weights = observation.weights[:, y_cen -
@@ -793,7 +793,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         # this model is under `model_frame`, i.e. under the modest PSF
     else:
         # Image
-        images = observation.images
+        images = observation.data
         # Weights
         weights = observation.weights
         # Compute model
@@ -849,7 +849,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
 
     if show_mark:
         for k, src in enumerate(blend.sources):
-            if isinstance(src, scarlet.source.PointSource):
+            if isinstance(src, scarlet.source.PointSource) or isinstance(src, scarlet.source.CompactExtendedSource):
                 color = 'white'
             elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
