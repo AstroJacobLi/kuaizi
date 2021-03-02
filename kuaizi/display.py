@@ -663,8 +663,10 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
     if show_mark:
         # Mark all of the sources from the detection cataog
         for k, src in enumerate(sources):
-            if isinstance(src, scarlet.source.PointSource) or isinstance(src, scarlet.source.CompactExtendedSource):
+            if isinstance(src, scarlet.source.PointSource):
                 color = 'white'
+            elif isinstance(src, scarlet.source.CompactExtendedSource):
+                color = 'yellow'
             elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
             elif isinstance(src, scarlet.source.MultiExtendedSource):
@@ -672,7 +674,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
             elif isinstance(src, scarlet.source.StarletSource):
                 color = 'lime'
             else:
-                color = 'yellow'
+                color = 'gray'
             if hasattr(src, "center"):
                 y, x = src.center
                 plt.text(x, y, str(k), color=color)
@@ -849,8 +851,10 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
 
     if show_mark:
         for k, src in enumerate(blend.sources):
-            if isinstance(src, scarlet.source.PointSource) or isinstance(src, scarlet.source.CompactExtendedSource):
+            if isinstance(src, scarlet.source.PointSource):
                 color = 'white'
+            elif isinstance(src, scarlet.source.CompactExtendedSource):
+                color = 'yellow'
             elif isinstance(src, scarlet.source.SingleExtendedSource):
                 color = 'red'
             elif isinstance(src, scarlet.source.MultiExtendedSource):
@@ -858,7 +862,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
             elif isinstance(src, scarlet.source.StarletSource):
                 color = 'lime'
             else:
-                color = 'yellow'
+                color = 'gray'
             if hasattr(src, "center"):
                 y, x = src.center
                 if zoomin_size is not None:
