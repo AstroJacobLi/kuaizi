@@ -379,7 +379,7 @@ def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_sca
     _cen = centroid(components, observation)
     measure_dict['x_cen'] = _cen[2]
     measure_dict['y_cen'] = _cen[1]
-    w = observation.frame.wcs
+    w = observation.model_frame.wcs
     ra, dec = w.wcs_pix2world(measure_dict['x_cen'], measure_dict['y_cen'], 0)
     measure_dict['ra_cen'] = float(ra)
     measure_dict['dec_cen'] = float(dec)
@@ -463,7 +463,7 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
         slices = tuple((src._model_frame_slices[1:], src._model_slices[1:])
                        for src in components)
         # Inv-variance map in the full scene
-        full_invvar = np.zeros(blend.frame.shape[1:], dtype=blend.frame.dtype)
+        full_invvar = np.zeros(blend.model_frame.shape[1:], dtype=blend.model_frame.dtype)
         # the inv-variance of background is 0???
         full_invvar = scarlet.blend._add_models(
             *invvar, full_model=full_invvar, slices=slices)
@@ -494,7 +494,7 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
         sersic['X0_scene'] = sersic['X0'] + components.bbox.origin[2]
         sersic['Y0_scene'] = sersic['Y0'] + components.bbox.origin[1]
 
-    w = observation.frame.wcs
+    w = observation.model_frame.wcs
     ra, dec = w.wcs_pix2world(sersic['X0_scene'], sersic['Y0_scene'], 0)
     sersic['RA0'] = float(ra)
     sersic['DEC0'] = float(dec)
