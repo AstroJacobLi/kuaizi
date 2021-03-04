@@ -2,7 +2,7 @@ from __future__ import division, print_function
 
 import copy
 import os
-import pickle
+import pickle, dill
 import sys
 from contextlib import contextmanager
 
@@ -89,7 +89,7 @@ class Data:
 
 class MockGal:
     """
-    This is a class for mock galaxy.
+    This is a class for "simple" (can be expressed by GalSim) mock galaxy.
 
     bkg_image
     bkg_variance
@@ -266,6 +266,48 @@ class MockGal:
         mock_model = Data(images=model_images, variances=None,
                           masks=None, channels=self.channels,
                           wcs=None, weights=None, psfs=self.bkg.psfs, info=galaxy)
+
+        # Finished!!!
+        self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`!
+        self.set_mock()  # mock has other things, including modified variances.
+
+    def from_scarlet(self, scarlet_model_dir, pixel_scale=HSC_pixel_scale):
+        from galsim import Image, InterpolatedImage
+        from galsim.interpolant import Lanczos
+
+        with open(scarlet_model_dir, 'rb') as f:
+            blend, info, mask = dill.load(f)
+            f.close()
+        assert ''.join(blend.observations[0].channels) == self.channels
+
+        # Crop the mask
+        new_weights = blend.observations[0].weights
+        x1, y1 = blend.sources[0].bbox.origin[1:]
+        x2 = x1 + blend.sources[0].bbox.shape[1:][0]
+        y2 = y1 + blend.sources[0].bbox.shape[1:][1]
+        mask = mask.astype(bool)[x1:x2, y1:y2]
+        mask += np.sum((new_weights[:, x1:x2, y1:y2] == 0), axis=0).astype(bool)
+        
+
+        mockgal_img = blend.sources[0].get_model() * np.repeat(~mask[np.newaxis, :, :], len(self.channels), axis=0)
+        gal_image = np.empty_like(self.bkg.images)
+        for i in range(len(mockgal_img)):
+            mockgal = InterpolatedImage(
+                Image(mockgal_img[i], dtype=float),
+                scale=pixel_scale,
+                x_interpolant=Lanczos(3))
+            gal_image[i] = mockgal.drawImage(
+                scale=pixel_scale, nx=self.bkg.images.shape[2], ny=self.bkg.images.shape[1]).array
+
+        # Generate variance map
+        ra, dec = self.bkg.wcs.wcs_pix2world(self.bkg.images.shape[2] / 2, self.bkg.images.shape[1] / 2, 0)
+        info = {'ra': ra, 'dec': dec, 
+                'scarlet_model': scarlet_model_dir,
+                'model_type': 'scarlet_lsbg_wvlt_0.5'}
+        mock_model = Data(images=gal_image, variances=None,
+                          masks=None, channels=self.channels,
+                          wcs=None, weights=None, psfs=self.bkg.psfs, 
+                          info=info)
 
         # Finished!!!
         self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`!
