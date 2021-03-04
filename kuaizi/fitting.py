@@ -2544,16 +2544,17 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
 
 
 def fitting_wavelet_mockgal(index=0, starlet_thresh=0.8, prefix='MockLSBG', pixel_scale=HSC_pixel_scale,
-                            zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure', show_figure=False):
+                            zp=HSC_zeropoint, model_dir='./Models/MockGalModel', output_dir='./Models/', 
+                            figure_dir='./Figure', show_figure=False):
     clear_output()
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
 
     from kuaizi.mock import MockGal
     mgal = MockGal.read(os.path.join(
-        model_dir, f'MockGalModel/{prefix}-{index:04d}.pkl'))
+        model_dir, f'{prefix}-{index:04d}.pkl'))
     print('Loading', os.path.join(
-        model_dir, f'MockGalModel/{prefix}-{index:04d}.pkl'))
+        model_dir, f'{prefix}-{index:04d}.pkl'))
     channels = mgal.channels
     channels_list = list(channels)
     filters = channels_list
@@ -2570,5 +2571,5 @@ def fitting_wavelet_mockgal(index=0, starlet_thresh=0.8, prefix='MockLSBG', pixe
 
     blend = _fitting_wavelet(
         data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
+        zp=zp, model_dir=output_dir, figure_dir=figure_dir, show_figure=show_figure)
     return blend
