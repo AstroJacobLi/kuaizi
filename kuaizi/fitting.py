@@ -2114,7 +2114,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if contam_ratio <= 0.10:
+        if contam_ratio <= 0.15:
             break
     print(f'# min_grad = {min_grad:.2f}, contam_ratio = {contam_ratio:.2f}. starlet_thresh = {starlet_thresh:.2f}.')
     starlet_source.center = (
@@ -2374,7 +2374,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             # footprint2[segmap_big == cen_indx_big + 1] = 0
 
             footprint = footprint + footprint2 # This is the mask for everything except target galaxy
-            
+
         with open(os.path.join(model_dir, f'{prefix}-{index:04d}-trained-model-wavelet.df'), 'wb') as fp:
             dill.dump(
                 [blend, {'e_rel': e_rel, 'loss': blend.loss[-1], 'sed_ind': sed_ind}, footprint], fp)
