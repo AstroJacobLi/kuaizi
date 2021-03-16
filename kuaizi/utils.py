@@ -170,9 +170,9 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
 
     if verbose:
         if logger is not None:
-            logger.info("    - Detected %d objects" % len(objects))
+            logger.info("    Detected %d objects" % len(objects))
         else:
-            print("# Detected %d objects" % len(objects))
+            print("    Detected %d objects" % len(objects))
     objects = Table(objects)
     objects.add_column(Column(data=np.arange(len(objects)), name='index'))
     # Maximum flux, defined as flux within 6 * `a` (semi-major axis) in radius.
@@ -384,11 +384,11 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
                                       verbose=False, visual=False,
                                       size_buffer=size_buffer)
         if gaia_stars is not None:
-            print(f'# {len(gaia_stars)} stars from GAIA are masked!')
+            print(f'    {len(gaia_stars)} stars from GAIA are masked!')
         else:
-            print('No GAIA stars are masked.')
+            print('    No GAIA stars are masked.')
     else:
-        print(f'# {len(gaia_stars)} stars from GAIA are masked!')
+        print(f'    {len(gaia_stars)} stars from GAIA are masked!')
 
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
@@ -573,6 +573,7 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
 ################# HDF5 related ##################
 # Print attributes of a HDF5 file
 
+
 def h5_print_attrs(f):
     '''
     Print all attributes of a HDF5 file.
@@ -594,6 +595,7 @@ def h5_print_attrs(f):
 
 # Rewrite dataset
 
+
 def h5_rewrite_dataset(mother_group, key, new_data):
     '''
     Rewrite the given dataset of a HDF5 group.
@@ -613,6 +615,7 @@ def h5_rewrite_dataset(mother_group, key, new_data):
 
 # Create New group
 
+
 def h5_new_group(mother_group, key):
     '''
     Create a new data_group
@@ -630,6 +633,7 @@ def h5_new_group(mother_group, key):
     return new_grp
 
 # String to dictionary
+
 
 def str2dic(string):
     '''
