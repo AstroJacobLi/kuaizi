@@ -511,6 +511,7 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
         raise ValueError(
             "The length of `obj_cat` is less than 1. Please check your catalog!")
     elif len(obj_cat) == 1:
+        # when there's only one object, you don't need to run Tractor for several rounds.
         kfold = 1
     else:
         step = int((len(obj_cat) - first_num) / (kfold - 1))
