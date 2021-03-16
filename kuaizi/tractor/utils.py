@@ -21,6 +21,7 @@ import kuaizi
 import os
 import sys
 
+
 class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
@@ -31,9 +32,7 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
-
-    
-def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5, 
+def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5,
                 match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
@@ -75,10 +74,11 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
     if layer_ind is not None:
         detect_image = datas[0].images[layer_ind]
     else:
-        hr_images = datas[0].images / np.sum(datas[0].images, axis=(1, 2))[:, None, None]
+        hr_images = datas[0].images / \
+            np.sum(datas[0].images, axis=(1, 2))[:, None, None]
         # Detection image as the sum over all images
         detect_image = np.sum(hr_images, axis=0)
-    
+
     if np.size(detect_image.shape) == 3:
         detect = detect_image.mean(axis=0)
     else:
@@ -89,9 +89,11 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
         detect = convolve(detect.astype(float), Gaussian2DKernel(conv_radius))
 
     if method == 'wavelet':
-        result = wavelet_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+        result = wavelet_detection(
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
     else:
-        result = vanilla_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+        result = vanilla_detection(
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
 
     obj_cat = result[0]
     segmap = result[1]
@@ -99,35 +101,41 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
     ## RA and Dec
     if len(datas) == 1:
         ra, dec = datas[0].wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        obj_cat.add_columns([Column(data=ra, name='ra'), Column(data=dec, name='dec')])
+        obj_cat.add_columns([Column(data=ra, name='ra'),
+                             Column(data=dec, name='dec')])
     else:
-        ra_lr, dec_lr = data_lr.wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        ra_hr, dec_hr = data_hr.wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        obj_cat.add_columns([Column(data=ra_lr, name='ra_lr'), Column(data=dec_lr, name='dec_lr')])
-        obj_cat.add_columns([Column(data=ra_hr, name='ra_hr'), Column(data=dec_lr, name='dec_hr')])
-    
-    ## Reorder columns
+        ra_lr, dec_lr = data_lr.wcs.wcs_pix2world(
+            obj_cat['x'], obj_cat['y'], 0)
+        ra_hr, dec_hr = data_hr.wcs.wcs_pix2world(
+            obj_cat['x'], obj_cat['y'], 0)
+        obj_cat.add_columns(
+            [Column(data=ra_lr, name='ra_lr'), Column(data=dec_lr, name='dec_lr')])
+        obj_cat.add_columns(
+            [Column(data=ra_hr, name='ra_hr'), Column(data=dec_lr, name='dec_hr')])
+
+    # Reorder columns
     colnames = obj_cat.colnames
     for item in ['dec', 'ra', 'y', 'x', 'index']:
         if item in colnames:
             colnames.remove(item)
             colnames.insert(0, item)
     obj_cat = obj_cat[colnames]
-    obj_cat.add_column(Column(data=[None]  * len(obj_cat), name='obj_type'), index=0)
-
+    obj_cat.add_column(
+        Column(data=[None] * len(obj_cat), name='obj_type'), index=0)
 
     if match_gaia:
-        obj_cat.add_column(Column(data=[None]  * len(obj_cat), name='gaia_coord'))
+        obj_cat.add_column(
+            Column(data=[None] * len(obj_cat), name='gaia_coord'))
         if len(datas) == 1:
             w = datas[0].wcs
             pixel_scale = w.to_header()['PC2_2'] * 3600
         else:
             w = data_hr.wcs
             pixel_scale = w.to_header()['PC2_2'] * 3600
-        
+
         # Retrieve GAIA catalog
         gaia_stars = image_gaia_stars(
-            detect, w, pixel_scale=pixel_scale, 
+            detect, w, pixel_scale=pixel_scale,
             verbose=True, visual=visual_gaia)
         # Cross-match with SExtractor catalog
         from astropy.coordinates import SkyCoord, match_coordinates_sky
@@ -138,10 +146,13 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
         psf_ind = temp[flag]
         star_mag = star_mag[flag]
         bright_star_flag = star_mag < 19.0
-        obj_cat['obj_type'][psf_ind[bright_star_flag]] = scarlet.source.ExtendedSource
-        obj_cat['obj_type'][psf_ind[~bright_star_flag]] = scarlet.source.PointSource
-        ## we also use the coordinates from Gaia for bright stars
-        obj_cat['gaia_coord'][psf_ind] = np.array(gaia_stars[['ra', 'dec']])[flag]
+        obj_cat['obj_type'][psf_ind[bright_star_flag]
+                            ] = scarlet.source.ExtendedSource
+        obj_cat['obj_type'][psf_ind[~bright_star_flag]
+                            ] = scarlet.source.PointSource
+        # we also use the coordinates from Gaia for bright stars
+        obj_cat['gaia_coord'][psf_ind] = np.array(
+            gaia_stars[['ra', 'dec']])[flag]
 
         # Cross-match for a second time: to deal with splitted bright stars
         temp_cat = obj_cat.copy(copy_data=True)
@@ -150,7 +161,7 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
                                                 SkyCoord(ra=temp_cat['ra'], dec=temp_cat['dec'], unit='deg'), nthneighbor=1)
         flag2 = dist2 < 1 * u.arcsec
         psf_ind2 = temp_cat[temp2[flag2]]['index'].data
-        ## we also use the coordinates from Gaia for bright stars
+        # we also use the coordinates from Gaia for bright stars
         obj_cat.remove_rows(psf_ind2)
         #obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
         #obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
@@ -222,14 +233,14 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
     from tractor.ellipses import EllipseE
     from tractor.sersic import SersicGalaxy, SersicIndex
 
-    #if shape_method is 'manual' or 'decals':
+    # if shape_method is 'manual' or 'decals':
     obj_type = np.array(list(map(lambda st: st.rstrip(' '), obj_cat['type'])))
     comp_galaxy = obj_cat[obj_type == 'COMP']
     dev_galaxy = obj_cat[obj_type == 'DEV']
     exp_galaxy = obj_cat[obj_type == 'EXP']
     rex_galaxy = obj_cat[obj_type == 'REX']
     ser_galaxy = obj_cat[obj_type == 'SER']
-    psf_galaxy = obj_cat[np.logical_or(obj_type =='PSF', obj_type=='   ')]
+    psf_galaxy = obj_cat[np.logical_or(obj_type == 'PSF', obj_type == '   ')]
 
     # elif shape_method is 'hsc':
     #     star_mask = obj_cat['{}_extendedness'.format(band)] < 0.5
@@ -245,7 +256,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
         # Using manually measured shapes
         if sources is None:
             sources = []
-        
+
         for obj in comp_galaxy:
             pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             sources.append(
@@ -276,9 +287,9 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
                 SersicGalaxy(
                     PixPos(pos_x, pos_y), Flux(obj['flux']),
                     GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                (90.0 + obj['theta'] * 180.0 / np.pi)), 
+                                (90.0 + obj['theta'] * 180.0 / np.pi)),
                     SersicIndex(2.0)
-                    )
+                )
             )
         for obj in rex_galaxy:
             pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
@@ -289,7 +300,8 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
 
         for obj in psf_galaxy:
             pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-            sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
+            sources.append(PointSource(
+                PixPos(pos_x, pos_y), Flux(obj['flux'])))
 
         # for obj in obj_cat:
         #     pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
@@ -319,7 +331,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
         #             SersicGalaxy(
         #                 PixPos(pos_x, pos_y), Flux(obj['flux']),
         #                 GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-        #                             (90.0 + obj['theta'] * 180.0 / np.pi)), 
+        #                             (90.0 + obj['theta'] * 180.0 / np.pi)),
         #                 SersicIndex(2.0)
         #                 )
         #         )
@@ -335,7 +347,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
         print(" - Now you have %d sources" % len(sources))
 
     elif shape_method is 'decals':
-        ## Using DECaLS shapes
+        # Using DECaLS shapes
         if sources is None:
             sources = []
         for obj in comp_galaxy:
@@ -362,14 +374,14 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
                     EllipseE(obj['shape_r'], obj['shape_e1'],
                              -obj['shape_e2'])))
         for obj in rex_galaxy:
-            #if obj['point_source'] > 0.0:
+            # if obj['point_source'] > 0.0:
             #            sources.append(PointSource(PixPos(w.wcs_world2pix([[obj['ra'], obj['dec']]],1)[0]),
             #                                               Flux(obj['flux'])))
             pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
             src = ExpGalaxy(
-                    PixPos(pos_x, pos_y), Flux(obj['flux']),
-                    EllipseE(obj['shape_r'], 0, 0)
-                   )
+                PixPos(pos_x, pos_y), Flux(obj['flux']),
+                EllipseE(obj['shape_r'], 0, 0)
+            )
             src.shape.freezeParam('e1')
             src.shape.freezeParam('e2')
             sources.append(src)
@@ -382,90 +394,91 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
                     EllipseE(obj['shape_r'], obj['shape_e1'],
                              -obj['shape_e2']),
                     SersicIndex(1.0)
-                    )
                 )
+            )
 
         for obj in psf_galaxy:
             pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-            sources.append(PointSource(PixPos(pos_x, pos_y), Flux(obj['flux'])))
+            sources.append(PointSource(
+                PixPos(pos_x, pos_y), Flux(obj['flux'])))
 
         print(" - Now you have %d sources" % len(sources))
 
     elif shape_method is 'hsc':
         from unagi import catalog
-        ## Using HSC CModel catalog
+        # Using HSC CModel catalog
         if sources is None:
             sources = []
-        
+
         for obj in ser_galaxy:
             pos_x, pos_y = obj['x'], obj['y']
             flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
             r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
-                                        obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
-                                        to_pixel=False, update=False) # arcsec, degree
+                obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                to_pixel=False, update=False)  # arcsec, degree
             sources.append(
                 SersicGalaxy(
                     PixPos(pos_x, pos_y), Flux(flux),
                     GalaxyShape(r_gal, ba_gal, pa_gal + 90),
                     SersicIndex(1.0)
-                    )
                 )
+            )
 
         for obj in dev_galaxy:
             pos_x, pos_y = obj['x'], obj['y']
             flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
             r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
-                                        obj, shape_type='cmodel_dev_ellipse', axis_ratio=True,
-                                        to_pixel=False, update=False) # arcsec, degree
+                obj, shape_type='cmodel_dev_ellipse', axis_ratio=True,
+                to_pixel=False, update=False)  # arcsec, degree
             sources.append(
                 DevGalaxy(
                     PixPos(pos_x, pos_y), Flux(flux),
-                    GalaxyShape(r_gal, ba_gal, pa_gal + 90), 
-                    )
+                    GalaxyShape(r_gal, ba_gal, pa_gal + 90),
+                )
             )
-        
+
         for obj in exp_galaxy:
             pos_x, pos_y = obj['x'], obj['y']
             flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
             r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
-                                        obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
-                                        to_pixel=False, update=False) # arcsec, degree
+                obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                to_pixel=False, update=False)  # arcsec, degree
             sources.append(
                 ExpGalaxy(
                     PixPos(pos_x, pos_y), Flux(flux),
                     GalaxyShape(r_gal, ba_gal, pa_gal + 90)
-                    )
                 )
-
+            )
 
         for obj in rex_galaxy:
             pos_x, pos_y = obj['x'], obj['y']
             flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
             r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
-                                        obj, shape_type='cmodel_ellipse', axis_ratio=True,
-                                        to_pixel=False, update=False) # arcsec, degree
+                obj, shape_type='cmodel_ellipse', axis_ratio=True,
+                to_pixel=False, update=False)  # arcsec, degree
             src = ExpGalaxy(
-                    PixPos(pos_x, pos_y), Flux(flux),
-                    GalaxyShape(r_gal, 1, 0)
-                   )
+                PixPos(pos_x, pos_y), Flux(flux),
+                GalaxyShape(r_gal, 1, 0)
+            )
             src.shape.freezeParam('ab')
             src.shape.freezeParam('phi')
             sources.append(src)
-            
 
         for obj in psf_galaxy:
             pos_x, pos_y = obj['x'], obj['y']
             flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
 
             sources.append(PointSource(PixPos(pos_x, pos_y), Flux(flux)))
-        
+
         print(" - Now you have %d sources" % len(sources))
     else:
-         raise ValueError('Cannot use this shape method') 
+        raise ValueError('Cannot use this shape method')
     return sources
 
 # Do tractor iteration
-def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale, 
+
+
+def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                       shape_method='manual', freeze_pos=False,
                       kfold=4, first_num=50, band_name=None, fig_name=None, verbose=False):
     '''
@@ -494,14 +507,24 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     from tractor.psf import Flux, PixPos, PointSource, PixelizedPSF, Image, Tractor
     from tractor.ellipses import EllipseE
 
-    step = int((len(obj_cat) - first_num) / (kfold - 1))
+    if len(obj_cat) < 1:
+        raise ValueError(
+            "The length of `obj_cat` is less than 1. Please check your catalog!")
+    elif len(obj_cat) == 1:
+        kfold = 1
+    else:
+        step = int((len(obj_cat) - first_num) / (kfold - 1))
+
     for i in range(kfold):
         if i == 0:
             obj_small_cat = obj_cat[:first_num]
-            sources = add_tractor_sources(obj_small_cat, None, w, shape_method=shape_method)
+            sources = add_tractor_sources(
+                obj_small_cat, None, w, shape_method=shape_method)
         else:
-            obj_small_cat = obj_cat[first_num + step * (i - 1) : first_num + step * (i)]
-            sources = add_tractor_sources(obj_small_cat, sources, w, shape_method=shape_method)
+            obj_small_cat = obj_cat[first_num +
+                                    step * (i - 1): first_num + step * (i)]
+            sources = add_tractor_sources(
+                obj_small_cat, sources, w, shape_method=shape_method)
 
         with HiddenPrints():
             tim = Image(data=img_data,
@@ -526,27 +549,27 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
         #         if dlnp < 1e-5:
         #             break
         # print(dlnp, i)
-            
-        
-        
+
         ########################
         plt.rc('font', size=20)
-        if i % 2 == 1 or i == (kfold - 1) :
-            fig, [ax1, ax2, ax3] = plt.subplots(1, 3, figsize=(18,8))
+        if i % 2 == 1 or i == (kfold - 1):
+            fig, [ax1, ax2, ax3] = plt.subplots(1, 3, figsize=(18, 8))
 
             with HiddenPrints():
-                trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[:])
+                trac_mod_opt = trac_obj.getModelImage(
+                    0, minsb=0., srcs=sources[:])
 
             if band_name is None:
                 _ = kuaizi.display.display_multiple(
-                        [img_data, trac_mod_opt, img_data - trac_mod_opt],
-                        text=['raw\ image', 'tractor\ model', 'residual'], 
-                        ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
+                    [img_data, trac_mod_opt, img_data - trac_mod_opt],
+                    text=['raw\ image', 'tractor\ model', 'residual'],
+                    ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
             else:
                 _ = kuaizi.display.display_multiple(
-                        [img_data, trac_mod_opt, img_data - trac_mod_opt],
-                        text=[f'{band_name}-band\ raw\ image', 'tractor\ model', 'residual'], 
-                        ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
+                    [img_data, trac_mod_opt, img_data - trac_mod_opt],
+                    text=[f'{band_name}-band\ raw\ image',
+                          'tractor\ model', 'residual'],
+                    ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
 
             # ax1 = display_single(img_data, ax=ax1, scale_bar=False)
             # if band_name is not None:
@@ -562,21 +585,22 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 if fig_name is not None:
                     plt.savefig(fig_name, dpi=200, bbox_inches='tight')
                     plt.show()
-                    print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+                    print('   The chi-square is', np.sqrt(
+                        np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
             elif verbose:
                 plt.show()
-                print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+                print('   The chi-square is', np.sqrt(
+                    np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
             else:
                 plt.close()
-                print('   The chi-square is', np.sqrt(np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data)) 
+                print('   The chi-square is', np.sqrt(
+                    np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
 
         #trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[1:])
         #ax4 = display_single(img_data - trac_mod_opt, ax=ax4, scale_bar=False, color_bar=True, contrast=0.05)
         #ax4.set_title('remain central galaxy')
 
-
     return sources, trac_obj, fig
-
 
 
 def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use_cmodel_filt=None, freeze_pos=False, verbose=False):
@@ -608,10 +632,11 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
 
     print("### `" + obj_name + f"` {filt}-band")
     layer_ind = channels.index(filt)
-    
+
     if use_cmodel_filt is not None:
         cmodel_filt = use_cmodel_filt
-        print(f' - Using {cmodel_filt}-band CModel as initial guesses for all bands')
+        print(
+            f' - Using {cmodel_filt}-band CModel as initial guesses for all bands')
     else:
         cmodel_filt = filt
 
@@ -620,10 +645,10 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
         coord, box_size=s_ang * 1.1, archive=hsc_dr,
         verbose=True, psf=True, cmodel=True, aper=True, shape=True,
         meas=cmodel_filt, flux=False, aper_type='3_20')
-    
+
     cutout_clean, clean_mask = catalog.select_clean_objects(
-        cutout_objs, return_catalog=True, verbose=False) # Select "clean" images
-    
+        cutout_objs, return_catalog=True, verbose=False)  # Select "clean" images
+
     # Convert `RA, Dec` to `x, y`
     x, y = data.wcs.wcs_world2pix(cutout_clean['ra'], cutout_clean['dec'], 0)
     cutout_clean['x'] = x
@@ -632,9 +657,11 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
     # sort by magnitude
     cutout_clean.sort(f'cmodel_mag')
     # Remove weird objects: abs(psf_mag - cmodel_mag) > 1
-    cutout_clean = cutout_clean[(cutout_clean['psf_mag'] - cutout_clean['cmodel_mag']) < 2.5]
+    cutout_clean = cutout_clean[(
+        cutout_clean['psf_mag'] - cutout_clean['cmodel_mag']) < 2.5]
     # Remove faint objects satisfying `i_cmodel_mag > 26` or `i_psf_mag > 26`
-    cutout_clean = cutout_clean[(cutout_clean['i_cmodel_mag'] <= 26) & (cutout_clean['i_psf_mag'] <= 26)]
+    cutout_clean = cutout_clean[(cutout_clean['i_cmodel_mag'] <= 26) & (
+        cutout_clean['i_psf_mag'] <= 26)]
 
     # Plot HSC CModel catalog on top of the rgb image
     if filt == 'i':
@@ -644,13 +671,14 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
 
         img_rgb = scarlet.display.img_to_rgb(
             data.images,
-            norm=scarlet.display.AsinhMapping(minimum=-0.2, stretch=stretch, Q=Q),
+            norm=scarlet.display.AsinhMapping(
+                minimum=-0.2, stretch=stretch, Q=Q),
             channel_map=channel_map)
-    
+
         _ = plotting.cutout_show_objects(
-            img_rgb, cutout_clean, cutout_wcs=data.wcs, xsize=8, show_weighted=True) # Exp is brown. Dev is dashed-white.
+            img_rgb, cutout_clean, cutout_wcs=data.wcs, xsize=8, show_weighted=True)  # Exp is brown. Dev is dashed-white.
         plt.savefig(obj_name + '_cmodel_i.png', bbox_inches='tight')
-    
+
     # Find out the target galaxy in CModel catalog
     catalog.moments_to_shape(
         cutout_clean,
@@ -664,35 +692,39 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
     cen_obj_ind = np.argsort(dist)[0]
     cen_obj = cutout_clean[cen_obj_ind]
 
-    ## Assign types to each object in CModel catalog
+    # Assign types to each object in CModel catalog
     obj_type = np.empty_like(cutout_clean['object_id'], dtype='S4')
 
     star_mask = cutout_clean['{}_extendedness'.format(filt)] < 0.5
-    obj_type[star_mask] = 'PSF' # If extendedness is less than 0.5: assign 'PSF' type
+    # If extendedness is less than 0.5: assign 'PSF' type
+    obj_type[star_mask] = 'PSF'
 
     fracdev = cutout_clean['cmodel_fracdev']
     ba = cutout_clean['cmodel_ellipse_ba']
     # If b/a > 0.8 (round shape): assign 'REX'
     obj_type[(ba >= 0.8) & (~star_mask)] = 'REX'  # round_exp_galaxy
     # If 0.6 < b/a < 0.8 (not very round) and `fracdev >= 0.6`: assign 'DEV'
-    obj_type[(ba < 0.8) & (fracdev >= 0.6) & (~star_mask)] = 'DEV' # dev_galaxy
+    obj_type[(ba < 0.8) & (fracdev >= 0.6) & (
+        ~star_mask)] = 'DEV'  # dev_galaxy
     # If 0.6 < b/a < 0.8 (not very round) and `fracdev < 0.6`: assign 'REX' (although it might not be very round)
-    obj_type[(ba < 0.8) & (ba > 0.6) & (fracdev < 0.6) & (~star_mask)] = 'REX' # round_exp_galaxy
+    obj_type[(ba < 0.8) & (ba > 0.6) & (fracdev < 0.6) &
+             (~star_mask)] = 'REX'  # round_exp_galaxy
     # If b/a < 0.6 (elongated) and `fracdev < 0.6`: assign 'EXP'
-    obj_type[(ba <= 0.6) & (fracdev < 0.6) & (~star_mask)] = 'EXP' # exp_galaxy
+    obj_type[(ba <= 0.6) & (fracdev < 0.6) & (
+        ~star_mask)] = 'EXP'  # exp_galaxy
 
     # Target object is always Sersic
     obj_type[cen_obj_ind] = 'SER'
 
     cutout_clean['type'] = obj_type
-    
-    psf_obj = PixelizedPSF(data.psfs[layer_ind]) # Construct PSF
-    
+
+    psf_obj = PixelizedPSF(data.psfs[layer_ind])  # Construct PSF
+
     kfold = 3
     while True:
         try:
             if kfold == 1:
-                break 
+                break
             sources, trac_obj, fig = tractor_iteration(
                 cutout_clean,
                 data.wcs,
@@ -704,10 +736,10 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
                 freeze_pos=freeze_pos,
                 kfold=kfold,
                 first_num=cen_obj_ind + 1,
-                band_name=filt, 
-                fig_name=obj_name + '_cmodel_tractor_' + filt, 
+                band_name=filt,
+                fig_name=obj_name + '_cmodel_tractor_' + filt,
                 verbose=verbose)
-            
+
         except Exception as e:
             print('   ' + str(e))
             if kfold == 3:
@@ -717,10 +749,8 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
             pass
         else:
             break
-        
+
     return trac_obj
-
-
 
 
 def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.fits.gz', freeze_pos=True, verbose=False):
@@ -746,7 +776,7 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
     import scarlet
     from astropy.table import vstack
     from astropy.coordinates import match_coordinates_sky
-    
+
     obj_name = obj['name'].rstrip('_y')
     coord = SkyCoord(obj['ra'], obj['dec'], frame='icrs', unit='deg')
 
@@ -771,7 +801,7 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
         deblend_cont=0.005,
         sky_subtract=True)
     # Download DECaLS tractor catalogs and match SEP detection with the tractor catalog
-    
+
     bricks_cat = Table.read(brick_file, format='fits')  # DR8 brick catalog
     bricks_corr = SkyCoord(
         ra=np.array(bricks_cat['RA']) * u.degree,
@@ -784,14 +814,16 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
     bricknames = to_download['BRICKNAME'].data.astype(
         str)  # in case that there are more than one `tractor` file
     # Download tractor catalog of the corresponding brick
-    tractor_cat = kuaizi.download.download_decals_tractor_catalog(bricknames, layer='dr9', overwrite=False)
+    tractor_cat = kuaizi.download.download_decals_tractor_catalog(
+        bricknames, layer='dr9', overwrite=False)
 
     # Match these galaxies with DECaLS tractor file and get their type
     decals_corr = SkyCoord(
         ra=np.array(tractor_cat['ra']) * u.degree,
         dec=np.array(tractor_cat['dec']) * u.degree)
-    detect_coor = SkyCoord(ra=obj_cat_sep['ra'] * u.degree, dec=obj_cat_sep['dec'] * u.degree)
-    
+    detect_coor = SkyCoord(
+        ra=obj_cat_sep['ra'] * u.degree, dec=obj_cat_sep['dec'] * u.degree)
+
     temp = tractor_cat[match_coordinates_sky(detect_coor, decals_corr)[0]]
     for columns in temp.columns:
         obj_cat_sep.add_column(temp[columns], rename_duplicate=True)
@@ -807,14 +839,14 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
 
     #obj_cat_sex['type'][obj_cat_sex['type'] == 'PSF'] = 'REX'
     obj_cat_sep['type'][cen_obj_ind] = 'SER'
-    
-    psf_obj = PixelizedPSF(data.psfs[layer_ind]) # Construct PSF
-    
+
+    psf_obj = PixelizedPSF(data.psfs[layer_ind])  # Construct PSF
+
     kfold = 3
     while True:
         try:
             if kfold == 1:
-                break 
+                break
             sources, trac_obj, fig = tractor_iteration(
                 obj_cat_sep,
                 data.wcs,
@@ -826,15 +858,15 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
                 freeze_pos=freeze_pos,
                 kfold=kfold,
                 first_num=cen_obj_ind + 1,
-                band_name=filt, 
-                fig_name=obj_name + '_sep_tractor_' + filt, 
+                band_name=filt,
+                fig_name=obj_name + '_sep_tractor_' + filt,
                 verbose=verbose)
-            
+
         except Exception as e:
             print('   ' + str(e))
             kfold -= 1
             pass
         else:
             break
-        
+
     return trac_obj
