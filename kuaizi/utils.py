@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 from astropy.io import fits
 from astropy import wcs
-from astropy.table import Table, Column
+from astropy.table import Table, Column, vstack
 from astropy import units as u
 from astropy.units import Quantity
 from astropy.coordinates import SkyCoord
@@ -251,6 +251,130 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     return objects, segmap
 
 
+def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
+                              verbose=False, visual=False, size_buffer=1.4):
+    """
+    Search for bright stars using GAIA catalogs on Tigress (`/tigress/HSC/refcats/htm/gaia_dr2_20200414`).
+    For more information, see https://community.lsst.org/t/gaia-dr2-reference-catalog-in-lsst-format/3901.
+    This function requires `lsstpipe`.
+
+    Parameters:
+        image (numpy 2-D array): input image.
+        wcs (`astropy.wcs` object): WCS of the input image.
+        pixel_scale (float): default is 0.168 (HSC pixel size). This only affect the figure scale bar.
+        mask_a (float): a scaling factor for the size of the plotted star, larger value means larger circle will be plotted.
+        mask_b (float): a scale size for the plotted star, larger value gives larger circle. 
+        visual (bool): whether display the matched Gaia stars.
+
+    Return: 
+        gaia_results (`astropy.table.Table` object): a catalog of matched stars.
+    """
+    # Central coordinate
+    ra_cen, dec_cen = wcs.all_pix2world(image.shape[1] / 2,
+                                        image.shape[0] / 2,
+                                        0)
+    img_cen_ra_dec = SkyCoord(
+        ra_cen, dec_cen, unit=('deg', 'deg'), frame='icrs')
+
+    # Width and height of the search box
+    img_ra_size = Quantity(pixel_scale * (image.shape)
+                           [1] * size_buffer, u.arcsec).to(u.degree)
+    img_dec_size = Quantity(pixel_scale * (image.shape)
+                            [0] * size_buffer, u.arcsec).to(u.degree)
+
+    # Search for stars in Gaia catatlogs, which are stored in
+    # `/tigress/HSC/refcats/htm/gaia_dr2_20200414`.
+    try:
+        from lsst.meas.algorithms.htmIndexer import HtmIndexer
+        import lsst.geom as geom
+
+        def getShards(ra, dec, radius):
+            htm = HtmIndexer(depth=7)
+
+            afw_coords = geom.SpherePoint(
+                geom.Angle(ra, geom.degrees),
+                geom.Angle(dec, geom.degrees))
+
+            shards, onBoundary = htm.getShardIds(
+                afw_coords, radius * geom.degrees)
+            return shards
+
+    except ImportError as e:
+        # Output expected ImportErrors.
+        print(e.__class__.__name__ + ": " + e.message)
+        print('LSST Pipe must be installed to query Gaia stars on Tigress.')
+
+    # find out the Shard ID of target area in the HTM (Hierarchical triangular mesh) system
+    shards = getShards(ra_cen, dec_cen, max(
+        img_ra_size, img_dec_size).to(u.degree).value)
+    cat = vstack([Table.read(
+        f'/tigress/HSC/refcats/htm/gaia_dr2_20200414/{index}.fits') for index in shards])
+    cat['coord_ra'] = cat['coord_ra'].to(u.degree)
+    # why GAIA coordinates are in RADIAN???
+    cat['coord_dec'] = cat['coord_dec'].to(u.degree)
+
+    # Trim this catalog a little bit
+    # Ref: https://github.com/MerianSurvey/caterpillar/blob/main/caterpillar/catalog.py
+    if cat:  # if not empty
+        gaia_results = cat[
+            (cat['coord_ra'] > img_cen_ra_dec.ra - img_ra_size / 2) &
+            (cat['coord_ra'] < img_cen_ra_dec.ra + img_ra_size / 2) &
+            (cat['coord_dec'] > img_cen_ra_dec.dec - img_dec_size / 2) &
+            (cat['coord_dec'] < img_cen_ra_dec.dec + img_dec_size / 2)
+        ]
+
+        gaia_results['phot_g_mean_mag'] = -2.5 * \
+            np.log10(
+                (gaia_results['phot_g_mean_flux'] / (3631 * u.Jy)))  # AB magnitude
+
+        # Convert the (RA, Dec) of stars into pixel coordinate using WCS
+        x_gaia, y_gaia = wcs.all_world2pix(gaia_results['coord_ra'],
+                                           gaia_results['coord_dec'], 0)
+
+        # Generate mask for each star
+        rmask_gaia_arcsec = mask_a * np.exp(
+            -gaia_results['phot_g_mean_mag'] / mask_b)
+
+        # Update the catalog
+        gaia_results.add_column(Column(data=x_gaia, name='x_pix'))
+        gaia_results.add_column(Column(data=y_gaia, name='y_pix'))
+        gaia_results.add_column(
+            Column(data=rmask_gaia_arcsec, name='rmask_arcsec'))
+
+        if visual:
+            fig = plt.figure(figsize=(8, 8))
+            ax1 = fig.add_subplot(111)
+
+            ax1 = display_single(image, ax=ax1)
+            # Plot an ellipse for each object
+            for star in gaia_results:
+                smask = mpl_ellip(
+                    xy=(star['x_pix'], star['y_pix']),
+                    width=(2.0 * star['rmask_arcsec'] / pixel_scale),
+                    height=(2.0 * star['rmask_arcsec'] / pixel_scale),
+                    angle=0.0)
+                smask.set_facecolor(ORG(0.2))
+                smask.set_edgecolor(ORG(1.0))
+                smask.set_alpha(0.3)
+                ax1.add_artist(smask)
+
+            # Show stars
+            ax1.scatter(
+                gaia_results['x_pix'],
+                gaia_results['y_pix'],
+                color=ORG(1.0),
+                s=100,
+                alpha=0.9,
+                marker='+')
+
+            ax1.set_xlim(0, image.shape[1])
+            ax1.set_ylim(0, image.shape[0])
+
+        return gaia_results
+
+    return None
+
+
 def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                      verbose=False, visual=False, size_buffer=1.4, tap_url=None):
     """
@@ -268,7 +392,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         gaia_results (`astropy.table.Table` object): a catalog of matched stars.
     """
     # Central coordinate
-    ra_cen, dec_cen = wcs.wcs_pix2world(image.shape[0] / 2,
+    ra_cen, dec_cen = wcs.all_pix2world(image.shape[0] / 2,
                                         image.shape[1] / 2,
                                         0)
     img_cen_ra_dec = SkyCoord(
@@ -305,7 +429,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         # Convert the (RA, Dec) of stars into pixel coordinate
         ra_gaia = np.asarray(gaia_results['ra'])
         dec_gaia = np.asarray(gaia_results['dec'])
-        x_gaia, y_gaia = wcs.wcs_world2pix(ra_gaia, dec_gaia, 0)
+        x_gaia, y_gaia = wcs.all_world2pix(ra_gaia, dec_gaia, 0)
 
         # Generate mask for each star
         rmask_gaia_arcsec = mask_a * np.exp(
@@ -346,8 +470,6 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
             ax1.set_xlim(0, image.shape[0])
             ax1.set_ylim(0, image.shape[1])
 
-            return gaia_results
-
         return gaia_results
 
     return None
@@ -355,7 +477,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
 
 def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                    size_buffer=1.4, gaia_bright=18.0,
-                   factor_b=1.3, factor_f=1.9):
+                   factor_b=1.3, factor_f=1.9, tigress=False):
     """Find stars using Gaia and mask them out if necessary. From https://github.com/dr-guangtou/kungpao.
 
     Using the stars found in the GAIA TAP catalog, we build a bright star mask following
@@ -373,22 +495,29 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
         gaia_bright (float): a threshold above which are classified as bright stars.
         factor_b (float): a scale size of mask for bright stars. Larger value gives smaller mask size.
         factor_f (float): a scale size of mask for faint stars. Larger value gives smaller mask size.
+        tigress (bool): whether take Gaia catalogs on Tigress
 
     Return: 
         msk_star (numpy 2-D array): the masked pixels are marked by one.
 
     """
     if gaia_stars is None:
-        gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
-                                      mask_a=mask_a, mask_b=mask_b,
-                                      verbose=False, visual=False,
-                                      size_buffer=size_buffer)
-        if gaia_stars is not None:
-            print(f'    {len(gaia_stars)} stars from GAIA are masked!')
+        if tigress:
+            gaia_stars = _image_gaia_stars_tigress(img, wcs, pixel_scale=pixel_scale,
+                                                   mask_a=mask_a, mask_b=mask_b,
+                                                   verbose=False, visual=False,
+                                                   size_buffer=size_buffer)
         else:
-            print('    No GAIA stars are masked.')
+            gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
+                                          mask_a=mask_a, mask_b=mask_b,
+                                          verbose=False, visual=False,
+                                          size_buffer=size_buffer)
+        if gaia_stars is not None:
+            print(f'    {len(gaia_stars)} stars from Gaia are masked!')
+        else:  # does not find Gaia stars
+            print('    No Gaia stars are masked.')
     else:
-        print(f'    {len(gaia_stars)} stars from GAIA are masked!')
+        print(f'    {len(gaia_stars)} stars from Gaia are masked!')
 
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
@@ -519,7 +648,7 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
     if not pixel_unit:
         # img_size in unit of arcsec
         cutout_size = np.asarray(size) / pixel_scale
-        cen_x, cen_y = wcs.wcs_world2pix(coord_1, coord_2, 0)
+        cen_x, cen_y = wcs.all_world2pix(coord_1, coord_2, 0)
     else:
         cutout_size = np.asarray(size)
         cen_x, cen_y = coord_1, coord_2

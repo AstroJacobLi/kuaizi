@@ -1843,7 +1843,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
 
 def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint, starlet_thresh=0.8, prefix='mockgal',
-                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True):
+                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True, tigress=False):
     '''
     This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
 
@@ -1863,7 +1863,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         mask_a=694.7,
         mask_b=3.8,
         factor_b=1.0,
-        factor_f=1.5)
+        factor_f=1.5,
+        tigress=tigress)
 
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
@@ -1959,7 +1960,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             mask_a=694.7,
             mask_b=3.8,
             factor_b=1.0,
-            factor_f=0.6)
+            factor_f=0.6, 
+            tigress=tigress)
     else:
         star_cat = []
 
