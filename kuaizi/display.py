@@ -785,7 +785,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         size = int(zoomin_size / pixel_scale / 2)  # half-size
         # Image
         images = observation.data[:, y_cen - size:y_cen +
-                                    size + 1, x_cen - size:x_cen + size + 1]
+                                  size + 1, x_cen - size:x_cen + size + 1]
         # Weights
         weights = observation.weights[:, y_cen -
                                       size:y_cen + size + 1, x_cen - size:x_cen + size + 1]

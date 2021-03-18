@@ -1960,7 +1960,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             mask_a=694.7,
             mask_b=3.8,
             factor_b=1.0,
-            factor_f=0.6, 
+            factor_f=0.6,
             tigress=tigress)
     else:
         star_cat = []
@@ -2603,7 +2603,7 @@ def fitting_wavelet_obs_tigress(lsbg, starlet_thresh=0.8, prefix='LSBG', pixel_s
 
     blend = _fitting_wavelet(
         data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
+        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True)
 
     return blend
 

@@ -305,6 +305,8 @@ def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_
         print('LSST Pipe must be installed to query Gaia stars on Tigress.')
 
     # find out the Shard ID of target area in the HTM (Hierarchical triangular mesh) system
+    print('    Taking Gaia catalogs stored in `Tigress`')
+
     shards = getShards(ra_cen, dec_cen, max(
         img_ra_size, img_dec_size).to(u.degree).value)
     cat = vstack([Table.read(
@@ -322,14 +324,15 @@ def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_
             (cat['coord_dec'] > img_cen_ra_dec.dec - img_dec_size / 2) &
             (cat['coord_dec'] < img_cen_ra_dec.dec + img_dec_size / 2)
         ]
+        gaia_results.rename_columns(['coord_ra', 'coord_dec'], ['ra', 'dec'])
 
         gaia_results['phot_g_mean_mag'] = -2.5 * \
             np.log10(
                 (gaia_results['phot_g_mean_flux'] / (3631 * u.Jy)))  # AB magnitude
 
         # Convert the (RA, Dec) of stars into pixel coordinate using WCS
-        x_gaia, y_gaia = wcs.all_world2pix(gaia_results['coord_ra'],
-                                           gaia_results['coord_dec'], 0)
+        x_gaia, y_gaia = wcs.all_world2pix(gaia_results['ra'],
+                                           gaia_results['dec'], 0)
 
         # Generate mask for each star
         rmask_gaia_arcsec = mask_a * np.exp(
