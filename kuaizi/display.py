@@ -25,7 +25,7 @@ from palettable.colorbrewer.sequential import (Blues_9, Greys_9, OrRd_9,
 
 
 def random_cmap(ncolors=256, background_color='white'):
-    """Random color maps, from ``kungpao`` https://github.com/dr-guangtou/kungpao. 
+    """Random color maps, from ``kungpao`` https://github.com/dr-guangtou/kungpao.
 
     Generate a matplotlib colormap consisting of random (muted) colors.
     A random colormap is very useful for plotting segmentation images.
@@ -273,15 +273,15 @@ def display_single(img,
                    text_y_offset=0.80,
                    text_color='w'):
     """
-    Display single image using ``arcsinh`` stretching, "zscale" scaling and ``viridis`` colormap as default. 
+    Display single image using ``arcsinh`` stretching, "zscale" scaling and ``viridis`` colormap as default.
     This function is from ``kungpao`` https://github.com/dr-guangtou/kungpao.
 
     Parameters:
         img (numpy 2-D array): The image array.
         pixel_scale (float): The pixel size, in unit of "arcsec/pixel".
         physical_scale (bool): Whether show the image in physical scale.
-        xsize (int): Width of the image, default = 8. 
-        ysize (int): Height of the image, default = 8. 
+        xsize (int): Width of the image, default = 8.
+        ysize (int): Height of the image, default = 8.
         ax (``matplotlib.pyplot.axes`` object): The user could provide axes on which the figure will be drawn.
         stretch (str): Stretching schemes. Options are "arcsinh", "log", "log10" and "linear".
         scale (str): Scaling schemes. Options are "zscale" and "percentile".
@@ -484,19 +484,19 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
 def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle_size=30,
                  pixel_scale=0.168, color='r', **kwargs):
     """
-    Draw circles on an image according to a catalogue. 
+    Draw circles on an image according to a catalogue.
 
     Parameters:
         img (numpy 2-D array): Image itself.
         catalog (``astropy.table.Table`` object): A catalog which contains positions.
-        colnames (list): List of string, indicating which columns correspond to positions. 
+        colnames (list): List of string, indicating which columns correspond to positions.
             It can also be "ra" and "dec", but then "header" is needed.
-        header: Header file of a FITS image containing WCS information, typically ``astropy.io.fits.header`` object.  
+        header: Header file of a FITS image containing WCS information, typically ``astropy.io.fits.header`` object.
         ax (``matplotlib.pyplot.axes`` object): The user could provide axes on which the figure will be drawn.
         circle_size (float): Radius of circle, in pixel.
         pixel_scale (float): Pixel size, in arcsec/pixel. Needed for correct scale bar.
         color (str): Color of circles.
-        **kwargs: other arguments of ``display_single``. 
+        **kwargs: other arguments of ``display_single``.
 
     Returns:
         ax: If the input ``ax`` is not ``None``.
@@ -547,19 +547,19 @@ def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle
 def draw_rectangles(img, catalog, colnames=['x', 'y'], header=None, ax=None, rectangle_size=[30, 30],
                     pixel_scale=0.168, color='r', **kwargs):
     """
-    Draw rectangles on an image according to a catalogue. 
+    Draw rectangles on an image according to a catalogue.
 
     Parameters:
         img (numpy 2-D array): Image itself.
         catalog (``astropy.table.Table`` object): A catalog which contains positions.
-        colnames (list): List of string, indicating which columns correspond to positions. 
+        colnames (list): List of string, indicating which columns correspond to positions.
             It can also be "ra" and "dec", but then "header" is needed.
-        header: Header file of a FITS image containing WCS information, typically ``astropy.io.fits.header`` object.  
+        header: Header file of a FITS image containing WCS information, typically ``astropy.io.fits.header`` object.
         ax (``matplotlib.pyplot.axes`` object): The user could provide axes on which the figure will be drawn.
         rectangle_size (list of floats): Size of rectangles, in pixel.
         pixel_scale (float): Pixel size, in arcsec/pixel. Needed for correct scale bar.
         color (str): Color of rectangles.
-        **kwargs: other arguments of ``display_single``. 
+        **kwargs: other arguments of ``display_single``.
 
     Returns:
         ax: If the input ``ax`` is not ``None``.
@@ -625,7 +625,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         show_mark (bool): whether plot the indices of sources in the figure
         pixel_scale (float): default is 0.168 arcsec/pixel.
 
-    Returns: 
+    Returns:
         ax: if input `ax` is provided
         fig: if no `ax` is provided as input
 
@@ -753,7 +753,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         show_mark (bool): whether plot the indices of sources in the figure
         pixel_scale (float): default is 0.168 arcsec/pixel
 
-    Returns: 
+    Returns:
         ax: if input `ax` is provided
         fig: if no `ax` is provided as input
 
@@ -956,6 +956,278 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
             # ax[2].add_patch(rect)
             # for panel in range(len(ax)):
             #     ax[panel].add_patch(rect)
+
+    from matplotlib.ticker import MaxNLocator, NullFormatter
+    for axx in ax:
+        axx.yaxis.set_major_locator(MaxNLocator(5))
+        axx.xaxis.set_major_locator(MaxNLocator(5))
+
+    # Show the size of PSF. FWHM is 1 arcsec.
+    from matplotlib.patches import Circle
+    circ1 = Circle((40, 40),
+                   radius=1 / 0.168,
+                   linewidth=1.,
+                   hatch='/////',
+                   fc='None',
+                   ec='white')
+    ax[1].add_patch(circ1)
+
+    plt.subplots_adjust(wspace=0.2)
+
+    if ax is None:
+        return fig
+    return ax
+
+
+def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_gray_mask=True,
+                                    show_ind=None, add_boxes=True,
+                                    stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
+                                    scale_bar_length=10.0, scale_bar_fontsize=15, scale_bar_y_offset=0.3, scale_bar_color='w',
+                                    scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+    '''
+    Display the scene on Tiger, including
+    - zoom-in raw img w/ gray initial mask
+    - zoom-in scarlet model w/ gray (final) mask
+    - zoom-in residual with dark final mask
+    - loss curve
+
+    Arguments:
+        blend (scarlet.blend): the blend of observation and sources
+        aggr_mask (numpy 2-D array): aggressive mask
+        zoomin_size (float, in arcsec): the size of shown image, if not showing in full size
+        ax (matplotlib.axes object): input axes object
+        show_loss (bool): whether displaying the loss curve
+        show_mask (bool): whether displaying the mask encoded in `data.weights'
+        show_ind (list): if not None, only objects with these indices are shown in the figure
+        stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
+        channels (str): names of the bands in `observation`
+        show_mark (bool): whether plot the indices of sources in the figure
+        pixel_scale (float): default is 0.168 arcsec/pixel
+
+    Returns:
+        ax: if input `ax` is provided
+        fig: if no `ax` is provided as input
+
+    '''
+    import scarlet
+    from scarlet.display import AsinhMapping
+
+    if ax is None:
+        if show_loss:
+            fig = plt.figure(figsize=(24, 6))
+            ax = [fig.add_subplot(1, 4, n + 1) for n in range(4)]
+        else:
+            fig = plt.figure(figsize=(18, 6))
+            ax = [fig.add_subplot(1, 3, n + 1) for n in range(3)]
+
+    # Observation
+    observation = blend.observations[0]
+    loss = blend.loss
+
+    ########## Figure 1 ###########
+    # In Figure 1, we'd like to show boxes for all sources
+    if zoomin_size is not None:
+        x_cen = observation.model_frame.shape[2] // 2
+        y_cen = observation.model_frame.shape[1] // 2
+        size = int(zoomin_size / pixel_scale / 2)  # half-size
+        # Image
+        images = observation.data[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
+        # Weights
+        weights = observation.weights[:, y_cen -
+                                      size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        if aggr_mask is not None:
+            aggr_mask = aggr_mask[y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1].astype(bool)
+        # Compute model
+        model = blend.get_model()[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
+        # this model is under `model_frame`, i.e. under the modest PSF
+    else:
+        # Image
+        images = observation.data
+        # Weights
+        weights = observation.weights
+        # Compute model
+        model = blend.get_model()
+        # this model is under `model_frame`, i.e. under the modest PSF
+
+    # Render it in the observed frame
+    model_ = observation.render(model)
+    # Mask
+    mask = (np.sum(weights == 0, axis=0) != 0)
+    # Compute residual
+    residual = images - model_
+
+    # Create RGB images
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+    channel_map = scarlet.display.channels_to_rgb(len(channels))
+    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    residual_rgb = scarlet.display.img_to_rgb(
+        residual, norm=norm, channel_map=channel_map)
+    vmax = np.max(np.abs(residual_rgb))
+
+    ax[0].imshow(img_rgb)
+    ax[0].imshow(mask.astype(float), origin='lower',
+                 alpha=0.1, cmap='Greys_r')
+    ax[0].set_title("Data")
+
+    if add_boxes:
+        from matplotlib.patches import Rectangle
+        for k, src in enumerate(blend.sources):
+            box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
+
+            if zoomin_size is not None:
+                extent = get_extent(src.bbox, [x_cen - size, y_cen - size])
+            else:
+                extent = get_extent(src.bbox)
+            rect = Rectangle(
+                (extent[0], extent[2]),
+                extent[1] - extent[0],
+                extent[3] - extent[2],
+                **box_kwargs
+            )
+            ax[0].add_patch(rect)
+
+    if show_mark:
+        for k, src in enumerate(blend.sources):
+            if isinstance(src, scarlet.source.PointSource):
+                color = 'white'
+            elif isinstance(src, scarlet.source.CompactExtendedSource):
+                color = 'yellow'
+            elif isinstance(src, scarlet.source.SingleExtendedSource):
+                color = 'red'
+            elif isinstance(src, scarlet.source.MultiExtendedSource):
+                color = 'cyan'
+            elif isinstance(src, scarlet.source.StarletSource):
+                color = 'lime'
+            else:
+                color = 'gray'
+            if hasattr(src, "center"):
+                y, x = src.center
+                if zoomin_size is not None:
+                    y = y - y_cen + size
+                    x = x - x_cen + size
+                ax[0].text(x, y, k, color=color)
+                ax[0].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+                ax[1].text(x, y, k, color=color)
+                ax[1].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+                ax[2].text(x, y, k, color=color)
+                ax[2].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+
+    ########## Figure 2 & 3 ###########
+    # In Figure 2, we only show the model of target galaxy (by setting `show_ind`) with gray mask
+
+    if show_ind is not None:
+        sources = np.copy(blend.sources)
+        gal_sources = np.array(sources)[show_ind]
+        blend = scarlet.Blend(gal_sources, observation)
+
+    if zoomin_size is not None:
+        # Compute model
+        model = blend.get_model()[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
+        # this model is under `model_frame`, i.e. under the modest PSF
+    else:
+        # Compute model
+        model = blend.get_model()
+        # this model is under `model_frame`, i.e. under the modest PSF
+
+    # Render it in the observed frame
+    model_ = observation.render(model)
+    # Compute residual
+    residual = images - model_
+
+    # Create RGB images
+    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    residual_rgb = scarlet.display.img_to_rgb(
+        residual, norm=norm, channel_map=channel_map)
+    vmax = np.max(np.abs(residual_rgb))
+
+    if show_mask:
+        ax[1].imshow(model_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
+    elif show_gray_mask:
+        ax[1].imshow(model_rgb)
+        ax[1].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
+    else:
+        ax[1].imshow(model_rgb)
+
+    ax[1].set_title("Model")
+
+    ########## Figure 3 ###########
+    # In Figure 3, we show the residual when removing the model of target galaxy (by setting `show_ind`) with aggressive mask
+    if aggr_mask is None:
+        ax[2].imshow(residual_rgb * (~np.tile(mask.T, (3, 1, 1))).T,
+                     vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].set_title("Residual")
+    else:
+        ax[2].imshow(residual_rgb * (~np.tile((aggr_mask | mask).T, (3, 1, 1))).T,
+                     vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[2].set_title("Residual")
+
+    (img_size_x, img_size_y) = images[0].shape
+    if scale_bar:
+        if scale_bar_loc == 'left':
+            scale_bar_x_0 = int(img_size_x * 0.04)
+            scale_bar_x_1 = int(img_size_x * 0.04 +
+                                (scale_bar_length / pixel_scale))
+        else:
+            scale_bar_x_0 = int(img_size_x * 0.95 -
+                                (scale_bar_length / pixel_scale))
+            scale_bar_x_1 = int(img_size_x * 0.95)
+        scale_bar_y = int(img_size_y * 0.10)
+        scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+        scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+
+        if scale_bar_length < 60:
+            scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+        elif 60 < scale_bar_length < 3600:
+            scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+        else:
+            scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+        scale_bar_text_size = scale_bar_fontsize
+
+        ax[0].plot(
+            [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+            linewidth=3,
+            c=scale_bar_color,
+            alpha=1.0)
+        ax[0].text(
+            scale_bar_text_x,
+            scale_bar_text_y,
+            scale_bar_text,
+            fontsize=scale_bar_text_size,
+            horizontalalignment='center',
+            color=scale_bar_color)
+
+    if add_text is not None:
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
+        if usetex:
+            ax[0].text(
+                text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax[0].text(text_x_0, text_y_0, add_text,
+                       fontsize=text_fontsize, color=text_color)
+
+    if show_loss:
+        ax[3].plot(-np.array(loss))
+        ax[3].set_xlabel('Iteration', labelpad=-40)
+        # ax[3].set_ylabel('log-Likelihood')
+        ax[3].set_title("log-Likelihood")
+        xlim, ylim = ax[3].axes.get_xlim(), ax[3].axes.get_ylim()
+        xrange = xlim[1] - xlim[0]
+        yrange = ylim[1] - ylim[0]
+        ax[3].set_aspect((xrange / yrange), adjustable='box')
+        ax[3].ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
 
     from matplotlib.ticker import MaxNLocator, NullFormatter
     for axx in ax:
