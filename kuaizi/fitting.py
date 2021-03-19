@@ -1842,13 +1842,16 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
         return blend
 
 
-def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint, starlet_thresh=0.8, prefix='mockgal',
+def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.8, prefix='mockgal',
                      index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True, tigress=False):
     '''
     This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
 
+    data (kuaizi.mock.Data class): a useful class which incorporates all information of a galaxy.
+
+
     '''
-    from scarlet import Starlet
+    # from scarlet import Starlet
 
     lsbg_coord = coord
 
@@ -2213,7 +2216,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
     plt.savefig(
-        os.path.join(figure_dir, f'{prefix}-{index:04d}-src-wavelet.png'), bbox_inches='tight')
+        os.path.join(figure_dir, f'{prefix}-{index}-src-wavelet.png'), bbox_inches='tight')
     if not show_figure:
         plt.close()
 
@@ -2224,19 +2227,19 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
         blend,
         minimum=-0.3,
         stretch=1,
-        channels='griz',
+        channels=data.channels,
         show_loss=False,
         show_mask=False,
         show_mark=True,
         scale_bar=False)
     plt.savefig(
-        os.path.join(figure_dir, f'{prefix}-{index:04d}-init-wavelet.png'), bbox_inches='tight')
+        os.path.join(figure_dir, f'{prefix}-{index}-init-wavelet.png'), bbox_inches='tight')
     if not show_figure:
         plt.close()
 
     try:
         blend.fit(150, 1e-4)
-        with open(os.path.join(model_dir, f'{prefix}-{index:04d}-trained-model-wavelet.df'), 'wb') as fp:
+        with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
             dill.dump([blend, {'e_rel': 1e-4, 'loss': blend.loss[-1]}], fp)
             fp.close()
         last_loss = blend.loss[-1]
@@ -2251,7 +2254,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                 if recent_loss < min_loss:
                     print(
                         f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-                    with open(os.path.join(model_dir, f'{prefix}-{index:04d}-trained-model-wavelet.df'), 'wb') as fp:
+                    with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
                         dill.dump(
                             [blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                         fp.close()
@@ -2259,7 +2262,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
                     if recent_loss < last_loss:  # better than the saved model
                         print(
                             f'    Optimizaiton: I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                        with open(os.path.join(model_dir, f'{prefix}-{index:04d}-trained-model-wavelet.df'), 'wb') as fp:
+                        with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
                             dill.dump(
                                 [blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
                             fp.close()
@@ -2401,7 +2404,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             footprint = footprint + footprint2
 
         outdir = os.path.join(
-            model_dir, f'{prefix}-{index:04d}-trained-model-wavelet.df')
+            model_dir, f'{prefix}-{index}-trained-model-wavelet.df')
         print(f'  - Saving the results as {os.path.abspath(outdir)}')
         with open(os.path.abspath(outdir), 'wb') as fp:
             dill.dump(
@@ -2409,65 +2412,86 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, zp=HSC_zeropoint,
             fp.close()
 
         # Save fitting figure
-        fig = kz.display.display_scarlet_model(
+        # zoomin_size: in arcsec, rounded to integer multiple of 30 arcsec
+        zoomin_size = round(
+            (sources[0].bbox.shape[1] * pixel_scale * 3) / 30) * 30
+        fig = kz.display.display_scarlet_results_tigress(
             blend,
+            footprint,
+            show_ind=sed_ind,
+            zoomin_size=zoomin_size,
             minimum=-0.3,
             stretch=1,
-            channels='griz',
+            Q=1,
+            channels=data.channels,
             show_loss=True,
             show_mask=False,
             show_mark=False,
-            scale_bar=False)
+            scale_bar=True)
         plt.savefig(
-            os.path.join(figure_dir, f'{prefix}-{index:04d}-fitting-wavelet.png'), bbox_inches='tight')
+            os.path.join(figure_dir, f'{prefix}-{index}-zoomin-wavelet.png'), bbox_inches='tight')
         if not show_figure:
             plt.close()
 
-        # Save zoomin figure (non-agressively-masked, target galaxy only)
-        fig = kz.display.display_scarlet_model(
-            blend,
-            show_ind=sed_ind,
-            zoomin_size=50,
-            minimum=-0.3,
-            stretch=1,
-            channels='griz',
-            show_loss=True,
-            show_mask=False,
-            show_mark=False,
-            scale_bar=False)
-        plt.savefig(
-            os.path.join(figure_dir, f'{prefix}-{index:04d}-zoomin-wavelet.png'), bbox_inches='tight')
-        if not show_figure:
-            plt.close()
+        # fig = kz.display.display_scarlet_model(
+        #     blend,
+        #     minimum=-0.3,
+        #     stretch=1,
+        #     channels=data.channels,
+        #     show_loss=True,
+        #     show_mask=False,
+        #     show_mark=False,
+        #     scale_bar=False)
+        # plt.savefig(
+        #     os.path.join(figure_dir, f'{prefix}-{index}-fitting-wavelet.png'), bbox_inches='tight')
+        # if not show_figure:
+        #     plt.close()
 
-        # Save zoomin figure (aggressively-masked, target galaxy only)
-        new_weights = data.weights.copy()
-        for layer in new_weights:
-            layer[footprint.astype(bool)] = 0
-        observation2 = scarlet.Observation(
-            data.images,
-            wcs=data.wcs,
-            psf=data.psfs,
-            weights=new_weights,
-            channels=list(data.channels))
-        observation2 = observation2.match(model_frame)
-        blend2 = scarlet.Blend(sources, observation2)
+        # # Save zoomin figure (non-agressively-masked, target galaxy only)
+        # fig = kz.display.display_scarlet_model(
+        #     blend,
+        #     show_ind=sed_ind,
+        #     zoomin_size=50,
+        #     minimum=-0.3,
+        #     stretch=1,
+        #     channels=data.channels,
+        #     show_loss=True,
+        #     show_mask=False,
+        #     show_mark=False,
+        #     scale_bar=False)
+        # plt.savefig(
+        #     os.path.join(figure_dir, f'{prefix}-{index}-zoomin-wavelet.png'), bbox_inches='tight')
+        # if not show_figure:
+        #     plt.close()
 
-        fig = kz.display.display_scarlet_model(
-            blend2,
-            show_ind=sed_ind,
-            zoomin_size=50,
-            minimum=-0.3,
-            stretch=1,
-            channels='griz',
-            show_loss=False,
-            show_mask=True,
-            show_mark=False,
-            scale_bar=False)
-        plt.savefig(
-            os.path.join(figure_dir, f'{prefix}-{index:04d}-zoomin-mask-wavelet.png'), bbox_inches='tight')
-        if not show_figure:
-            plt.close()
+        # # Save zoomin figure (aggressively-masked, target galaxy only)
+        # new_weights = data.weights.copy()
+        # for layer in new_weights:
+        #     layer[footprint.astype(bool)] = 0
+        # observation2 = scarlet.Observation(
+        #     data.images,
+        #     wcs=data.wcs,
+        #     psf=data.psfs,
+        #     weights=new_weights,
+        #     channels=list(data.channels))
+        # observation2 = observation2.match(model_frame)
+        # blend2 = scarlet.Blend(sources, observation2)
+
+        # fig = kz.display.display_scarlet_model(
+        #     blend2,
+        #     show_ind=sed_ind,
+        #     zoomin_size=50,
+        #     minimum=-0.3,
+        #     stretch=1,
+        #     channels=data.channels,
+        #     show_loss=False,
+        #     show_mask=True,
+        #     show_mark=False,
+        #     scale_bar=False)
+        # plt.savefig(
+        #     os.path.join(figure_dir, f'{prefix}-{index}-zoomin-mask-wavelet.png'), bbox_inches='tight')
+        # if not show_figure:
+        #     plt.close()
 
         # # Save high-freq-removed figure
         # ## remove high-frequency features from the Starlet objects
@@ -2567,30 +2591,58 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
 
     blend = _fitting_wavelet(
         data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
+        model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure)
     return blend
 
 
-def fitting_wavelet_obs_tigress(lsbg, starlet_thresh=0.8, prefix='LSBG', pixel_scale=HSC_pixel_scale,
+def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', starlet_thresh=0.8, prefix='candy', pixel_scale=HSC_pixel_scale,
                                 zp=HSC_zeropoint, model_dir='./Model', figure_dir='./Figure', show_figure=False):
+    '''
+    Run scarlet wavelet modeling on Tiger.
+
+    env_dict (dict): dictionary indication file directory, such as 
+        `env_dict = {'project': 'HSC', 'name': 'LSBG', 'data_dir': '/tigress/jiaxuanl/Data'}`/
+
+    '''
+
     clear_output()
 
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
 
-    kz.utils.set_env(project='HSC', name='LSBG',
-                     data_dir='/home/jiaxuanl/Data')
+    kz.utils.set_env(**env_dict)
 
-    index = lsbg['Seq']
-    channels = 'griz'
-    print(f'### Running scarlet wavelet modeling for {prefix}-{index}')
+    index = lsbg[name]
+    # channels = 'griz'
+
+    # raise exception in case the input channels are weird
+    assert isinstance(channels, str), 'Input channels must be a string!'
+    if len(set(channels) & set('grizy')) == 0:
+        raise ValueError('The input channels must be a subset of "grizy"!')
+
+    # index of the overlap between input channels and 'grizy'
+    overlap = [i for i, item in enumerate('grizy') if item in channels]
+
+    file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
+        [os.path.isfile(f"{lsbg['prefix']}_{filt}.fits") for filt in channels])
+    if not file_exist_flag:
+        raise FileExistsError(
+            f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+
+    file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
+        [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
+    if not file_exist_flag:
+        raise FileExistsError(
+            f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
 
     # useful for query GAIA
-    lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
+    lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
 
-    cutout = [fits.open(f"{lsbg['prefix']}_{band}.fits") for band in channels]
-    psf_list = [fits.open(f"{lsbg['prefix']}_{band}_psf.fits")
-                for band in channels]
+    print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+
+    cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits") for filt in channels]
+    psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
+                for filt in channels]
 
     # Reconstructure data
     images = np.array([hdu[1].data for hdu in cutout])
@@ -2603,7 +2655,7 @@ def fitting_wavelet_obs_tigress(lsbg, starlet_thresh=0.8, prefix='LSBG', pixel_s
 
     blend = _fitting_wavelet(
         data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        zp=zp, model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True)
+        model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True)
 
     return blend
 
