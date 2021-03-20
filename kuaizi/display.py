@@ -950,12 +950,10 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
                 extent[3] - extent[2],
                 **box_kwargs
             )
-            # print(rect)
+            xlim, ylim = ax[0].get_xlim(), ax[0].get_ylim()
             ax[0].add_patch(rect)
-            # ax[1].add_patch(rect)
-            # ax[2].add_patch(rect)
-            # for panel in range(len(ax)):
-            #     ax[panel].add_patch(rect)
+            ax[0].set_xlim(xlim)
+            ax[0].set_ylim(ylim)
 
     from matplotlib.ticker import MaxNLocator, NullFormatter
     for axx in ax:
@@ -1089,7 +1087,10 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
                 extent[3] - extent[2],
                 **box_kwargs
             )
+            xlim, ylim = ax[0].get_xlim(), ax[0].get_ylim()
             ax[0].add_patch(rect)
+            ax[0].set_xlim(xlim)
+            ax[0].set_ylim(ylim)
 
     if show_mark:
         for k, src in enumerate(blend.sources):
