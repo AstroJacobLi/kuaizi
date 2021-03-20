@@ -62,11 +62,11 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
     # Use JL as a template
     pkg_path = kuaizi.__path__[0]
     if style == 'default':
-        plt.style.use(os.path.join(pkg_path, 'mplstyle/default.mplstyle')
+        plt.style.use(os.path.join(pkg_path, 'mplstyle/default.mplstyle'))
     else:
         plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
         rcParams.update({'font.size': fontsize,
-                        'text.usetex': usetex})
+                         'text.usetex': usetex})
         if style == 'SM':
             rcParams.update({
                 "figure.figsize": "6, 6",
