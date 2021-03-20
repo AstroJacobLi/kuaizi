@@ -780,9 +780,14 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         blend = scarlet.Blend(gal_sources, observation)
 
     if zoomin_size is not None:
-        x_cen = observation.model_frame.shape[2] // 2
-        y_cen = observation.model_frame.shape[1] // 2
+        y_cen, x_cen = blend.sources[0].center
+        _, y_img_size, x_img_size = observation.data.shape
+        # x_cen = observation.model_frame.shape[2] // 2
+        # y_cen = observation.model_frame.shape[1] // 2
         size = int(zoomin_size / pixel_scale / 2)  # half-size
+        # half-size should not exceed the image half-size
+        size = min(size, y_cen, y_img_size - y_cen, x_cen, x_img_size - x_cen)
+
         # Image
         images = observation.data[:, y_cen - size:y_cen +
                                   size + 1, x_cen - size:x_cen + size + 1]
@@ -1023,11 +1028,17 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     loss = blend.loss
 
     ########## Figure 1 ###########
-    # In Figure 1, we'd like to show boxes for all sources
+    # In Figure 1, we'd like to show boxes for all sources.
+    # The zoomin cutout should be centered at the target galaxy.
     if zoomin_size is not None:
-        x_cen = observation.model_frame.shape[2] // 2
-        y_cen = observation.model_frame.shape[1] // 2
+        y_cen, x_cen = blend.sources[0].center
+        _, y_img_size, x_img_size = observation.data.shape
+        # x_cen = observation.model_frame.shape[2] // 2
+        # y_cen = observation.model_frame.shape[1] // 2
         size = int(zoomin_size / pixel_scale / 2)  # half-size
+        # half-size should not exceed the image half-size
+        size = min(size, y_cen, y_img_size - y_cen, x_cen, x_img_size - x_cen)
+
         # Image
         images = observation.data[:, y_cen - size:y_cen +
                                   size + 1, x_cen - size:x_cen + size + 1]

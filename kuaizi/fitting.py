@@ -1872,7 +1872,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
-        lvl=1.2,
+        lvl=2,
         mask=msk_star,
         method='vanilla',
         convolve=False,
@@ -1920,9 +1920,22 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     starlet_source = scarlet.StarletSource(model_frame,
                                            (cen_obj['ra'], cen_obj['dec']),
                                            observation,
-                                           thresh=0.001,
+                                           thresh=0.01,
                                            min_grad=-0.3,  # the initial guess of box size is as large as possible
                                            starlet_thresh=5e-3)
+
+    # If the initial guess of the box is way too large, set min_grad = 0.1.
+    if starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0]:
+        starlet_source = scarlet.StarletSource(model_frame,
+                                               (cen_obj['ra'], cen_obj['dec']),
+                                               observation,
+                                               thresh=0.01,
+                                               min_grad=0.1,  # the initial guess of box size is as large as possible
+                                               starlet_thresh=5e-3)
+        small_box = True
+    else:
+        small_box = False
+
     starlet_extent = kz.display.get_extent(
         starlet_source.bbox)  # [x1, x2, y1, y2]
     # extra enlarge
@@ -1995,13 +2008,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # overlap_flag is for objects which fall in the footprint of central galaxy in the fist SEP detection
     overlap_flag = [(segmap_ori == (cen_indx_ori + 1))[item]
                     for item in list(zip(obj_cat['y'].astype(int), obj_cat['x'].astype(int)))]
+    overlap_flag = np.array(overlap_flag)
     # box_flat is for objects which fall in the initial Starlet box
     box_flag = np.unique(
         segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
-    box_flag = np.delete(np.sort(box_flag), 0)
-    overlap_flag = np.array(overlap_flag)
-    overlap_flag[box_flag] = True
-    obj_cat_cpct = obj_cat[overlap_flag]
+    if len(box_flag) > 0:
+        box_flag = np.delete(np.sort(box_flag), 0)
+        overlap_flag[box_flag] = True
+    if len(overlap_flag) > 0:
+        obj_cat_cpct = obj_cat[overlap_flag]
 
     # Remove the source if it is the central galaxy
     if dist[cen_indx_highfreq] < 1 * u.arcsec:
@@ -2044,14 +2059,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     segmap = segmap_big.copy()
     box_flag = np.unique(
         segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
-    box_flag = np.delete(np.sort(box_flag), 0)
-
-    for ind in box_flag:
-        segmap[segmap == ind + 1] = 0
-
-    box_flag = np.delete(box_flag, np.where(box_flag == cen_indx_big)[
-                         0])  # dont include the central galaxy
-    obj_cat_big = obj_cat[box_flag]
+    if len(box_flag) > 0:
+        box_flag = np.delete(np.sort(box_flag), 0)
+        for ind in box_flag:
+            segmap[segmap == ind + 1] = 0
+        box_flag = np.delete(box_flag, np.where(box_flag == cen_indx_big)[
+            0])  # dont include the central galaxy
+        obj_cat_big = obj_cat[box_flag]
+    else:
+        obj_cat_big = obj_cat
 
     smooth_radius = 4
     gaussian_threshold = 0.01
@@ -2110,12 +2126,17 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # Add central Starlet source
     src = obj_cat_ori[cen_indx_ori]
     # Find a better box, not too large, not too small
-    for min_grad in np.arange(-0.3, 0.4, 0.05):
+    if small_box:
+        min_grad_range = np.arange(0.1, 0.4, 0.05)
+    else:
+        min_grad_range = np.arange(-0.3, 0.4, 0.05)
+
+    for min_grad in min_grad_range:
         starlet_source = scarlet.StarletSource(
             model_frame,
             (src['ra'], src['dec']),
             observation,
-            thresh=0.001,
+            thresh=0.01,
             min_grad=min_grad,
             starlet_thresh=starlet_thresh)
         starlet_extent = kz.display.get_extent(starlet_source.bbox)
@@ -2124,7 +2145,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if contam_ratio <= 0.15:
+        if contam_ratio <= 0.10:
             break
 
     print(f'  - Wavelet modeling with the following hyperparameters:')
@@ -2415,6 +2436,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         # zoomin_size: in arcsec, rounded to integer multiple of 30 arcsec
         zoomin_size = round(
             (sources[0].bbox.shape[1] * pixel_scale * 3) / 30) * 30
+        # cannot exceed the image size
+        zoomin_size = min(zoomin_size, data.images.shape[1] * pixel_scale)
+
         fig = kz.display.display_scarlet_results_tigress(
             blend,
             footprint,
