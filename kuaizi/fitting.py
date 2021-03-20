@@ -298,10 +298,10 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
                     print(
                         f'Cannot achieve a global optimization with e_rel = {e_rel}.')
 
-        print("Scarlet ran for {1} iterations to logL = {2}".format(
+        print("Scarlet ran for {1} iterations to logL = {2:.2f}".format(
             e_rel, len(blend.loss), -blend.loss[-1]))
         end = time.time()
-        print(f'Elapsed time for fitting: {end - start} s')
+        print(f'Elapsed time for fitting: {(end - start):.2f} s')
 
         with open(f"./Models/{prefix}-{index:04d}-trained-model.pkl", "rb") as fp:
             blend = pickle.load(fp)[0]
@@ -2632,7 +2632,8 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     from kuaizi.mock import Data
 
     kz.utils.set_env(**env_dict)
-
+    kz.utils.set_matplotlib(style='default')
+    
     index = lsbg[name]
     # channels = 'griz'
 
