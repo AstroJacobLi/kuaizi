@@ -11,4 +11,4 @@
 module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 
-python3 wvlt_script.py
+python3 wvlt_script.py --index 23
