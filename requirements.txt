@@ -1,7 +1,7 @@
 numpy
 scipy
 astropy>=3.2.1
-matplotlib>=3.3.2
+matplotlib==3.3.4
 sep
 photutils>=0.7.2
 astroquery>=0.4.0
@@ -10,3 +10,4 @@ tqdm
 PyYAML
 galsim
 dill
+fire
