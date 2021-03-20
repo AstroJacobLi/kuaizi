@@ -61,51 +61,53 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
     import kuaizi
     # Use JL as a template
     pkg_path = kuaizi.__path__[0]
-    plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
-    rcParams.update({'font.size': fontsize,
-                     'text.usetex': usetex})
-
-    if style == 'SM':
-        rcParams.update({
-            "figure.figsize": "6, 6",
-            "axes.linewidth": 0.6,
-            "xtick.major.width": 0.5,
-            "xtick.minor.width": 0.3,
-            "ytick.major.width": 0.5,
-            "ytick.minor.width": 0.3,
-            "font.family": "monospace",
-            "font.stretch": "semi-expanded",
-            # The default edge colors for scatter plots.
-            "scatter.edgecolors": "black",
-            "mathtext.bf": "monospace:bold",
-            "mathtext.cal": "monospace:bold",
-            "mathtext.it": "monospace:italic",
-            "mathtext.rm": "monospace",
-            "mathtext.sf": "monospace",
-            "mathtext.tt": "monospace",
-            "mathtext.fallback": "cm",
-            "mathtext.default": 'it'
-        })
-
-        if usetex is True:
+    if style == 'default':
+        plt.style.use(os.path.join(pkg_path, 'mplstyle/default.mplstyle')
+    else:
+        plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
+        rcParams.update({'font.size': fontsize,
+                        'text.usetex': usetex})
+        if style == 'SM':
             rcParams.update({
-                "text.latex.preamble": '\n'.join([
-                    '\\usepackage{amsmath}'
-                    '\\usepackage[T1]{fontenc}',
-                    '\\usepackage{courier}',
-                    '\\usepackage[variablett]{lmodern}',
-                    '\\usepackage[LGRgreek]{mathastext}',
-                    '\\renewcommand{\\rmdefault}{\\ttdefault}'
-                ])
+                "figure.figsize": "6, 6",
+                "axes.linewidth": 0.6,
+                "xtick.major.width": 0.5,
+                "xtick.minor.width": 0.3,
+                "ytick.major.width": 0.5,
+                "ytick.minor.width": 0.3,
+                "font.family": "monospace",
+                "font.stretch": "semi-expanded",
+                # The default edge colors for scatter plots.
+                "scatter.edgecolors": "black",
+                "mathtext.bf": "monospace:bold",
+                "mathtext.cal": "monospace:bold",
+                "mathtext.it": "monospace:italic",
+                "mathtext.rm": "monospace",
+                "mathtext.sf": "monospace",
+                "mathtext.tt": "monospace",
+                "mathtext.fallback": "cm",
+                "mathtext.default": 'it'
             })
 
-    if style == 'nature':
-        rcParams.update({
-            "font.family": "sans-serif",
-            # The default edge colors for scatter plots.
-            "scatter.edgecolors": "black",
-            "mathtext.fontset": "stixsans"
-        })
+            if usetex is True:
+                rcParams.update({
+                    "text.latex.preamble": '\n'.join([
+                        '\\usepackage{amsmath}'
+                        '\\usepackage[T1]{fontenc}',
+                        '\\usepackage{courier}',
+                        '\\usepackage[variablett]{lmodern}',
+                        '\\usepackage[LGRgreek]{mathastext}',
+                        '\\renewcommand{\\rmdefault}{\\ttdefault}'
+                    ])
+                })
+
+        if style == 'nature':
+            rcParams.update({
+                "font.family": "sans-serif",
+                # The default edge colors for scatter plots.
+                "scatter.edgecolors": "black",
+                "mathtext.fontset": "stixsans"
+            })
 
 
 def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,

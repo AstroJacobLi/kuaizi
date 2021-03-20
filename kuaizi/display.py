@@ -930,8 +930,8 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
 
     if show_loss:
         ax[3].plot(-np.array(loss))
-        ax[3].set_xlabel('Iteration')
-        ax[3].set_ylabel('log-Likelihood')
+        ax[3].set_xlabel('Iteration', labelpad=-40)
+        # ax[3].set_ylabel('log-Likelihood')
         ax[3].set_title("log-Likelihood")
         xlim, ylim = ax[3].axes.get_xlim(), ax[3].axes.get_ylim()
         xrange = xlim[1] - xlim[0]
