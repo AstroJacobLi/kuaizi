@@ -18,7 +18,6 @@ from astropy.io import fits
 from astropy.table import Column, Table
 
 from astropy.utils.data import clear_download_cache, download_file
-from IPython.display import clear_output
 
 # Initialize `unagi`
 # from unagi import config, hsc, plotting
@@ -328,7 +327,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
 
 
 def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_away_factor=3.0, compact_away_factor=0.4):
-    clear_output()
+
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
@@ -738,7 +737,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
 
 
 def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_away_factor=3.0, compact_away_factor=0.4):
-    clear_output()
+
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
@@ -1129,7 +1128,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
 
 
 def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0, compact_away_factor=0.4, zp=HSC_zeropoint):
-    clear_output()
+
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
 
@@ -1459,7 +1458,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
 
 
 def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0, compact_away_factor=0.4, zp=HSC_zeropoint):
-    clear_output()
+
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
 
@@ -2559,7 +2558,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
 def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thresh=0.8, prefix='LSBG', pixel_scale=HSC_pixel_scale,
                                 zp=HSC_zeropoint, model_dir='./Models', figure_dir='./Figure', show_figure=False):
-    clear_output()
+
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     # kz.utils.set_matplotlib(usetex=False, fontsize=15)
@@ -2629,8 +2628,6 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 
     '''
 
-    clear_output()
-
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
 
@@ -2687,7 +2684,7 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 def fitting_wavelet_mockgal(index=0, starlet_thresh=0.8, prefix='MockLSBG', pixel_scale=HSC_pixel_scale,
                             zp=HSC_zeropoint, model_dir='./Models/MockGalModel', output_dir='./Models/',
                             figure_dir='./Figure', show_figure=False):
-    clear_output()
+
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
     index = index
 
