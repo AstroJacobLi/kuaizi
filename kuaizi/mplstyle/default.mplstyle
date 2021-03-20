@@ -251,7 +251,7 @@
 #font.variant: normal
 #font.weight:  normal
 #font.stretch: normal
-#font.size:    10.0
+font.size:    15.0
 
 #font.serif:      DejaVu Serif, Bitstream Vera Serif, Computer Modern Roman, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
 #font.sans-serif: DejaVu Sans, Bitstream Vera Sans, Computer Modern Sans Serif, Lucida Grande, Verdana, Geneva, Lucid, Arial, Helvetica, Avant Garde, sans-serif
@@ -535,9 +535,9 @@
 #figure.titlesize:   large     # size of the figure title (``Figure.suptitle()``)
 #figure.titleweight: normal    # weight of the figure title
 #figure.figsize:     6.0, 4.0  # figure size in inches
-#figure.dpi:         70       # figure dots per inch
-#figure.facecolor:   (1, 1, 1, 0)     # figure facecolor
-#figure.edgecolor:   (1, 1, 1, 0)     # figure edgecolor
+figure.dpi:         72       # figure dots per inch
+figure.facecolor:   (1, 1, 1, 0)     # figure facecolor
+figure.edgecolor:   (1, 1, 1, 0)     # figure edgecolor
 #figure.frameon:     True      # enable figure frame
 #figure.max_open_warning: 20   # The maximum number of figures to open through
                                # the pyplot interface before emitting a warning.
@@ -571,10 +571,10 @@
 ## * IMAGES                                                                  *
 ## ***************************************************************************
 #image.aspect: equal                # {equal, auto} or a number
-#image.interpolation:  none  # see help(imshow) for options
-#image.cmap:   inferno              # A colormap name, gray etc...
-#image.lut:    256                  # the size of the colormap lookup table
-#image.origin: lower                # {lower, upper}
+image.interpolation:  none  # see help(imshow) for options
+image.cmap:   inferno              # A colormap name, gray etc...
+image.lut:    256                  # the size of the colormap lookup table
+image.origin: lower                # {lower, upper}
 #image.resample:  True
 #image.composite_image: True  # When True, all the images on a set of axes are
                               # combined into a single composite image before
@@ -654,11 +654,11 @@
 ## The default savefig params can be different from the display params
 ## e.g., you may want a higher resolution, or to make the figure
 ## background white
-#savefig.dpi:       figure      # figure dots per inch or 'figure'
-#savefig.facecolor: auto        # figure facecolor when saving
-#savefig.edgecolor: auto        # figure edgecolor when saving
-#savefig.format:    png         # {png, ps, pdf, svg}
-#savefig.bbox:      standard    # {tight, standard}
+savefig.dpi:       figure      # figure dots per inch or 'figure'
+savefig.facecolor: auto        # figure facecolor when saving
+savefig.edgecolor: auto        # figure edgecolor when saving
+savefig.format:    png         # {png, ps, pdf, svg}
+savefig.bbox:      tight    # {tight, standard}
                                 # 'tight' is incompatible with pipe-based animation
                                 # backends (e.g. 'ffmpeg') but will work with those
                                 # based on temporary files (e.g. 'ffmpeg_file')
