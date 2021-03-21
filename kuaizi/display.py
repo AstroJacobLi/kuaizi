@@ -1133,8 +1133,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
                            horizontalalignment='center', verticalalignment='center')
 
     ########## Figure 2 & 3 ###########
-    # In Figure 2, we only show the model of target galaxy (by setting `show_ind`) with gray mask
-
+    # In Figure 2, we only show the model of target galaxy (by setting `show_ind`) with gray aggressive mask
     if show_ind is not None:
         sources = np.copy(blend.sources)
         gal_sources = np.array(sources)[show_ind]
@@ -1163,11 +1162,17 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
         residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
 
-    if show_mask:
+    if show_mask and aggr_mask is None:
         ax[1].imshow(model_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
-    elif show_gray_mask:
+    elif show_mask and aggr_mask is not None:
+        ax[1].imshow(model_rgb * (~np.tile((aggr_mask | mask).T, (3, 1, 1))).T)
+    elif show_gray_mask and aggr_mask is None:
         ax[1].imshow(model_rgb)
         ax[1].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
+    elif show_gray_mask and aggr_mask is not None:
+        ax[1].imshow(model_rgb)
+        ax[1].imshow((aggr_mask | mask).astype(float), origin='lower',
                      alpha=0.1, cmap='Greys_r')
     else:
         ax[1].imshow(model_rgb)
