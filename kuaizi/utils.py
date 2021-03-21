@@ -110,6 +110,39 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
             })
 
 
+def set_logger(logger_name='fitting_wavelet_obs_tigress', file_name='candy', level='INFO'):
+    import logging
+    logger = logging.getLogger(logger_name)
+    if level.lower() == 'info':
+        logger.setLevel(logging.INFO)
+    elif level.lower == 'debug':
+        logger.setLevel(logging.DEBUG)
+    elif level.lower == 'warning':
+        logger.setLevel(logging.WARNING)
+    elif level.lower == 'error':
+        logger.setLevel(logging.ERROR)
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(file_name)
+    fh.setLevel(logging.DEBUG)
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+    # create formatter and add it to the handlers
+    DATE_FORMAT = "%Y-%m-%d %H:%M:%S %p"
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s: %(message)s', datefmt=DATE_FORMAT)
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+    # add the handlers to the logger
+    if (logger.hasHandlers()):
+        logger.handlers.clear()
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    return logger
+
+
 def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
                 deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0,
                 sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False,
@@ -173,8 +206,7 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     if verbose:
         if logger is not None:
             logger.info("    Detected %d objects" % len(objects))
-        else:
-            print("    Detected %d objects" % len(objects))
+        print("    Detected %d objects" % len(objects))
     objects = Table(objects)
     objects.add_column(Column(data=np.arange(len(objects)), name='index'))
     # Maximum flux, defined as flux within 6 * `a` (semi-major axis) in radius.
@@ -254,7 +286,7 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
 
 
 def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
-                              verbose=False, visual=False, size_buffer=1.4):
+                              verbose=True, visual=False, size_buffer=1.4, logger=None):
     """
     Search for bright stars using GAIA catalogs on Tigress (`/tigress/HSC/refcats/htm/gaia_dr2_20200414`).
     For more information, see https://community.lsst.org/t/gaia-dr2-reference-catalog-in-lsst-format/3901.
@@ -303,10 +335,16 @@ def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_
 
     except ImportError as e:
         # Output expected ImportErrors.
-        print(e.__class__.__name__ + ": " + e.message)
+        if logger is not None:
+            logger.error(e)
+            logger.error(
+                'LSST Pipe must be installed to query Gaia stars on Tigress.')
+        print(e)
         print('LSST Pipe must be installed to query Gaia stars on Tigress.')
 
     # find out the Shard ID of target area in the HTM (Hierarchical triangular mesh) system
+    if logger is not None:
+        logger.info('    Taking Gaia catalogs stored in `Tigress`')
     print('    Taking Gaia catalogs stored in `Tigress`')
 
     shards = getShards(ra_cen, dec_cen, max(
@@ -482,7 +520,7 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
 
 def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                    size_buffer=1.4, gaia_bright=18.0,
-                   factor_b=1.3, factor_f=1.9, tigress=False):
+                   factor_b=1.3, factor_f=1.9, tigress=False, logger=None):
     """Find stars using Gaia and mask them out if necessary. From https://github.com/dr-guangtou/kungpao.
 
     Using the stars found in the GAIA TAP catalog, we build a bright star mask following
@@ -511,17 +549,24 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
             gaia_stars = _image_gaia_stars_tigress(img, wcs, pixel_scale=pixel_scale,
                                                    mask_a=mask_a, mask_b=mask_b,
                                                    verbose=False, visual=False,
-                                                   size_buffer=size_buffer)
+                                                   size_buffer=size_buffer, logger=logger)
         else:
             gaia_stars = image_gaia_stars(img, wcs, pixel_scale=pixel_scale,
                                           mask_a=mask_a, mask_b=mask_b,
                                           verbose=False, visual=False,
                                           size_buffer=size_buffer)
         if gaia_stars is not None:
+            if logger is not None:
+                logger.info(
+                    f'    {len(gaia_stars)} stars from Gaia are masked!')
             print(f'    {len(gaia_stars)} stars from Gaia are masked!')
         else:  # does not find Gaia stars
+            if logger is not None:
+                logger.info('    No Gaia stars are masked.')
             print('    No Gaia stars are masked.')
     else:
+        if logger is not None:
+            logger.info(f'    {len(gaia_stars)} stars from Gaia are masked!')
         print(f'    {len(gaia_stars)} stars from Gaia are masked!')
 
     # Make a mask image

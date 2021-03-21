@@ -3,7 +3,7 @@ import numpy as np
 import scarlet
 from scarlet.wavelet import mad_wavelet, Starlet
 
-from .utils import extract_obj, image_gaia_stars
+from .utils import extract_obj, image_gaia_stars, _image_gaia_stars_tigress
 from astropy.table import Table, Column
 from astropy import units as u
 from astropy.units import Quantity
@@ -184,7 +184,7 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
 
 
 def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5,
-                match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
+                match_gaia=True, show_fig=True, visual_gaia=True, tigress=False, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
@@ -220,6 +220,11 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     bg_rms: array
         background level for each dataset
     '''
+    if 'logger' in kwargs:
+        logger = kwargs['logger']
+    else:
+        logger = None
+
     if len(datas) == 1:
         hr_images = datas[0].images / \
             np.sum(datas[0].images, axis=(1, 2))[:, None, None]
@@ -301,9 +306,15 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
             pixel_scale = w.to_header()['PC2_2'] * 3600
 
         # Retrieve GAIA catalog
-        gaia_stars = image_gaia_stars(
-            detect, w, pixel_scale=pixel_scale,
-            verbose=True, visual=visual_gaia)
+        if tigress:
+            gaia_stars = _image_gaia_stars_tigress(
+                detect, w, pixel_scale=pixel_scale,
+                verbose=True, visual=visual_gaia, logger=logger)
+        else:
+            gaia_stars = image_gaia_stars(
+                detect, w, pixel_scale=pixel_scale,
+                verbose=True, visual=visual_gaia)
+
         # Cross-match with SExtractor catalog
         from astropy.coordinates import SkyCoord, match_coordinates_sky
         temp, dist, _ = match_coordinates_sky(SkyCoord(ra=gaia_stars['ra'], dec=gaia_stars['dec'], unit='deg'),
@@ -332,7 +343,9 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         obj_cat.remove_rows(psf_ind2)
         #obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
         #obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
-        print(f'# Matched {len(psf_ind)} stars from GAIA')
+        if logger:
+            logger.info(f'    Matched {len(psf_ind)} stars from GAIA')
+        print(f'    Matched {len(psf_ind)} stars from GAIA')
 
     obj_cat['index'] = np.arange(len(obj_cat))
 
