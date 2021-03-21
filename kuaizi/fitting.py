@@ -1969,20 +1969,21 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     starlet_extent[1] += 5
     starlet_extent[3] += 5
 
-    # Show the Starlet initial box
-    fig = display_single(data.images.mean(axis=0))
-    from matplotlib.patches import Rectangle
-    box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
-    rect = Rectangle(
-        (starlet_extent[0], starlet_extent[2]),
-        starlet_extent[1] - starlet_extent[0],
-        starlet_extent[3] - starlet_extent[2],
-        **box_kwargs
-    )
-    ax = plt.gca()
-    ax.add_patch(rect)
-    plt.close()
+    if show_figure:
+        # Show the Starlet initial box
+        fig = display_single(data.images.mean(axis=0))
+        from matplotlib.patches import Rectangle
+        box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
+        rect = Rectangle(
+            (starlet_extent[0], starlet_extent[2]),
+            starlet_extent[1] - starlet_extent[0],
+            starlet_extent[3] - starlet_extent[2],
+            **box_kwargs
+        )
+        ax = plt.gca()
+        ax.add_patch(rect)
 
+    return
     if gaia_cat is not None:
         star_flag = [(item[0] > starlet_extent[0]) & (item[0] < starlet_extent[1]) &
                      (item[1] > starlet_extent[2]) & (
