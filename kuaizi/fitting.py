@@ -34,6 +34,26 @@ plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
+class ScarletFittingError(Exception):
+    """Exception raised for errors when fitting a galaxy using scarlet.
+
+    Attributes:
+        prefix, index, coord, channels
+        message -- explanation of the error
+    """
+
+    def __init__(self, prefix, index, starlet_thresh, channels, error):
+        self.prefix = prefix
+        self.index = index
+        self.starlet_thresh = starlet_thresh
+        self.channels = channels
+        self.error = error
+        super().__init__(self.error)
+
+    def __str__(self):
+        return f'{self.prefix}-{self.index} in `{self.channels}` bands with `starlet_thresh = {self.starlet_thresh}` -> {self.error}'
+
+
 def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_away_factor=3.0, compact_away_factor=0.4):
     from kuaizi.utils import padding_PSF
     kz.utils.set_env(project='HSC', name='HSC_LSBG')
@@ -273,7 +293,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
             fp.close()
         last_loss = blend.loss[-1]
         print(
-            f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -631,7 +651,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
             fp.close()
         last_loss = blend.loss[-1]
         print(
-            f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -1040,7 +1060,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
             fp.close()
         last_loss = blend.loss[-1]
         print(
-            f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -1392,7 +1412,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
             fp.close()
         last_loss = blend.loss[-1]
         print(
-            f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -1736,7 +1756,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
             fp.close()
         last_loss = blend.loss[-1]
         print(
-            f'Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -1842,7 +1862,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
 
 def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.8, prefix='mockgal',
-                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True, tigress=False):
+                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True, tigress=False, logger=None):
     '''
     This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
 
@@ -1850,13 +1870,17 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
 
     '''
-    # from scarlet import Starlet
-
     lsbg_coord = coord
+    if logger is None:
+        from .utils import set_logger
+        logger = set_logger('_fitting_wavelet',
+                            f'{prefix}-{index}.log')
 
     # 2 whitespaces before "-", i.e., 4 whitespaces before word
     print('  - Detect sources and make mask')
+    logger.info('  - Detect sources and make mask')
     print('    Query GAIA stars...')
+    logger.info('    Query GAIA stars...')
     gaia_cat, msk_star = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
         data.images.mean(axis=0),  # averaged image
         data.wcs,
@@ -1866,7 +1890,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         mask_b=3.8,
         factor_b=1.0,
         factor_f=1.5,
-        tigress=tigress)
+        tigress=tigress,
+        logger=logger)
 
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
@@ -1884,7 +1909,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         minarea=20,
         deblend_nthresh=48,
         deblend_cont=0.07,  # 0.07, I changed it to 0.1
-        sky_subtract=True)
+        sky_subtract=True,
+        logger=logger)
 
     catalog_c = SkyCoord(obj_cat_ori['ra'], obj_cat_ori['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
@@ -1976,7 +2002,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             mask_b=3.8,
             factor_b=1.0,
             factor_f=0.6,
-            tigress=tigress)
+            tigress=tigress,
+            logger=logger)
     else:
         star_cat = []
 
@@ -1996,7 +2023,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                                                 minarea=3,
                                                                 deblend_nthresh=30,
                                                                 deblend_cont=0.03,
-                                                                sky_subtract=True)
+                                                                sky_subtract=True,
+                                                                logger=logger)
 
     catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
@@ -2048,7 +2076,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         minarea=20,   # only want large things
         deblend_nthresh=30,
         deblend_cont=0.02,
-        sky_subtract=True)
+        sky_subtract=True,
+        logger=logger)
 
     catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
@@ -2147,7 +2176,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         if contam_ratio <= 0.10:
             break
 
+    logger.info('  - Wavelet modeling with the following hyperparameters:')
     print(f'  - Wavelet modeling with the following hyperparameters:')
+    logger.info(
+        f'    min_grad = {min_grad:.2f}, starlet_thresh = {starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}).')
     print(
         f'    min_grad = {min_grad:.2f}, starlet_thresh = {starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}).'
     )
@@ -2260,11 +2292,14 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     try:
         blend.fit(150, 1e-4)
         with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
-            dill.dump([blend, {'e_rel': 1e-4, 'loss': blend.loss[-1]}], fp)
+            dill.dump([blend, {'starlet_thresh': starlet_thresh,
+                               'e_rel': 1e-4, 'loss': blend.loss[-1]}, None], fp)
             fp.close()
         last_loss = blend.loss[-1]
+        logger.info(
+            f'    Optimizaiton: Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
         print(
-            f'    Optimizaiton: Succeed for e_rel = 1e-4 with {len(blend.loss)} iterations! Try higher accuracy!')
+            f'    Optimizaiton: Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
         for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
             blend.fit(150, e_rel)
@@ -2272,29 +2307,38 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                 recent_loss = np.mean(blend.loss[-10:])
                 min_loss = np.min(blend.loss[:-10])
                 if recent_loss < min_loss:
+                    logger.info(
+                        f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
                     print(
                         f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
                     with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
                         dill.dump(
-                            [blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
+                            [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1]}, None], fp)
                         fp.close()
                 elif abs((recent_loss - min_loss) / min_loss) < 0.02:
                     if recent_loss < last_loss:  # better than the saved model
+                        logger.info(
+                            f'    Optimizaiton: I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
                         print(
                             f'    Optimizaiton: I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
                         with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
                             dill.dump(
-                                [blend, {'e_rel': e_rel, 'loss': blend.loss[-1]}], fp)
+                                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1]}, None], fp)
                             fp.close()
                         break
                 else:
+                    logger.info(
+                        f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
                     print(
                         f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
 
-        print("  - After {1} iterations, logL = {2}".format(
+        logger.info("  - After {1} iterations, logL = {2:.2f}".format(
+            e_rel, len(blend.loss), -blend.loss[-1]))
+        print("  - After {1} iterations, logL = {2:.2f}".format(
             e_rel, len(blend.loss), -blend.loss[-1]))
         end = time.time()
-        print(f'    Elapsed time for fitting: {end - start} s')
+        logger.info(f'    Elapsed time for fitting: {(end - start):.2f} s')
+        print(f'    Elapsed time for fitting: {(end - start):.2f} s')
 
         # In principle, Now we don't need to find which components compose a galaxy. The central Starlet is enough!
         if len(blend.sources) > 1:
@@ -2334,10 +2378,14 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                 sed_ind = np.array(list(set(sed_ind).union({0})))
         else:
             sed_ind = np.array([0])
+        logger.info(
+            f'  - Components {sed_ind} are considered as the target galaxy.')
         print(
             f'  - Components {sed_ind} are considered as the target galaxy.')
 
         # Only mask bright stars!!!
+        logger.info(
+            '  - Masking stars and other sources that are modeled, to deal with leaky flux issue.')
         print('  - Masking stars and other sources that are modeled, to deal with leaky flux issue.')
         # Generate a VERY AGGRESSIVE mask, named "footprint"
         footprint = np.zeros_like(segmap_highfreq, dtype=bool)
@@ -2425,10 +2473,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
         outdir = os.path.join(
             model_dir, f'{prefix}-{index}-trained-model-wavelet.df')
+        logger.info(f'  - Saving the results as {os.path.abspath(outdir)}')
         print(f'  - Saving the results as {os.path.abspath(outdir)}')
         with open(os.path.abspath(outdir), 'wb') as fp:
             dill.dump(
-                [blend, {'e_rel': e_rel, 'loss': blend.loss[-1], 'sed_ind': sed_ind}, footprint], fp)
+                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1], 'sed_ind': sed_ind}, footprint], fp)
             fp.close()
 
         # Save fitting figure
@@ -2456,6 +2505,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         if not show_figure:
             plt.close()
 
+        logger.info('Done! (♡˙︶˙♡)')
+        logger.info('\n')
         # fig = kz.display.display_scarlet_model(
         #     blend,
         #     minimum=-0.3,
@@ -2552,8 +2603,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
         return blend
     except Exception as e:
-        print(e)
-        return blend
+        raise ScarletFittingError(
+            prefix, index, starlet_thresh, data.channels, e)
 
 
 def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thresh=0.8, prefix='LSBG', pixel_scale=HSC_pixel_scale,
@@ -2619,7 +2670,8 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
 
 
 def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', starlet_thresh=0.8, prefix='candy', pixel_scale=HSC_pixel_scale,
-                                zp=HSC_zeropoint, model_dir='./Model', figure_dir='./Figure', show_figure=False):
+                                zp=HSC_zeropoint, model_dir='./Model', figure_dir='./Figure', show_figure=False,
+                                logger=None, global_logger=None):
     '''
     Run scarlet wavelet modeling on Tiger.
 
@@ -2631,18 +2683,23 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
 
+    index = lsbg[name]
+
+    if logger is None:
+        from .utils import set_logger
+        logger = set_logger('fitting_wavelet_obs_tigress',
+                            os.path.join(model_dir, f'{prefix}-{index}.log'), level='info')
+
+    logger.info(f'Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+    logger.info(f'Working directory: {os.getcwd()}')
+
     kz.utils.set_env(**env_dict)
     kz.utils.set_matplotlib(style='default')
-    
-    index = lsbg[name]
-    # channels = 'griz'
 
-    # raise exception in case the input channels are weird
     assert isinstance(channels, str), 'Input channels must be a string!'
     if len(set(channels) & set('grizy')) == 0:
         raise ValueError('The input channels must be a subset of "grizy"!')
 
-    # index of the overlap between input channels and 'grizy'
     overlap = [i for i, item in enumerate('grizy') if item in channels]
 
     file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
@@ -2675,11 +2732,22 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     data = Data(images=images, weights=weights,
                 wcs=w, psfs=psfs, channels=channels)
 
-    blend = _fitting_wavelet(
-        data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
-        model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True)
+    try:
+        blend = _fitting_wavelet(
+            data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
+            model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True, logger=logger)
+        return blend
 
-    return blend
+    except Exception as e:
+        logger.error(e)
+        print(e)
+        logger.error(f'Task failed for `{lsbg["prefix"]}`')
+        logger.info('\n')
+        if global_logger is not None:
+            global_logger.error(
+                f'Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+
+        return
 
 
 def fitting_wavelet_mockgal(index=0, starlet_thresh=0.8, prefix='MockLSBG', pixel_scale=HSC_pixel_scale,
