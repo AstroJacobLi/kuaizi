@@ -6,7 +6,11 @@ from kuaizi.fitting import fitting_wavelet_obs_tigress
 from astropy.io import fits
 from astropy.table import Table
 
+kz.utils.set_env(project='HSC', name='LSBG', data_dir='/tigress/jiaxuanl/Data')
+
 lsbg_cat = Table.read('/tigress/jiaxuanl/Data/HSC/LSBG/Cutout/Candy/candy_cutout_cat.fits')
+
+global_logger = kz.utils.set_logger(logger_name='candy_sample', file_name='candy_log', level='ERROR')
 
 def run_scarlet_wvlt(index):
     blend = fitting_wavelet_obs_tigress(
@@ -16,7 +20,8 @@ def run_scarlet_wvlt(index):
         channels='griz',
         starlet_thresh=1,
         prefix='candy',
-        show_figure=False)
+        show_figure=False,
+        global_logger=None)
     return
 
 
