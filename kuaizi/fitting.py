@@ -1,5 +1,7 @@
 # Import packages
+from memory_profiler import profile
 import os
+import gc
 import sys
 import pickle
 import dill
@@ -1889,8 +1891,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         gaia_bright=19.5,
         mask_a=694.7,
         mask_b=3.8,
-        factor_b=1.0,
-        factor_f=1.5,
+        factor_b=0.7,
+        factor_f=1.0,
         tigress=tigress,
         logger=logger)
 
@@ -1926,6 +1928,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     cen_obj['y'] = y
     cen_obj['ra'] = ra
     cen_obj['dec'] = dec
+    cen_obj_coord = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
 
     # We roughly guess the box size of the Starlet model
     model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(data.channels))
@@ -1947,7 +1950,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                            (cen_obj['ra'], cen_obj['dec']),
                                            observation,
                                            thresh=0.01,
-                                           min_grad=-0.3,  # the initial guess of box size is as large as possible
+                                           min_grad=-0.1,  # the initial guess of box size is as large as possible
                                            starlet_thresh=5e-3)
 
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
@@ -2028,7 +2031,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                                                 logger=logger)
 
     catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
-    dist = lsbg_coord.separation(catalog_c)
+    dist = cen_obj_coord.separation(catalog_c)
     cen_indx_highfreq = obj_cat[np.argsort(dist)[0]]['index']
 
     # Don't mask out objects that fall in the segmap of the central object and the Starlet box
@@ -2081,7 +2084,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         logger=logger)
 
     catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
-    dist = lsbg_coord.separation(catalog_c)
+    dist = cen_obj_coord.separation(catalog_c)
     cen_indx_big = obj_cat_ori[np.argsort(dist)[0]]['index']
 
     # mask out big objects that are NOT identified in the high_freq step
@@ -2115,7 +2118,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
         # Remove compact objects that are too close to the central
     catalog_c = SkyCoord(obj_cat_cpct['ra'], obj_cat_cpct['dec'], unit='deg')
-    dist = lsbg_coord.separation(catalog_c)
+    dist = cen_obj_coord.separation(catalog_c)
     obj_cat_cpct.remove_rows(np.where(dist < 3 * u.arcsec)[0])
     # Remove objects that are already masked!
     inside_flag = [
@@ -2125,7 +2128,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     obj_cat_cpct.remove_rows(np.where(inside_flag)[0])
     # Remove big objects that are toooo near to the target
     catalog_c = SkyCoord(obj_cat_big['ra'], obj_cat_big['dec'], unit='deg')
-    dist = lsbg_coord.separation(catalog_c)
+    dist = cen_obj_coord.separation(catalog_c)
     obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
     # Remove objects that are already masked!
     inside_flag = [
@@ -2270,7 +2273,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         scale_bar_length=10,
         add_text=f'{prefix}-{index}')
     plt.savefig(
-        os.path.join(figure_dir, f'{prefix}-{index}-src-wavelet.png'), bbox_inches='tight')
+        os.path.join(figure_dir, f'{prefix}-{index}-src-wavelet.png'), dpi=70, bbox_inches='tight')
     if not show_figure:
         plt.close()
 
@@ -2287,7 +2290,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         show_mark=True,
         scale_bar=False)
     plt.savefig(
-        os.path.join(figure_dir, f'{prefix}-{index}-init-wavelet.png'), bbox_inches='tight')
+        os.path.join(figure_dir, f'{prefix}-{index}-init-wavelet.png'), dpi=70, bbox_inches='tight')
     if not show_figure:
         plt.close()
 
@@ -2333,7 +2336,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                         f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
                     print(
                         f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
-
+            else:
+                continue
+        if len(blend.loss) < 50:
+            logger.warning(
+                '  ! Might be poor fitting! Iterations less than 50.')
+            print('  ! Might be poor fitting! Iterations less than 50.')
         logger.info("  - After {1} iterations, logL = {2:.2f}".format(
             e_rel, len(blend.loss), -blend.loss[-1]))
         print("  - After {1} iterations, logL = {2:.2f}".format(
@@ -2416,19 +2424,20 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                 data.images.mean(axis=0),
                 data.wcs,
                 gaia_stars=star_cat,
-                pixel_scale=0.168,
-                gaia_bright=18.,
+                pixel_scale=pixel_scale,
+                gaia_bright=19,
                 mask_a=694.7,
                 mask_b=3.8,
-                factor_b=1.0,
-                factor_f=2.0)
+                factor_b=0.9,
+                factor_f=1.1,
+                tigress=tigress)
             footprint = footprint | star_mask
 
         # Mask big objects from `big_cat`
         if len(obj_cat_big) > 0:
             # Blow-up radius depends on the distance to target galaxy
             catalog_c = SkyCoord(big_cat['ra'], big_cat['dec'], unit='deg')
-            dist = lsbg_coord.separation(catalog_c)
+            dist = cen_obj_coord.separation(catalog_c)
             near_flag = (dist < 4 * cen_obj['a'] * HSC_pixel_scale * u.arcsec)
 
             footprint2 = np.zeros_like(segmap_big, dtype=bool)
@@ -2503,7 +2512,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             show_mark=False,
             scale_bar=True)
         plt.savefig(
-            os.path.join(figure_dir, f'{prefix}-{index}-zoomin-wavelet.png'), bbox_inches='tight')
+            os.path.join(figure_dir, f'{prefix}-{index}-zoomin-wavelet.png'), dpi=55, bbox_inches='tight')
         if not show_figure:
             plt.close()
 
@@ -2658,8 +2667,7 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
     # Reconstructure data
     images = np.array([hdu[1].data for hdu in cutout])
     w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
-    filters = channels_list
-    weights = 1 / np.array([hdu[3].data for hdu in cutout])
+    weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
     psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
     psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights,
@@ -2673,7 +2681,7 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
 
 def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', starlet_thresh=0.8, prefix='candy', pixel_scale=HSC_pixel_scale,
                                 zp=HSC_zeropoint, model_dir='./Model', figure_dir='./Figure', show_figure=False,
-                                logger=None, global_logger=None):
+                                logger=None, global_logger=None, fail_logger=None):
     '''
     Run scarlet wavelet modeling on Tiger.
 
@@ -2733,17 +2741,24 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     # Reconstructure data
     images = np.array([hdu[1].data for hdu in cutout])
     w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
-    weights = 1 / np.array([hdu[3].data for hdu in cutout])
+    weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
     psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
     psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights,
                 wcs=w, psfs=psfs, channels=channels)
+    del cutout, psf_list
+    del images, w, weights, psf_pad, psfs
+    gc.collect()
 
     try:
         blend = _fitting_wavelet(
             data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix,
             bright=bright, index=index, pixel_scale=pixel_scale,
             model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True, logger=logger)
+        if global_logger is not None:
+            global_logger.info(
+                f'Task succeeded for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+        gc.collect()
         return blend
 
     except Exception as e:
@@ -2755,6 +2770,10 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
             logger.error(f'Task failed for `{lsbg["prefix"]}`')
 
         logger.info('\n')
+        if fail_logger is not None:
+            fail_logger.error(
+                f'Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+
         if global_logger is not None:
             global_logger.error(
                 f'Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
