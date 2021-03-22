@@ -56,7 +56,6 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
     '''
 
     import matplotlib.pyplot as plt
-    from matplotlib.colorbar import Colorbar
     from matplotlib import rcParams
     import kuaizi
     # Use JL as a template
