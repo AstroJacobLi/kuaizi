@@ -1,5 +1,4 @@
 # Import packages
-from memory_profiler import profile
 import os
 import gc
 import sys
