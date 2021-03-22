@@ -1862,12 +1862,13 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
 
 def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.8, prefix='mockgal',
-                     index=0, model_dir='./Model', figure_dir='./Figure', show_figure=True, tigress=False, logger=None):
+                     bright=False, index=0, model_dir='./Model', figure_dir='./Figure',
+                     show_figure=True, tigress=False, logger=None):
     '''
     This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
 
     data (kuaizi.mock.Data class): a useful class which incorporates all information of a galaxy.
-
+    bright (bool): whether treat this galaxy as a VERY BRIGHT GALAXY. This will omit compact sources. 
 
     '''
     lsbg_coord = coord
@@ -1949,8 +1950,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                            min_grad=-0.3,  # the initial guess of box size is as large as possible
                                            starlet_thresh=5e-3)
 
-    # If the initial guess of the box is way too large, set min_grad = 0.1.
-    if starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0]:
+    # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
+    if starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
         starlet_source = scarlet.StarletSource(model_frame,
                                                (cen_obj['ra'], cen_obj['dec']),
                                                observation,
@@ -1983,7 +1984,6 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         ax = plt.gca()
         ax.add_patch(rect)
 
-    return
     if gaia_cat is not None:
         star_flag = [(item[0] > starlet_extent[0]) & (item[0] < starlet_extent[1]) &
                      (item[1] > starlet_extent[2]) & (
@@ -2071,12 +2071,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         match_gaia=False,
         show_fig=show_figure,
         visual_gaia=False,
-        b=45,
+        b=32,
         f=3,
         pixel_scale=pixel_scale,
         minarea=20,   # only want large things
         deblend_nthresh=30,
-        deblend_cont=0.02,
+        deblend_cont=0.01,
         sky_subtract=True,
         logger=logger)
 
@@ -2213,14 +2213,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         cpct = cpct[np.setdiff1d(np.arange(len(cpct)),
                                  tempid[np.where(sep2d < 1 * u.arcsec)])]
 
-    for k, src in enumerate(cpct):
-        if src['fwhm_custom'] < 5:
-            new_source = scarlet.source.CompactExtendedSource(
-                model_frame, (src['ra'], src['dec']), observation)
-        else:
-            new_source = scarlet.source.SingleExtendedSource(
-                model_frame, (src['ra'], src['dec']), observation, thresh=2)
-        sources.append(new_source)
+    if not bright:  # for bright galaxy, we don't include these compact sources into modeling, due to the limited computational resources
+        for k, src in enumerate(cpct):
+            if src['fwhm_custom'] < 5:
+                new_source = scarlet.source.CompactExtendedSource(
+                    model_frame, (src['ra'], src['dec']), observation)
+            else:
+                new_source = scarlet.source.SingleExtendedSource(
+                    model_frame, (src['ra'], src['dec']), observation, thresh=2)
+            sources.append(new_source)
 
     # IF GAIA stars are within the box: exclude it from the big_cat
     if len(obj_cat_big) > 0:
@@ -2685,6 +2686,8 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     from kuaizi.mock import Data
 
     index = lsbg[name]
+    # whether this galaxy is a very bright one
+    bright = (lsbg['mag_auto_i'] < 17)
 
     if logger is None:
         from .utils import set_logger
@@ -2692,6 +2695,9 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
                             os.path.join(model_dir, f'{prefix}-{index}.log'), level='info')
 
     logger.info(f'Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+    if bright:
+        logger.info(
+            f"This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
     logger.info(f'Working directory: {os.getcwd()}')
 
     kz.utils.set_env(**env_dict)
@@ -2735,14 +2741,19 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 
     try:
         blend = _fitting_wavelet(
-            data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix, index=index, pixel_scale=pixel_scale,
+            data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix,
+            bright=bright, index=index, pixel_scale=pixel_scale,
             model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True, logger=logger)
         return blend
 
     except Exception as e:
         logger.error(e)
         print(e)
-        logger.error(f'Task failed for `{lsbg["prefix"]}`')
+        if bright:
+            logger.error(f'Task failed for bright galaxy `{lsbg["prefix"]}`')
+        else:
+            logger.error(f'Task failed for `{lsbg["prefix"]}`')
+
         logger.info('\n')
         if global_logger is not None:
             global_logger.error(

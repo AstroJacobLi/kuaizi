@@ -11,3 +11,7 @@ This repo is for the notebook and scripts used for modeling LSBGs in HSC using s
 Cutouts (and PSFs) with size of 0.6 arcmin in 5 bands takes 11 Mb. 
 
 After pickling, one galaxy in 5 bands takes 7.1 Mb. 
+
+### Image Gallery
+
+Cutout images of the candy sample: http://tigress-web.princeton.edu/~jiaxuanl/candy/cutout_figure/page1.html
