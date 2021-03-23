@@ -1192,6 +1192,10 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
 
     (img_size_x, img_size_y) = images[0].shape
     if scale_bar:
+        if scale_bar_length / pixel_scale > 0.7 * min(img_size_x, img_size_y):
+            # if scale_bar_length is too large
+            scale_bar_length = 0.3 * min(img_size_x, img_size_y) * pixel_scale
+
         if scale_bar_loc == 'left':
             scale_bar_x_0 = int(img_size_x * 0.04)
             scale_bar_x_1 = int(img_size_x * 0.04 +

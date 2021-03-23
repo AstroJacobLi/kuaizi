@@ -1958,7 +1958,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                                (cen_obj['ra'], cen_obj['dec']),
                                                observation,
                                                thresh=0.01,
-                                               min_grad=0.1,  # the initial guess of box size is as large as possible
+                                               min_grad=0.07,  # the initial guess of box size is as large as possible
                                                starlet_thresh=5e-3)
         small_box = True
     else:
@@ -2128,7 +2128,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # Remove big objects that are toooo near to the target
     catalog_c = SkyCoord(obj_cat_big['ra'], obj_cat_big['dec'], unit='deg')
     dist = cen_obj_coord.separation(catalog_c)
-    obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
+    #obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
+    obj_cat_big.remove_rows(np.where(
+        dist < 2 * np.sqrt(cen_obj['a'] * cen_obj['b']) * pixel_scale * u.arcsec)[0])
     # Remove objects that are already masked!
     inside_flag = [
         (data.weights[0] == 0)[item] for item in list(
@@ -2217,12 +2219,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if not bright:  # for bright galaxy, we don't include these compact sources into modeling, due to the limited computational resources
         for k, src in enumerate(cpct):
-            if src['fwhm_custom'] < 5:
+            if src['fwhm_custom'] < 3:
+                new_source = scarlet.source.PointSource(
+                    model_frame, (src['ra'], src['dec']), observation)
+            elif src['fwhm_custom'] >= 3 and src['fwhm_custom'] < 5:
                 new_source = scarlet.source.CompactExtendedSource(
                     model_frame, (src['ra'], src['dec']), observation)
             else:
                 new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, thresh=2)
+                    model_frame, (src['ra'], src['dec']), observation, thresh=2, min_grad=0.2)
             sources.append(new_source)
 
     # IF GAIA stars are within the box: exclude it from the big_cat
@@ -2237,13 +2242,13 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
         # [np.where(sep2d > 2 * u.arcsec)[0]]
         for k, src in enumerate(big_cat):
-            if src['fwhm_custom'] > 15:
+            if src['fwhm_custom'] > 20:
                 new_source = scarlet.source.ExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, K=2, shifting=True)
+                    model_frame, (src['ra'], src['dec']), observation, K=2, thresh=2, shifting=True, min_grad=0.2)
             else:
                 # try:
                 new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=True)
+                    model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=False, min_grad=0.2)
         #         except:
         #             new_source = scarlet.source.SingleExtendedSource(
         #                 model_frame, (src['ra'], src['dec']), observation, coadd=coadd, coadd_rms=bg_cutoff)
@@ -2251,8 +2256,14 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if len(star_cat) > 0:
         for k, src in enumerate(star_cat):
-            new_source = scarlet.source.ExtendedSource(
-                model_frame, (src['ra'], src['dec']), observation, K=2)
+            # if src['phot_g_mean_mag'] > 20:
+            new_source = scarlet.source.SingleExtendedSource(
+                model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=False, min_grad=0.2)
+            # only use SingleExtendedSource
+            # else:
+            #     new_source = scarlet.source.ExtendedSource(
+            #         model_frame, (src['ra'], src['dec']), observation, K=2, thresh=2, shifting=False, min_grad=0.2)
+
             sources.append(new_source)
 
     # Visualize our data and mask and source
@@ -2294,6 +2305,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         plt.close()
 
     try:
+        if bright:
+            e_rel_list = [5e-4, 1e-5]  # otherwise it will take forever....
+        else:
+            e_rel_list = [5e-4, 1e-5, 5e-5, 1e-6]
         blend.fit(150, 1e-4)
         with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
             dill.dump([blend, {'starlet_thresh': starlet_thresh,
@@ -2305,7 +2320,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         print(
             f'    Optimizaiton: Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
-        for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
+        for i, e_rel in enumerate(e_rel_list):
             blend.fit(150, e_rel)
             if len(blend.loss) > 50:  # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
@@ -2492,7 +2507,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
         # Save fitting figure
         # zoomin_size: in arcsec, rounded to integer multiple of 30 arcsec
-        zoomin_size = round(
+        zoomin_size = np.ceil(
             (sources[0].bbox.shape[1] * pixel_scale * 3) / 30) * 30
         # cannot exceed the image size
         zoomin_size = min(zoomin_size, data.images.shape[1] * pixel_scale)
@@ -2734,13 +2749,15 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 
         print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
 
-        cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits") for filt in channels]
+        cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits")
+                  for filt in channels]
         psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
                     for filt in channels]
 
         # Reconstructure data
         images = np.array([hdu[1].data for hdu in cutout])
-        w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
+        # note: all bands share the same WCS here
+        w = wcs.WCS(cutout[0][1].header)
         weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
         psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
         psfs = scarlet.ImagePSF(np.array(psf_pad))
