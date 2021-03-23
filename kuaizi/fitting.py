@@ -2710,46 +2710,46 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     kz.utils.set_env(**env_dict)
     kz.utils.set_matplotlib(style='default')
 
-    assert isinstance(channels, str), 'Input channels must be a string!'
-    if len(set(channels) & set('grizy')) == 0:
-        raise ValueError('The input channels must be a subset of "grizy"!')
-
-    overlap = [i for i, item in enumerate('grizy') if item in channels]
-
-    file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
-        [os.path.isfile(f"{lsbg['prefix']}_{filt}.fits") for filt in channels])
-    if not file_exist_flag:
-        raise FileExistsError(
-            f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
-
-    file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
-        [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
-    if not file_exist_flag:
-        raise FileExistsError(
-            f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
-
-    # useful for query GAIA
-    lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
-
-    print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
-
-    cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits") for filt in channels]
-    psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
-                for filt in channels]
-
-    # Reconstructure data
-    images = np.array([hdu[1].data for hdu in cutout])
-    w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
-    weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
-    psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
-    psfs = scarlet.ImagePSF(np.array(psf_pad))
-    data = Data(images=images, weights=weights,
-                wcs=w, psfs=psfs, channels=channels)
-    del cutout, psf_list
-    del images, w, weights, psf_pad, psfs
-    gc.collect()
-
     try:
+        assert isinstance(channels, str), 'Input channels must be a string!'
+        if len(set(channels) & set('grizy')) == 0:
+            raise ValueError('The input channels must be a subset of "grizy"!')
+
+        overlap = [i for i, item in enumerate('grizy') if item in channels]
+
+        file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
+            [os.path.isfile(f"{lsbg['prefix']}_{filt}.fits") for filt in channels])
+        if not file_exist_flag:
+            raise FileExistsError(
+                f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+
+        file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
+            [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
+        if not file_exist_flag:
+            raise FileExistsError(
+                f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+
+        # useful for query GAIA
+        lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
+
+        print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+
+        cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits") for filt in channels]
+        psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
+                    for filt in channels]
+
+        # Reconstructure data
+        images = np.array([hdu[1].data for hdu in cutout])
+        w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
+        weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
+        psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
+        psfs = scarlet.ImagePSF(np.array(psf_pad))
+        data = Data(images=images, weights=weights,
+                    wcs=w, psfs=psfs, channels=channels)
+        del cutout, psf_list
+        del images, w, weights, psf_pad, psfs
+        gc.collect()
+
         blend = _fitting_wavelet(
             data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix,
             bright=bright, index=index, pixel_scale=pixel_scale,
