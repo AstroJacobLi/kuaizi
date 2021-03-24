@@ -16,13 +16,7 @@ lsbg_cat = Table.read(
     '/tigress/jiaxuanl/Data/HSC/LSBG/Cutout/Candy/candy_cutout_cat.fits')
 
 
-fail_logger = kz.utils.set_logger(
-    logger_name='candy_fail', file_name='candy_fail', level='ERROR')
-global_logger = kz.utils.set_logger(
-    logger_name='candy_sample', file_name='candy_log', level='INFO')
-
-
-def run_scarlet_wvlt(index, starlet_thresh=0.5):
+def run_scarlet_wvlt(index, starlet_thresh=0.5, global_logger=None, fail_logger=None):
     blend = fitting_wavelet_obs_tigress(
         {'project': 'HSC', 'name': 'LSBG', 'data_dir': '/tigress/jiaxuanl/Data'},
         lsbg_cat[index],
@@ -36,8 +30,14 @@ def run_scarlet_wvlt(index, starlet_thresh=0.5):
     return
 
 
-def multiprocess_fitting(njobs, ind_list=None, low=0, high=1, starlet_thresh=0.5):
+def multiprocess_fitting(njobs, ind_list=None, low=0, high=1, suffix='', starlet_thresh=0.5):
     print('Number of processor to use:', njobs)
+
+    fail_logger = kz.utils.set_logger(
+        logger_name='candy_fail' + suffix, file_name='candy_fail' + suffix, level='ERROR')
+    global_logger = kz.utils.set_logger(
+        logger_name='candy_sample' + suffix, file_name='candy_log' + suffix, level='INFO')
+
     pool = Pool(njobs)
     if ind_list is not None:
         iterable = ind_list
@@ -45,7 +45,7 @@ def multiprocess_fitting(njobs, ind_list=None, low=0, high=1, starlet_thresh=0.5
         iterable = np.arange(low, high, 1)
 
     print(iterable)
-    pool.map(partial(run_scarlet_wvlt, starlet_thresh=starlet_thresh), iterable)
+    pool.map(partial(run_scarlet_wvlt, starlet_thresh=starlet_thresh, global_logger=global_logger, fail_logger=fail_logger), iterable)
     pool.close()
     pool.join()
 

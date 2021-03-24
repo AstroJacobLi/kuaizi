@@ -11,4 +11,4 @@
 module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 
-python3 wvlt_multiprocess.py --njobs 6 --ind_list "[ 89,  95,  96,  97,  98,  99, 110, 165, 173, 174, 177, 178, 179, 181, 182, 183, 184, 187, 188, 189, 191, 192, 193, 194, 195, 196, 197, 198, 199]" --suffix "_complement" --starlet_thresh 0.5
+python3 wvlt_multiprocess.py --njobs 6 --low 100 --high 200 --suffix "_100_200" --starlet_thresh 0.5
