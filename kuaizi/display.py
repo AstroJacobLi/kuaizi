@@ -1169,11 +1169,11 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     elif show_gray_mask and aggr_mask is None:
         ax[1].imshow(model_rgb)
         ax[1].imshow(mask.astype(float), origin='lower',
-                     alpha=0.1, cmap='Greys_r')
+                     alpha=0.15, cmap='Greys_r')
     elif show_gray_mask and aggr_mask is not None:
         ax[1].imshow(model_rgb)
         ax[1].imshow((aggr_mask | mask).astype(float), origin='lower',
-                     alpha=0.1, cmap='Greys_r')
+                     alpha=0.15, cmap='Greys_r')
     else:
         ax[1].imshow(model_rgb)
 

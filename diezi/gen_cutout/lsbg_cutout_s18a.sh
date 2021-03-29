@@ -2,7 +2,7 @@
 
 . /home/jiaxuanl/Research/diezi/setup_env.sh
 
-# export LSBGDIR="/home/jiaxuanl/Data/HSC/LSBG"
+# Actually you should first save files to /tiger/scratch/gpfs/jiaxuanl
 export LSBGDIR="/tigress/jiaxuanl/Data/HSC/LSBG"
 
 # python3 s18a_batch_cutout.py \

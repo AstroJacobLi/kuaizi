@@ -1974,7 +1974,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if show_figure:
         # Show the Starlet initial box
-        fig = display_single(data.images.mean(axis=0))
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax = display_single(data.images.mean(axis=0), ax=ax)
         from matplotlib.patches import Rectangle
         box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
         rect = Rectangle(
@@ -2115,7 +2116,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         layer[seg_mask.astype(bool)] = 0
         layer[seg_mask_large.astype(bool)] = 0
 
-        # Remove compact objects that are too close to the central
+    # Remove compact objects that are too close to the central
     catalog_c = SkyCoord(obj_cat_cpct['ra'], obj_cat_cpct['dec'], unit='deg')
     dist = cen_obj_coord.separation(catalog_c)
     obj_cat_cpct.remove_rows(np.where(dist < 3 * u.arcsec)[0])
@@ -2139,7 +2140,6 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     obj_cat_big.remove_rows(np.where(inside_flag)[0])
 
     # Construct `scarlet` frames and observation
-    from functools import partial
     model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(data.channels))
     model_frame = scarlet.Frame(
         data.images.shape,
@@ -2711,15 +2711,24 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
     # whether this galaxy is a very bright one
     bright = (lsbg['mag_auto_i'] < 17)
 
+    if not os.path.isdir(model_dir):
+        os.mkdir(model_dir)
+
     if logger is None:
         from .utils import set_logger
         logger = set_logger('fitting_wavelet_obs_tigress',
                             os.path.join(model_dir, f'{prefix}-{index}.log'), level='info')
 
     logger.info(f'Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+    print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
+
     if bright:
         logger.info(
             f"This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
+        print(
+            f"    This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
+
+    print(f'    Working directory: {os.getcwd()}')
     logger.info(f'Working directory: {os.getcwd()}')
 
     kz.utils.set_env(**env_dict)
@@ -2746,8 +2755,6 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 
         # useful for query GAIA
         lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
-
-        print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
 
         cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits")
                   for filt in channels]
