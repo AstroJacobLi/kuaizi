@@ -1955,13 +1955,20 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                    starlet_thresh=5e-3)
 
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
-    if starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
-        starlet_source = StarletSource(model_frame,
-                                       (cen_obj['ra'], cen_obj['dec']),
-                                       observation,
-                                       thresh=0.01,
-                                       min_grad=0.07,  # the initial guess of box size is as large as possible
-                                       starlet_thresh=5e-3)
+    if starlet_source.bbox.shape[1] > 0.8 * data.images[0].shape[0]: # The box is way too large
+        starlet_source = scarlet.StarletSource(model_frame,
+                                            (cen_obj['ra'], cen_obj['dec']),
+                                            observation,
+                                            thresh=0.01,
+                                            min_grad=0.15,  # the initial guess of box size is as large as possible
+                                            starlet_thresh=5e-3)
+    elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
+        starlet_source = scarlet.StarletSource(model_frame,
+                                            (cen_obj['ra'], cen_obj['dec']),
+                                            observation,
+                                            thresh=0.01,
+                                            min_grad=0.07,  # the initial guess of box size is as large as possible
+                                            starlet_thresh=5e-3)
         small_box = True
     else:
         small_box = False
@@ -2172,15 +2179,26 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         min_grad_range = np.arange(-0.2, 0.4, 0.05)  # I changed -0.3 to -0.2
 
     for min_grad in min_grad_range:
-        starlet_source = StarletSource(
-            model_frame,
-            (src['ra'], src['dec']),
-            observation,
-            star_mask=starlet_mask,  # bright stars are masked when estimating morphology
-            satu_mask=data.masks,  # saturated pixels are masked when estimating SED
-            thresh=0.01,
-            min_grad=min_grad,
-            starlet_thresh=starlet_thresh)
+        try:
+            starlet_source = StarletSource(
+                model_frame,
+                (src['ra'], src['dec']),
+                observation,
+                star_mask=starlet_mask,  # bright stars are masked when estimating morphology
+                satu_mask=data.masks,  # saturated pixels are masked when estimating SED
+                thresh=0.01,
+                min_grad=min_grad,
+                starlet_thresh=starlet_thresh)
+        except:
+            starlet_source = StarletSource(
+                model_frame,
+                (src['ra'], src['dec']),
+                observation,
+                star_mask=None,  # bright stars are masked when estimating morphology
+                satu_mask=data.masks,  # saturated pixels are masked when estimating SED
+                thresh=0.01,
+                min_grad=min_grad,
+                starlet_thresh=starlet_thresh)
         starlet_extent = kz.display.get_extent(starlet_source.bbox)
         segbox = segmap_ori[starlet_extent[2]:starlet_extent[3],
                             starlet_extent[0]:starlet_extent[1]]
@@ -2265,8 +2283,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                         model_frame, (src['ra'], src['dec']),
                         observation, satu_mask=data.masks,  # helps to get SED correct
                         thresh=2, shifting=False, min_grad=0.2)
-                except Exception as e:
-                    logger.info(f'   ! Error: {e}')
+                except:
+                    new_source = scarlet.source.SingleExtendedSource(
+                        model_frame, (src['ra'], src['dec']),
+                        observation, 
+                        thresh=2, shifting=False, min_grad=0.2)
             sources.append(new_source)
 
     if len(star_cat) > 0:
@@ -2277,8 +2298,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                     model_frame, (src['ra'], src['dec']),
                     observation, satu_mask=data.masks,
                     thresh=2, shifting=False, min_grad=0.)
-            except Exception as e:
-                logger.info(f'   ! Error: {e}')
+            except:
+                new_source = scarlet.source.SingleExtendedSource(
+                    model_frame, (src['ra'], src['dec']),
+                    observation,
+                    thresh=2, shifting=False, min_grad=0.)
             # only use SingleExtendedSource
             sources.append(new_source)
 
