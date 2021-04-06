@@ -2260,23 +2260,25 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                     observation,
                     K=2, thresh=2, shifting=True, min_grad=0.2)
             else:
-                # try:
-                new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']),
-                    observation, satu_mask=data.masks,  # helps to get SED correct
-                    thresh=2, shifting=False, min_grad=0.2)
-        #         except:
-        #             new_source = scarlet.source.SingleExtendedSource(
-        #                 model_frame, (src['ra'], src['dec']), observation, coadd=coadd, coadd_rms=bg_cutoff)
+                try:
+                    new_source = scarlet.source.SingleExtendedSource(
+                        model_frame, (src['ra'], src['dec']),
+                        observation, satu_mask=data.masks,  # helps to get SED correct
+                        thresh=2, shifting=False, min_grad=0.2)
+                except Exception as e:
+                    logger.info(f'   ! Error: {e}')
             sources.append(new_source)
 
     if len(star_cat) > 0:
         for k, src in enumerate(star_cat):
             # if src['phot_g_mean_mag'] > 20:
-            new_source = scarlet.source.SingleExtendedSource(
-                model_frame, (src['ra'], src['dec']),
-                observation, satu_mask=data.masks,
-                thresh=2, shifting=False, min_grad=0.)
+            try:
+                new_source = scarlet.source.SingleExtendedSource(
+                    model_frame, (src['ra'], src['dec']),
+                    observation, satu_mask=data.masks,
+                    thresh=2, shifting=False, min_grad=0.)
+            except Exception as e:
+                logger.info(f'   ! Error: {e}')
             # only use SingleExtendedSource
             sources.append(new_source)
 
