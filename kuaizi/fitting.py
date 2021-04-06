@@ -11,6 +11,8 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import scarlet
+from scarlet.source import StarletSource
+
 import sep
 from astropy import wcs
 from astropy.convolution import Box2DKernel, Gaussian2DKernel, convolve
@@ -1883,15 +1885,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     logger.info('  - Detect sources and make mask')
     print('    Query GAIA stars...')
     logger.info('    Query GAIA stars...')
-    gaia_cat, msk_star = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
+    gaia_cat, msk_star_ori = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
         data.images.mean(axis=0),  # averaged image
         data.wcs,
         pixel_scale=pixel_scale,
         gaia_bright=19.5,
         mask_a=694.7,
         mask_b=3.8,
-        factor_b=0.7,
-        factor_f=1.0,
+        factor_b=1.0,  # 0.7,
+        factor_f=1.4,  # 1.0,
         tigress=tigress,
         logger=logger)
 
@@ -1899,7 +1901,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
         lvl=2,
-        mask=msk_star,
+        mask=msk_star_ori,
         method='vanilla',
         convolve=False,
         match_gaia=False,
@@ -1945,21 +1947,21 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     observation = observation.match(model_frame)
 
     cen_obj = obj_cat_ori[cen_indx_ori]
-    starlet_source = scarlet.StarletSource(model_frame,
-                                           (cen_obj['ra'], cen_obj['dec']),
-                                           observation,
-                                           thresh=0.01,
-                                           min_grad=-0.1,  # the initial guess of box size is as large as possible
-                                           starlet_thresh=5e-3)
+    starlet_source = StarletSource(model_frame,
+                                   (cen_obj['ra'], cen_obj['dec']),
+                                   observation,
+                                   thresh=0.01,
+                                   min_grad=-0.1,  # the initial guess of box size is as large as possible
+                                   starlet_thresh=5e-3)
 
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
     if starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
-        starlet_source = scarlet.StarletSource(model_frame,
-                                               (cen_obj['ra'], cen_obj['dec']),
-                                               observation,
-                                               thresh=0.01,
-                                               min_grad=0.07,  # the initial guess of box size is as large as possible
-                                               starlet_thresh=5e-3)
+        starlet_source = StarletSource(model_frame,
+                                       (cen_obj['ra'], cen_obj['dec']),
+                                       observation,
+                                       thresh=0.01,
+                                       min_grad=0.07,  # the initial guess of box size is as large as possible
+                                       starlet_thresh=5e-3)
         small_box = True
     else:
         small_box = False
@@ -2154,6 +2156,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         channels=list(data.channels))
     observation = observation.match(model_frame)
 
+    # STARLET_MASK!!! contains the mask for irrelavant objects, as well as larger bright star mask
+    # This is used to help getting the SED initialization correct.
+    starlet_mask = ((np.sum(observation.weights == 0, axis=0)
+                     != 0) + msk_star_ori).astype(bool)
+
     sources = []
 
     # Add central Starlet source
@@ -2162,13 +2169,15 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     if small_box:
         min_grad_range = np.arange(0.1, 0.4, 0.05)
     else:
-        min_grad_range = np.arange(-0.3, 0.4, 0.05)
+        min_grad_range = np.arange(-0.2, 0.4, 0.05)  # I changed -0.3 to -0.2
 
     for min_grad in min_grad_range:
-        starlet_source = scarlet.StarletSource(
+        starlet_source = StarletSource(
             model_frame,
             (src['ra'], src['dec']),
             observation,
+            star_mask=starlet_mask,  # bright stars are masked when estimating morphology
+            satu_mask=data.masks,  # saturated pixels are masked when estimating SED
             thresh=0.01,
             min_grad=min_grad,
             starlet_thresh=starlet_thresh)
@@ -2207,7 +2216,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     else:
         cpct = obj_cat_cpct
 
-    if len(star_cat) > 0:
+    if len(star_cat) > 0 and len(cpct) > 0:
         # remove intersection between cpct and stars
         star = SkyCoord(ra=star_cat['ra'], dec=star_cat['dec'], unit='deg')
         cpct_coor = SkyCoord(
@@ -2217,7 +2226,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         cpct = cpct[np.setdiff1d(np.arange(len(cpct)),
                                  tempid[np.where(sep2d < 1 * u.arcsec)])]
 
-    if not bright:  # for bright galaxy, we don't include these compact sources into modeling, due to the limited computational resources
+    if not bright:  # for bright galaxy, we don't include these compact sources into modeling,
+        # due to the limited computation resources
         for k, src in enumerate(cpct):
             if src['fwhm_custom'] < 3:
                 new_source = scarlet.source.PointSource(
@@ -2234,21 +2244,27 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     if len(obj_cat_big) > 0:
         if len(star_cat) > 0:
             star = SkyCoord(ra=star_cat['ra'], dec=star_cat['dec'], unit='deg')
-            tempid, sep2d, _ = match_coordinates_sky(star, big)
+            tempid, sep2d, _ = match_coordinates_sky(big, star)
+            # tempid, sep2d, _ = match_coordinates_sky(star, big)
             big_cat = obj_cat_big[np.setdiff1d(
-                np.arange(len(obj_cat_big)), tempid[np.where(sep2d < 1 * u.arcsec)])]
+                np.arange(len(obj_cat_big)), np.where(sep2d < 1.5 * u.arcsec)[0])]
+            # big_cat = obj_cat_big[np.setdiff1d(
+            #     np.arange(len(obj_cat_big)), tempid[np.where(sep2d < 1 * u.arcsec)])]
         else:
             big_cat = obj_cat_big
 
-        # [np.where(sep2d > 2 * u.arcsec)[0]]
         for k, src in enumerate(big_cat):
             if src['fwhm_custom'] > 20:
                 new_source = scarlet.source.ExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, K=2, thresh=2, shifting=True, min_grad=0.2)
+                    model_frame, (src['ra'], src['dec']),
+                    observation,
+                    K=2, thresh=2, shifting=True, min_grad=0.2)
             else:
                 # try:
                 new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=False, min_grad=0.2)
+                    model_frame, (src['ra'], src['dec']),
+                    observation, satu_mask=data.masks,  # helps to get SED correct
+                    thresh=2, shifting=False, min_grad=0.2)
         #         except:
         #             new_source = scarlet.source.SingleExtendedSource(
         #                 model_frame, (src['ra'], src['dec']), observation, coadd=coadd, coadd_rms=bg_cutoff)
@@ -2258,13 +2274,14 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         for k, src in enumerate(star_cat):
             # if src['phot_g_mean_mag'] > 20:
             new_source = scarlet.source.SingleExtendedSource(
-                model_frame, (src['ra'], src['dec']), observation, thresh=2, shifting=False, min_grad=0.2)
+                model_frame, (src['ra'], src['dec']),
+                observation, satu_mask=data.masks,
+                thresh=2, shifting=False, min_grad=0.)
             # only use SingleExtendedSource
-            # else:
-            #     new_source = scarlet.source.ExtendedSource(
-            #         model_frame, (src['ra'], src['dec']), observation, K=2, thresh=2, shifting=False, min_grad=0.2)
-
             sources.append(new_source)
+
+    print(f'    Total number of sources: {len(sources)}')
+    logger.info(f'    Total number of sources: {len(sources)}')
 
     # Visualize our data and mask and source
     if not os.path.isdir(figure_dir):
@@ -2307,9 +2324,13 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     try:
         if bright:
             e_rel_list = [5e-4, 1e-5]  # otherwise it will take forever....
+            n_iter = 100
         else:
-            e_rel_list = [5e-4, 1e-5, 5e-5, 1e-6]
-        blend.fit(150, 1e-4)
+            e_rel_list = [5e-4, 1e-5]  # , 5e-5, 1e-6]
+            n_iter = 150
+
+        blend.fit(n_iter, 1e-4)
+
         with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-wavelet.df'), 'wb') as fp:
             dill.dump([blend, {'starlet_thresh': starlet_thresh,
                                'e_rel': 1e-4, 'loss': blend.loss[-1]}, None], fp)
@@ -2595,7 +2616,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         # # Save high-freq-removed figure
         # ## remove high-frequency features from the Starlet objects
         # for src in np.array(blend2.sources)[sed_ind]:
-        #     if isinstance(src, scarlet.StarletSource):
+        #     if isinstance(src, StarletSource):
         #         # Cutout a patch of original image
         #         y_cen, x_cen = np.array(src.bbox.shape)[1:] // 2 + np.array(src.bbox.origin)[1:]
         #         size = np.array(src.bbox.shape)[1:] // 2
@@ -2682,6 +2703,7 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
     images = np.array([hdu[1].data for hdu in cutout])
     w = wcs.WCS(cutout[0][1].header)  # note: all bands share the same WCS here
     weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
+    weights[np.isinf(weights)] = 0.0
     psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
     psfs = scarlet.ImagePSF(np.array(psf_pad))
     data = Data(images=images, weights=weights,
@@ -2706,6 +2728,7 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
 
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
+    import unagi
 
     index = lsbg[name]
     # whether this galaxy is a very bright one
@@ -2766,9 +2789,12 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
         # note: all bands share the same WCS here
         w = wcs.WCS(cutout[0][1].header)
         weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
+        weights[np.isinf(weights)] = 0.0
         psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
         psfs = scarlet.ImagePSF(np.array(psf_pad))
-        data = Data(images=images, weights=weights,
+        sat_mask = np.array([sum(unagi.mask.Mask(
+            hdu[2].data, data_release='s18a').extract(['INTRP', 'SAT'])) for hdu in cutout])
+        data = Data(images=images, weights=weights, masks=sat_mask,
                     wcs=w, psfs=psfs, channels=channels)
         del cutout, psf_list
         del images, w, weights, psf_pad, psfs
@@ -2826,6 +2852,7 @@ def fitting_wavelet_mockgal(index=0, starlet_thresh=0.8, prefix='MockLSBG', pixe
     images = mgal.mock.images
     w = mgal.mock.wcs
     weights = 1 / mgal.mock.variances
+    weights[np.isinf(weights)] = 0.0
     psfs = scarlet.ImagePSF(np.array(mgal.mock.psfs))
     data = Data(images=images, weights=weights,
                 wcs=w, psfs=psfs, channels=channels)
