@@ -2338,7 +2338,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             e_rel_list = [5e-4, 1e-5]  # otherwise it will take forever....
             n_iter = 100
         else:
-            e_rel_list = [5e-4, 1e-5]  # , 5e-5, 1e-6]
+            e_rel_list = [5e-4, 1e-5, 5e-5, 1e-6]
             n_iter = 150
 
         blend.fit(n_iter, 1e-4)
@@ -2785,7 +2785,7 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
         file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
             [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
         default_exist_flag = np.all([os.path.isfile(
-            f'/tiger/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/psf_{filt}.fits') for filt in channels])
+            f'/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/psf_{filt}.fits') for filt in channels])
 
         if not file_exist_flag:
             logger.info(
