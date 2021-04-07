@@ -1897,6 +1897,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         tigress=tigress,
         logger=logger)
 
+    # Set the weights of saturated star centers to zero
+    temp = np.copy(data.masks)
+    for i in range(len(data.channels)):
+        temp[i][~msk_star_ori.astype(bool)] = 0
+        data.weights[i][temp[i].astype(bool)] = 0.0
+
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
@@ -1951,18 +1957,18 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                    (cen_obj['ra'], cen_obj['dec']),
                                    observation,
                                    thresh=0.01,
-                                   min_grad=-0.1,  # the initial guess of box size is as large as possible
+                                   min_grad=-0.05,  # the initial guess of box size is as large as possible
                                    starlet_thresh=5e-3)
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
     # The box is way too large
     if starlet_source.bbox.shape[1] > 0.8 * data.images[0].shape[0]:
-        min_grad = 0.15
+        min_grad = 0.10
         small_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (bright):
-        min_grad = 0.15
+        min_grad = 0.07
         small_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
-        min_grad = 0.07
+        min_grad = 0.03
         small_box = True
     else:
         small_box = False
@@ -2016,7 +2022,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             mask_a=694.7,
             mask_b=3.8,
             factor_b=1.0,
-            factor_f=0.6,
+            factor_f=0.7,
             tigress=tigress,
             logger=logger)
     else:
@@ -2165,10 +2171,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         channels=list(data.channels))
     observation = observation.match(model_frame)
 
-    # STARLET_MASK!!! contains the mask for irrelavant objects, as well as larger bright star mask
+    # STARLET_MASK!!! contains the mask for irrelavant objects (also very nearby objects),
+    # as well as larger bright star mask
     # This is used to help getting the SED initialization correct.
     starlet_mask = ((np.sum(observation.weights == 0, axis=0)
-                     != 0) + msk_star_ori).astype(bool)
+                     != 0) + msk_star_ori + (~((segmap_ori == 0) | (segmap_ori == cen_indx_ori + 1)))).astype(bool)
 
     sources = []
 
@@ -2196,7 +2203,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if contam_ratio <= 0.10:
+        if contam_ratio <= 0.08:
             break
 
     logger.info('  - Wavelet modeling with the following hyperparameters:')
@@ -2264,7 +2271,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             big_cat = obj_cat_big
 
         for k, src in enumerate(big_cat):
-            if src['fwhm_custom'] > 20:
+            if src['fwhm_custom'] > 22:
                 new_source = scarlet.source.ExtendedSource(
                     model_frame, (src['ra'], src['dec']),
                     observation,
@@ -2283,10 +2290,16 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         for k, src in enumerate(star_cat):
             # if src['phot_g_mean_mag'] > 20:
             try:
-                new_source = scarlet.source.SingleExtendedSource(
-                    model_frame, (src['ra'], src['dec']),
-                    observation, satu_mask=data.masks,
-                    thresh=2, shifting=False, min_grad=0.)
+                if src['phot_g_mean_mag'] < 18:
+                    new_source = scarlet.source.ExtendedSource(
+                        model_frame, (src['ra'], src['dec']),
+                        observation,
+                        K=2, thresh=4, shifting=True, min_grad=0.4)
+                else:
+                    new_source = scarlet.source.SingleExtendedSource(
+                        model_frame, (src['ra'], src['dec']),
+                        observation, satu_mask=data.masks,
+                        thresh=2, shifting=False, min_grad=0.)
             except Exception as e:
                 logger.info(f'   ! Error: {e}')
             # only use SingleExtendedSource
