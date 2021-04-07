@@ -2203,7 +2203,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if contam_ratio <= 0.08:
+        if contam_ratio <= 0.075:
             break
 
     logger.info('  - Wavelet modeling with the following hyperparameters:')
