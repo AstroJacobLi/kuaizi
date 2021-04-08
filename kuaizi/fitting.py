@@ -1918,7 +1918,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         pixel_scale=pixel_scale,
         minarea=20,
         deblend_nthresh=48,
-        deblend_cont=0.07,  # 0.07, I changed it to 0.1
+        deblend_cont=0.05,  # 0.07, I changed it to 0.1
         sky_subtract=True,
         logger=logger)
 
@@ -2183,11 +2183,16 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     src = obj_cat_ori[cen_indx_ori]
     # Find a better box, not too large, not too small
     if small_box:
-        min_grad_range = np.arange(0.1, 0.4, 0.05)
+        min_grad_range = np.arange(0.0, 0.4, 0.05)
     else:
         min_grad_range = np.arange(-0.2, 0.4, 0.05)  # I changed -0.3 to -0.2
 
-    for min_grad in min_grad_range:
+    contam_ratio_list = []
+    for k, min_grad in enumerate(min_grad_range):
+        if k == len(min_grad_range) - 1:
+            # if min_grad = 0.4 and contam_ratio is still very large,
+            # we choose the min_grad with minimum contam_ratio
+            min_grad = min_grad_range[np.argmin(contam_ratio_list)]
         starlet_source = StarletSource(
             model_frame,
             (src['ra'], src['dec']),
@@ -2203,8 +2208,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if contam_ratio <= 0.075:
+        if (contam_ratio <= 0.08 and (~small_box)) or (contam_ratio <= 0.10 and (small_box or bright)):
             break
+        else:
+            contam_ratio_list.append(contam_ratio)
 
     logger.info('  - Wavelet modeling with the following hyperparameters:')
     print(f'  - Wavelet modeling with the following hyperparameters:')
