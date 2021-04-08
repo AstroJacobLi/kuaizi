@@ -1918,7 +1918,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         pixel_scale=pixel_scale,
         minarea=20,
         deblend_nthresh=48,
-        deblend_cont=0.05,  # 0.07, I changed it to 0.1
+        deblend_cont=0.01,  # 0.05, 0.07, I changed it to 0.1
         sky_subtract=True,
         logger=logger)
 
@@ -1961,14 +1961,18 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                    starlet_thresh=5e-3)
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
     # The box is way too large
-    if starlet_source.bbox.shape[1] > 0.8 * data.images[0].shape[0]:
-        min_grad = 0.10
+    if starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (bright):
+        min_grad = 0.03
+        small_box = True
+    elif starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (~bright):
+        # not bright but large box: something must be wrong! min_grad should be larger
+        min_grad = 0.05
         small_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (bright):
-        min_grad = 0.07
+        min_grad = 0.02
         small_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
-        min_grad = 0.03
+        min_grad = 0.01
         small_box = True
     else:
         small_box = False
@@ -2021,8 +2025,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             gaia_bright=19.5,
             mask_a=694.7,
             mask_b=3.8,
-            factor_b=1.0,
-            factor_f=0.7,
+            factor_b=0.8,
+            factor_f=0.6,
             tigress=tigress,
             logger=logger)
     else:
@@ -2106,19 +2110,19 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     # mask out big objects that are NOT identified in the high_freq step
     segmap = segmap_big.copy()
-    box_flag = np.unique(
-        segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
+    segbox = segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]
+    box_flag = np.unique(segbox) - 1
     if len(box_flag) > 0:
         box_flag = np.delete(np.sort(box_flag), 0)
         for ind in box_flag:
-            segmap[segmap == ind + 1] = 0
+            if np.sum(segbox == ind + 1) / np.sum(segmap == ind + 1) > 0.5: segmap[segmap == ind + 1] = 0
         box_flag = np.delete(box_flag, np.where(box_flag == cen_indx_big)[
             0])  # dont include the central galaxy
         obj_cat_big = obj_cat[box_flag]
     else:
         obj_cat_big = obj_cat
 
-    smooth_radius = 4
+    smooth_radius = 5
     gaussian_threshold = 0.01
     mask_conv = np.copy(segmap)
     mask_conv[mask_conv > 0] = 1
@@ -2183,9 +2187,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     src = obj_cat_ori[cen_indx_ori]
     # Find a better box, not too large, not too small
     if small_box:
-        min_grad_range = np.arange(0.0, 0.4, 0.05)
+        min_grad_range = np.arange(min_grad, 0.3, 0.05)
     else:
-        min_grad_range = np.arange(-0.2, 0.4, 0.05)  # I changed -0.3 to -0.2
+        min_grad_range = np.arange(-0.2, 0.3, 0.05)  # I changed -0.3 to -0.2
 
     contam_ratio_list = []
     for k, min_grad in enumerate(min_grad_range):

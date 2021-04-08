@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=scarlet-wvlt       # create a short name for your job
+#SBATCH --job-name=scarlet-wvlt-0-50       # create a short name for your job
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks=1               # total number of tasks across all nodes
 #SBATCH --cpus-per-task=6        # cpu-cores per task (>1 if multi-threaded tasks)
@@ -11,4 +11,4 @@
 module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 
-python3 wvlt_multiprocess.py --njobs 4 --ind_list "[51, 53, 110, 112, 196]" --suffix "_complement" --starlet_thresh 0.5
+python3 wvlt_multiprocess.py --njobs 6 --low 0 --high 50 --suffix "_0_50" --starlet_thresh 0.5

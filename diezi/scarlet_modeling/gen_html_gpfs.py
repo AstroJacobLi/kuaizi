@@ -23,16 +23,20 @@ print(f'Failed {len(fail_array)} galaxies (based on checking figures):', fail_ar
 ## Check log files, find out error items
 with open('/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/candy_fail_0_100', 'r') as f:
     log = f.read()
-    f.close()    
+    f.close()
 with open('/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/candy_fail_100_200', 'r') as f:
-    log = f.read()
+    log += f.read()
     f.close()
 with open('/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/candy_fail_200_300', 'r') as f:
-    log = f.read()
+    log += f.read()
     f.close()
-with open('/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/candy_fail_complement', 'r') as f:
-    log = f.read()
-    f.close()
+
+try:
+    with open('/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/candy_fail_complement', 'r') as f:
+        log += f.read()
+        f.close()
+except Exception as e:
+    print('Encountered error:', e)
 
 loglist = log.split('\n')
 loglist = [item for item in loglist if len(item) > 0]
@@ -47,7 +51,7 @@ os.system('cp /scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Figure/candy-*-zoomin-*.png /
 ## Count figures in public_html/candy/scarlet_zoomin
 print(f'You have {len(ind_array)} galaxies to be displayed')
 
-row_num = 10
+row_num = 20
 page_num = len(lsbg_cat) // (row_num) + 1
 print('Total pages:', page_num)
 
