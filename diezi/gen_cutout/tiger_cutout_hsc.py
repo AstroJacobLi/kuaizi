@@ -375,7 +375,8 @@ def generate_cutout(butler, skymap, ra, dec, band='i', label='deepCoadd_skyMap',
 
 def cutout_one(butler, skymap, obj, band, label, psf):
     """Generate cutout for a single object."""
-    prefix, ra, dec, radius = obj['prefix'], obj['ra'], obj['dec'], obj['radius']
+    prefix, ra, dec, radius = obj['prefix'], obj['ra'], obj['dec'], obj['radius'] * \
+        u.arcmin  # might be bugy
     prefix = '_'.join([prefix, band.lower().strip()])
 
     try:

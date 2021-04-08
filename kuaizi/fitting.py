@@ -1879,6 +1879,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         from .utils import set_logger
         logger = set_logger('_fitting_wavelet',
                             f'{prefix}-{index}.log')
+    
+    if max(data.images.shape) * pixel_scale > 200:
+        first_dblend_cont = 0.07
+    else:
+        first_dblend_cont = 0.01
 
     # 2 whitespaces before "-", i.e., 4 whitespaces before word
     print('  - Detect sources and make mask')
@@ -1918,7 +1923,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         pixel_scale=pixel_scale,
         minarea=20,
         deblend_nthresh=48,
-        deblend_cont=0.01,  # 0.05, 0.07, I changed it to 0.1
+        deblend_cont=first_dblend_cont,  # 0.01, 0.05, 0.07, I changed it to 0.1
         sky_subtract=True,
         logger=logger)
 
@@ -2110,12 +2115,14 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     # mask out big objects that are NOT identified in the high_freq step
     segmap = segmap_big.copy()
-    segbox = segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]
+    segbox = segmap[starlet_extent[2]:starlet_extent[3],
+                    starlet_extent[0]:starlet_extent[1]]
     box_flag = np.unique(segbox) - 1
     if len(box_flag) > 0:
         box_flag = np.delete(np.sort(box_flag), 0)
         for ind in box_flag:
-            if np.sum(segbox == ind + 1) / np.sum(segmap == ind + 1) > 0.5: segmap[segmap == ind + 1] = 0
+            if np.sum(segbox == ind + 1) / np.sum(segmap == ind + 1) > 0.5:
+                segmap[segmap == ind + 1] = 0
         box_flag = np.delete(box_flag, np.where(box_flag == cen_indx_big)[
             0])  # dont include the central galaxy
         obj_cat_big = obj_cat[box_flag]
