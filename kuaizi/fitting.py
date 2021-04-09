@@ -1879,7 +1879,6 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         from .utils import set_logger
         logger = set_logger('_fitting_wavelet',
                             f'{prefix}-{index}.log')
-    
     if max(data.images.shape) * pixel_scale > 200:
         first_dblend_cont = 0.07
     else:
@@ -2036,6 +2035,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             logger=logger)
     else:
         star_cat = []
+        msk_star = np.copy(msk_star_ori)
 
     # This step masks out high frequency sources by doing wavelet transformation
     obj_cat, segmap_highfreq, bg_rms = kz.detection.makeCatalog([data],

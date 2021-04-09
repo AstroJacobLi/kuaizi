@@ -554,6 +554,11 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
                                           mask_a=mask_a, mask_b=mask_b,
                                           verbose=False, visual=False,
                                           size_buffer=size_buffer)
+        gaia_stars = gaia_stars[(abs(gaia_stars['pm_ra']) +
+                                 abs(gaia_stars['pm_dec']) + gaia_stars['parallax'] != 0)]
+        if len(gaia_stars) == 0:
+            gaia_stars = None
+
         if gaia_stars is not None:
             if logger is not None:
                 logger.info(
@@ -572,7 +577,6 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
     msk_star = np.zeros(img.shape).astype('uint8')
 
     # Remove sources with no parallax and proper motion
-    gaia_stars = gaia_stars[(abs(gaia_stars['pm_ra']) + abs(gaia_stars['pm_dec']) + gaia_stars['parallax'] != 0)]
     if gaia_stars is not None:
         gaia_b = gaia_stars[gaia_stars['phot_g_mean_mag'] <= gaia_bright]
         sep.mask_ellipse(msk_star, gaia_b['x_pix'], gaia_b['y_pix'],
