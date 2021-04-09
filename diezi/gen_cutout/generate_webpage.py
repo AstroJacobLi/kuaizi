@@ -64,9 +64,9 @@ for k in range(page_num):
         if ind >= len(index_list):
             f.write('</div> \n')
             break
-        page = int(np.ceil((ind + 1) / 10))
+        page = int(np.ceil((ind + 1) / 20))
         f.write(f'      <figure> <img src="candy_{index_list[ind]}_cutout.png" id="candy{index_list[ind]}">')
-        f.write(f'<figcaption><a class="clickable" target="_blank" href="../scarlet_zoomin/page{page}.html#candy{index_list[ind]}">Candy {index_list[ind]}</a></figcaption></figure> \n')
+        f.write(f'<figcaption><a class="clickable" target="_blank" href="../gpfs_scarlet_zoomin/page{page}.html#candy{index_list[ind]}">Candy {index_list[ind]}</a></figcaption></figure> \n')
         if (i + 1) % 7 == 0:
             f.write('</div> \n\n')
     
