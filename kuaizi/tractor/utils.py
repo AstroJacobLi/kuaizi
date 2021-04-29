@@ -208,10 +208,236 @@ def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convo
 ########################## The Tractor related ##########################
 #########################################################################
 
+
 # Add sources to tractor
 def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
     '''
-    Add tractor sources to the sources list.
+    Add tractor sources to the sources list. SHOULD FOLLOW THE ORDER OF OBJECTS IN THE INPUT CATALOG.
+
+    Parameters:
+    ----------
+    obj_cat: astropy Table, objects catalogue.
+    sources: list, to which we will add objects.
+    w: wcs object.
+    shape_method: string, 'manual' or 'decals' or 'hsc'. 
+        If 'manual', it will adopt the manually measured shapes. 
+        If 'decals', it will adopt shapes in 'DECaLS' tractor catalog.
+        If 'hsc', it will adopt shapes in HSC CModel catalog.
+
+    Returns:
+    --------
+    sources: list of sources.
+    '''
+    from tractor import NullWCS, NullPhotoCal, ConstantSky
+    from tractor.galaxy import GalaxyShape, DevGalaxy, ExpGalaxy, CompositeGalaxy
+    from tractor.psf import Flux, PixPos, PointSource, PixelizedPSF, Image, Tractor
+    from tractor.ellipses import EllipseE
+    from tractor.sersic import SersicGalaxy, SersicIndex
+
+    # if shape_method is 'manual' or 'decals':
+    obj_type = np.array(list(map(lambda st: st.rstrip(' '), obj_cat['type'])))
+    comp_galaxy = obj_cat[obj_type == 'COMP']
+    dev_galaxy = obj_cat[obj_type == 'DEV']
+    exp_galaxy = obj_cat[obj_type == 'EXP']
+    rex_galaxy = obj_cat[obj_type == 'REX']
+    ser_galaxy = obj_cat[obj_type == 'SER']
+    psf_galaxy = obj_cat[np.logical_or(obj_type == 'PSF', obj_type == '   ')]
+
+    # elif shape_method is 'hsc':
+    #     star_mask = obj_cat['{}_extendedness'.format(band)] < 0.5
+    #     psf_galaxy = obj_cat[star_mask]
+
+    #     fracdev = obj_cat['cmodel_fracdev'].values
+    #     dev_galaxy = obj_cat[(fracdev >= 0.5) & (~star_mask)]
+    #     exp_galaxy = obj_cat[(fracdev < 0.5) & (~star_mask)]
+    # else:
+    #     raise ValueError('Only "manual", "decals", or "hsc" is supported now.')
+
+    if shape_method is 'manual':
+        # Using manually measured shapes
+        if sources is None:
+            sources = []
+        
+        for i, obj in enumerate(obj_cat):
+            if obj_type[i] == 'COMP':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    CompositeGalaxy(
+                        PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
+                        GalaxyShape(obj['a_arcsec'] * 0.8, 0.9,
+                                    90.0 + obj['theta'] * 180.0 / np.pi),
+                        Flux(0.6 * obj['flux']),
+                        GalaxyShape(obj['a_arcsec'], obj['b_arcsec'] / obj['a_arcsec'],
+                                    90.0 + obj['theta'] * 180.0 / np.pi)))
+
+            elif obj_type[i] == 'DEV':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    DevGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
+
+            elif obj_type[i] == 'EXP':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    ExpGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
+            
+            elif obj_type[i] == 'SER':                        
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    SersicGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                    (90.0 + obj['theta'] * 180.0 / np.pi)),
+                        SersicIndex(2.0)
+                    )
+                )
+            elif obj_type[i] == 'REX':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                src = ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    EllipseE(obj['a_arcsec'], 0, 0)
+                )
+                src.shape.freezeParam('e1')
+                src.shape.freezeParam('e2')
+                sources.append(src)
+            else:
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(PointSource(
+                    PixPos(pos_x, pos_y), Flux(obj['flux'])))
+
+        print(" - Now you have %d sources" % len(sources))
+
+    elif shape_method is 'decals':
+        # Using DECaLS shapes
+        if sources is None:
+            sources = []
+        
+        for i, obj in enumerate(obj_cat):
+            if obj_type[i] == 'COMP':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    CompositeGalaxy(
+                        PixPos(pos_x, pos_y), Flux(0.4 * obj['flux']),
+                        EllipseE(obj['shape_r'], obj['shape_e1'],
+                                obj['shape_e2']), Flux(0.6 * obj['flux']),
+                        EllipseE(obj['shape_r'], obj['shape_e1'],
+                                obj['shape_e2'])))
+            elif obj_type[i] == 'DEV':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    DevGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        EllipseE(obj['shape_r'], obj['shape_e1'],
+                                -obj['shape_e2'])))
+            elif obj_type[i] == 'EXP':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    ExpGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        EllipseE(obj['shape_r'], obj['shape_e1'],
+                                -obj['shape_e2'])))
+            elif obj_type[i] == 'REX':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                src = ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    EllipseE(obj['shape_r'], 0, 0)
+                )
+                src.shape.freezeParam('e1')
+                src.shape.freezeParam('e2')
+                sources.append(src)
+            elif obj_type[i] == 'SER':
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(
+                    SersicGalaxy(
+                        PixPos(pos_x, pos_y), Flux(obj['flux']),
+                        EllipseE(obj['shape_r'], obj['shape_e1'],
+                                -obj['shape_e2']),
+                        SersicIndex(1.0)
+                    )
+                )
+            else:
+                pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
+                sources.append(PointSource(
+                    PixPos(pos_x, pos_y), Flux(obj['flux'])))
+
+        print(" - Now you have %d sources" % len(sources))
+
+    elif shape_method is 'hsc':
+        from unagi import catalog
+        # Using HSC CModel catalog
+        if sources is None:
+            sources = []
+        for obj in obj_cat:
+            if obj_type[i] == 'SER':
+                pos_x, pos_y = obj['x'], obj['y']
+                flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+                r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                    obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                    to_pixel=False, update=False)  # arcsec, degree
+                sources.append(
+                    SersicGalaxy(
+                        PixPos(pos_x, pos_y), Flux(flux),
+                        GalaxyShape(r_gal, ba_gal, pa_gal + 90),
+                        SersicIndex(1.0)
+                    )
+                )
+            elif obj_type[i] == 'DEV':
+                pos_x, pos_y = obj['x'], obj['y']
+                flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+                r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                    obj, shape_type='cmodel_dev_ellipse', axis_ratio=True,
+                    to_pixel=False, update=False)  # arcsec, degree
+                sources.append(
+                    DevGalaxy(
+                        PixPos(pos_x, pos_y), Flux(flux),
+                        GalaxyShape(r_gal, ba_gal, pa_gal + 90),
+                    )
+                )
+            elif obj_type[i] == 'EXP':
+                pos_x, pos_y = obj['x'], obj['y']
+                flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+                r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                    obj, shape_type='cmodel_exp_ellipse', axis_ratio=True,
+                    to_pixel=False, update=False)  # arcsec, degree
+                sources.append(
+                    ExpGalaxy(
+                        PixPos(pos_x, pos_y), Flux(flux),
+                        GalaxyShape(r_gal, ba_gal, pa_gal + 90)
+                    )
+                )
+            elif obj_type[i] == 'REX':
+                pos_x, pos_y = obj['x'], obj['y']
+                flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+                r_gal, ba_gal, pa_gal = catalog.moments_to_shape(
+                    obj, shape_type='cmodel_ellipse', axis_ratio=True,
+                    to_pixel=False, update=False)  # arcsec, degree
+                src = ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(flux),
+                    GalaxyShape(r_gal, 1, 0)
+                )
+                src.shape.freezeParam('ab')
+                src.shape.freezeParam('phi')
+                sources.append(src)
+            else:
+                pos_x, pos_y = obj['x'], obj['y']
+                flux = 10**((kuaizi.HSC_zeropoint - obj['cmodel_mag']) / 2.5)
+
+                sources.append(PointSource(PixPos(pos_x, pos_y), Flux(flux)))
+
+        print(" - Now you have %d sources" % len(sources))
+    else:
+        raise ValueError('Cannot use this shape method')
+    return sources
+
+# Add sources to tractor, old version
+def _add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
+    '''
+    Add tractor sources to the sources list. SHOULD FOLLOW THE ORDER OF OBJECTS IN THE INPUT CATALOG.
 
     Parameters:
     ----------
@@ -475,12 +701,12 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
         raise ValueError('Cannot use this shape method')
     return sources
 
+
 # Do tractor iteration
-
-
 def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
-                      shape_method='manual', freeze_pos=False,
-                      kfold=4, first_num=50, band_name=None, fig_name=None, verbose=False):
+                      shape_method='manual', freeze_dict=None, ref_source=None,
+                      kfold=4, first_num=50, band_name=None, 
+                      fig_name=None, verbose=False):
     '''
     Run tractor iteratively.
 
@@ -493,6 +719,10 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     psf_obj: PSF object, defined by tractor.psf.PixelizedPSF() class.
     pixel_scale: float, pixel scale in unit arcsec/pixel.
     shape_method: if 'manual', then adopt manually measured shape. If 'decals', then adopt DECaLS shape from tractor files.
+    freeze_dict: for the target galaxy, whether freeze position, shape, flux, Sersic index, etc. 
+        Example `freeze_dict` is like: `{'pos': True, 'shape': False, 'sersicindex': False}`.
+    ref_source: Tractor source as a reference when doing forced photometry. 
+        The target galaxy in other bands all takes parameters from this `ref_source`.  
     kfold: int, how many iterations you want to run.
     first_num: how many objects will be fit in the first run.
     fig_name: string, if not None, it will save the tractor subtracted image to the given path.
@@ -516,6 +746,14 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     else:
         step = int((len(obj_cat) - first_num) / (kfold - 1))
 
+    if freeze_dict is None:
+        freeze_dict = {}
+    
+    if 'target' in obj_cat.colnames:
+        target_index = np.where(obj_cat['target'] == 1)[0][0]
+    else:
+        target_index = 0 # regard the first object as target
+
     for i in range(kfold):
         if i == 0:
             obj_small_cat = obj_cat[:first_num]
@@ -527,7 +765,17 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             sources = add_tractor_sources(
                 obj_small_cat, sources, w, shape_method=shape_method)
 
-        with HiddenPrints():
+        if target_index < len(sources): # our target galaxy is now included in `sources`
+            if ref_source is not None:
+                sources[target_index] = ref_source
+            
+            cen_src = sources[target_index]
+            [cen_src.freezeParam(key) for key in freeze_dict if freeze_dict[key] is True and key in cen_src.namedparams]
+            # `src.namedparams` indicates the name of available parameters for this source
+            # We may only want to freeze the params for the target galaxy??? Don't need to freeze for all.
+            print('Target source:', sources[target_index])
+
+        with HiddenPrints(): # suppress annoying messages
             tim = Image(data=img_data,
                         invvar=invvar,
                         psf=psf_obj,
@@ -536,20 +784,8 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                         photocal=NullPhotoCal()
                         )
             trac_obj = Tractor([tim], sources)
-            trac_mod = trac_obj.getModelImage(0, minsb=0.0)
-
-            if freeze_pos:
-                for src in sources:
-                    src.freezeParam('pos')
-
             trac_obj.freezeParam('images')
             trac_obj.optimize_loop()
-        #     # Take several linearized least squares steps
-        #     for i in range(20):
-        #         dlnp, X, alpha = trac_obj.optimize()
-        #         if dlnp < 1e-5:
-        #             break
-        # print(dlnp, i)
 
         ########################
         plt.rc('font', size=20)
@@ -586,16 +822,15 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 if fig_name is not None:
                     plt.savefig(fig_name, dpi=200, bbox_inches='tight')
                     plt.show()
-                    print('   The chi-square is', np.sqrt(
-                        np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
+                    print('   The chi-square is', np.sum((img_data - trac_mod_opt)**2 / abs(img_data)))
+                    # print('   The chi-square is', np.sqrt(
+                    #     np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
             elif verbose:
                 plt.show()
-                print('   The chi-square is', np.sqrt(
-                    np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
+                print('   The chi-square is', np.sum((img_data - trac_mod_opt)**2 / abs(img_data)))
             else:
                 plt.close()
-                print('   The chi-square is', np.sqrt(
-                    np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
+                print('   The chi-square is', np.sum((img_data - trac_mod_opt)**2 / abs(img_data)))
 
         #trac_mod_opt = trac_obj.getModelImage(0, minsb=0., srcs=sources[1:])
         #ax4 = display_single(img_data - trac_mod_opt, ax=ax4, scale_bar=False, color_bar=True, contrast=0.05)
@@ -604,7 +839,8 @@ def tractor_iteration(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     return sources, trac_obj, fig
 
 
-def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use_cmodel_filt=None, freeze_pos=False, verbose=False):
+def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, 
+                       use_cmodel_filt=None, freeze_dict=None, ref_source=None, verbose=False):
     '''
     Run `the tractor` on HSC images, for Merian survey.
 
@@ -718,6 +954,13 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
     obj_type[cen_obj_ind] = 'SER'
 
     cutout_clean['type'] = obj_type
+    ### Add a "target" column to indicate which object is the target galaxy ###
+    cutout_clean['target'] = np.zeros(len(cutout_clean), dtype=int)
+    cutout_clean['target'][cen_obj_ind] = 1
+
+    print(f'# Type of the central object is {cutout_clean["type"][cen_obj_ind]}')
+    print(f'# Total number of objects: {len(cutout_clean)}')
+    print(f'# Central object index in {filt}-band: {cen_obj_ind}')
 
     psf_obj = PixelizedPSF(data.psfs[layer_ind])  # Construct PSF
 
@@ -734,12 +977,14 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
                 psf_obj,
                 kuaizi.HSC_pixel_scale,
                 shape_method='hsc',
-                freeze_pos=freeze_pos,
+                freeze_dict=freeze_dict,
+                ref_source=ref_source,
                 kfold=kfold,
                 first_num=cen_obj_ind + 1,
                 band_name=filt,
                 fig_name=obj_name + '_cmodel_tractor_' + filt,
                 verbose=verbose)
+            trac_obj.target_ind = cen_obj_ind # record the index of target galaxy
 
         except Exception as e:
             print('   ' + str(e))
@@ -754,7 +999,8 @@ def tractor_hsc_cmodel(obj_name, coord, s_ang, filt, channels, data, hsc_dr, use
     return trac_obj
 
 
-def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.fits.gz', freeze_pos=True, verbose=False):
+def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.fits.gz', 
+                    freeze_dict=None, ref_source=None, verbose=False):
     '''
     Run `the tractor` on HSC images, for Merian survey.
 
@@ -834,12 +1080,15 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
     dist = coord.separation(catalog_c)
     cen_obj_ind = np.argsort(dist)[0]
     cen_obj = obj_cat_sep[cen_obj_ind]
+    ### Add a "target" column to indicate which object is the target galaxy ###
+    obj_cat_sep['target'] = np.zeros(len(obj_cat_sep), dtype=int)
+    obj_cat_sep['target'][cen_obj_ind] = 1
+    #obj_cat_sex['type'][obj_cat_sex['type'] == 'PSF'] = 'REX'
+    obj_cat_sep['type'][cen_obj_ind] = 'SER'
 
     print(f'# Type of the central object is {cen_obj["type"]}')
     print(f'# Total number of objects: {len(obj_cat_sep)}')
-
-    #obj_cat_sex['type'][obj_cat_sex['type'] == 'PSF'] = 'REX'
-    obj_cat_sep['type'][cen_obj_ind] = 'SER'
+    print(f'# Central object index in {filt}-band: {cen_obj_ind}')
 
     psf_obj = PixelizedPSF(data.psfs[layer_ind])  # Construct PSF
 
@@ -856,12 +1105,14 @@ def tractor_hsc_sep(obj, filt, channels, data, brick_file='../survey-bricks-dr9.
                 psf_obj,
                 kuaizi.HSC_pixel_scale,
                 shape_method='decals',
-                freeze_pos=freeze_pos,
+                freeze_dict=freeze_dict,
+                ref_source=ref_source,
                 kfold=kfold,
                 first_num=cen_obj_ind + 1,
                 band_name=filt,
                 fig_name=obj_name + '_sep_tractor_' + filt,
                 verbose=verbose)
+            trac_obj.target_ind = cen_obj_ind # record the index of target galaxy
 
         except Exception as e:
             print('   ' + str(e))
