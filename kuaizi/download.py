@@ -81,8 +81,9 @@ def download_decals_tractor_catalog(bricknames, layer='dr8', output_dir='./', ov
         else:
             bricknames = list(bricknames.astype(str))
     for brick in bricknames:
-        URL = f'http://portal.nersc.gov/project/cosmo/data/legacysurvey/{layer}/south/tractor/{brick[:3]}/tractor-{brick}.fits'
+        URL = f'https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/{layer}/south/tractor/{brick[:3]}/tractor-{brick}.fits'
         filename = os.path.join(output_dir, f'tractor-{brick}.fits')
+        print(URL, filename)
         if not os.path.isfile(filename):
             with TqdmUpTo(unit='B', unit_scale=True, miniters=1, desc=filename) as t:  # all optional kwargs
                 urllib.request.urlretrieve(URL, filename=filename,
