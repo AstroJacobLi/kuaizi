@@ -616,8 +616,6 @@ def save_to_fits(img, fits_file, wcs=None, header=None, overwrite=True):
     return img_hdu
 
 # Cutout image
-
-
 def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
                pixel_unit=False, img_header=None, prefix='img_cutout',
                out_dir=None, save=True):
@@ -703,10 +701,134 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
 
     return cutout, [cen_pos, dx, dy], cutout_header
 
+
+# Filter correction between surveys
+def filter_corr_gunn_stryker(surveys, n_terms=4, x_upper_lims=[2, 5, 5], y_lim=None,
+    skip_calc_mag=False, gunn_stryker_dir='/Users/jiaxuanli/Research/HSC_Dragonfly_DECaLS/Filters/GunnStryker/'):
+    '''
+    Calculate filter correction between two surveys (such as HSC-r and DECam-r) 
+    based on synthetic photometry of stars (Gunn-Stryker library). 
+    This funciton change the input surveys in-place. `sedpy` is required. 
+    Gunn-Stryker spectra atlas: https://www.stsci.edu/hst/instrumentation/reference-data-for-calibration-and-tools/astronomical-catalogs/gunn-stryker-atlas-list
+
+    Parameters:
+        surveys (list): elements are a dictionary contains the name and filters in `sedpy` format. For example:
+            ```
+            hsc = {
+                'name': 'HSC',
+                'filters':
+                observate.load_filters(['hsc_g', 'hsc_r2', 'hsc_i2'],
+                                    directory=f"{filter_path}/hsc_responses_all_rev3/")
+            }
+            ```
+        n_terms (int): order of polynomial fitting.
+        x_upper_lims (list): the upper limits of x-axis (i.e., color) when doing 
+            polynomial fitting, in order to remove outliers. The length of `x_upper_lims` 
+            should be consistent with the number of possible combinations of the filters in the first survey, 
+            i.e., `len(x_upper_lims) = len(combinations(range(len(survey1['filters'])), 2))`.
+        y_lim (list): y_lim for the figure. Default is None.
+        skip_calc_mag (bool): if you have already calculated the synthetic magnitudes based 
+            on Gunn-Stryker catalog, you may want to skip this to save some time.
+        gunn_stryker_dir (str): the directory of Gunn-Stryker atals of spectra. 
+
+    Returns:
+        surveys (list): the input list of surveys. 
+            The synthetic magnitudes of each survey is updated in-place. 
+    '''
+    import re
+    from itertools import combinations
+    colorset = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    spec_cat = Table.read(os.path.join(gunn_stryker_dir, 'gsspectype.ascii'), 
+                          format='ascii.no_header')
+
+    if len(surveys) > 2:
+        raise ValueError("Please only input two surveys!")
+
+    # Calculate magnitude in each filter, for each star in Gunn-Stryker catalog
+    print('Calculating synthetic magnitudes based on Gunn-Stryker catalog')
+    if skip_calc_mag:
+        # Skip calculating synthetic mag, check whether the input "survey" already has synthetic mags
+        if not hasattr(surveys[0]['filters'][0], 'mag'):
+            print('The input `survey` does not have synthetic magnitudes. Calculate them again.')
+            skip_calc_mag = False
+    
+    if not skip_calc_mag:
+        for survey in surveys:
+            mag_dict = {}
+            for filt in survey['filters']:
+                temp = []
+                for obj in spec_cat: # iterate over stars
+                    filename = obj['col1'].rstrip('.tab') + '.ascii'
+                    spec = Table.read(os.path.join(gunn_stryker_dir, filename), format='ascii')
+                    mag = filt.ab_mag(spec['col1'], spec['col2'])
+                    temp.append(mag)
+                filt.mag = np.array(temp)
+
+    # Fit a relation between color and filter difference
+    survey_filters = [[re.sub('\d', '', re.sub('^\w+_', '', item.name)) for item in survey['filters']] for survey in surveys]
+    common_filters = np.intersect1d(*survey_filters) # such as ['g', 'r']
+
+    print(f"Deriving the filter correction between {surveys[0]['name']} and {surveys[1]['name']} in {len(common_filters)} bands: {common_filters}")
+
+    survey1, survey2 = surveys
+    fig, axes = plt.subplots(len(common_filters), len(survey1['filters']), 
+                            figsize=(5 * len(survey1['filters']), 4. * len(common_filters)), 
+                            sharex=True, sharey=True)
+
+    for i, filt in enumerate(common_filters):
+        survey1_filt = [item for item in survey1['filters'] if filt in item.name][0]
+        survey2_filt = [item for item in survey2['filters'] if filt in item.name][0]
+        
+        for j, color_ind in enumerate(combinations(range(len(survey1['filters'])), 2)):
+            y = survey1_filt.mag - survey2_filt.mag
+            # y-axis is the mag difference of the same bands in two surveys 
+            x = survey1['filters'][color_ind[0]].mag - survey1['filters'][color_ind[1]].mag 
+            # x-axis is color (such as g-i)
+            negative = (np.sum(y < 0) / len(y) > 0.6) # most of y is negative or not
+            
+            # sort by x
+            zipped = sorted(zip(x, y), key=lambda x: x[0])
+            x, y = list(zip(*zipped))
+            x, y = map(lambda t: np.array(t), [x, y])
+            
+            # fit polynomial
+            flag = (x < x_upper_lims[j])
+            poly_params = np.polyfit(x[flag], y[flag], n_terms)
+            func = np.poly1d(poly_params)
+            y_poly = func(x)
+            
+            # Plot figure
+            ax = axes[i, j]
+            title = Polynomial_to_LaTeX(func)
+            #title = '$y = ' + '+'.join([r'{0:.3f} x^{1:d}'.format(item, n_term - num) for num, item in enumerate(poly_params)]) + '$'
+            ax.scatter(x, y, color='k')
+            ylim = ax.get_ylim()
+            if y_lim is not None: ylim = y_lim
+            xlim = ax.get_xlim()
+            
+            ax.plot(x, y_poly, color=colorset[j], lw=2)
+            ax.set_xlabel(survey1['filters'][color_ind[0]].name + ' - ' + survey1['filters'][color_ind[1]].name)
+            if j == 0: ax.set_ylabel(survey1_filt.name + ' - ' + survey2_filt.name)
+            if negative:
+                ax.text((xlim[0] + xlim[1]) * 0.5, (0.85 * ylim[0] + 0.15 * ylim[1]), title, 
+                        ha='center', va='center', fontsize=9)
+            else:
+                ax.text((xlim[0] + xlim[1]) * 0.5, (0.15 * ylim[0] + 0.85 * ylim[1]), title, 
+                        ha='center', va='center', fontsize=9)
+            ax.hlines(0, xlim[0], xlim[1], color='gray', linestyle='-.')
+            #ax.set_title(title, fontsize=8)
+            ax.set_ylim(ylim)
+            ax.set_xlim(xlim)
+    
+    plt.subplots_adjust(hspace=0.0, wspace=0.0)
+    plt.show()
+
+    return surveys
+
+
 ################# HDF5 related ##################
 # Print attributes of a HDF5 file
-
-
 def h5_print_attrs(f):
     '''
     Print all attributes of a HDF5 file.
@@ -727,8 +849,6 @@ def h5_print_attrs(f):
     f.visititems(print_attrs)
 
 # Rewrite dataset
-
-
 def h5_rewrite_dataset(mother_group, key, new_data):
     '''
     Rewrite the given dataset of a HDF5 group.
@@ -747,8 +867,6 @@ def h5_rewrite_dataset(mother_group, key, new_data):
     return dt
 
 # Create New group
-
-
 def h5_new_group(mother_group, key):
     '''
     Create a new data_group
@@ -766,11 +884,52 @@ def h5_new_group(mother_group, key):
     return new_grp
 
 # String to dictionary
-
-
 def str2dic(string):
     '''
     This function is used to load string dictionary and convert it into python dictionary.
     '''
     import yaml
     return yaml.load(string)
+
+def Polynomial_to_LaTeX(p):
+    """
+    Small function to print nicely the polynomial p as we write it in maths, in LaTeX code.
+    From https://perso.crans.org/besson/publis/notebooks/Demonstration%20of%20numpy.polynomial.Polynomial%20and%20nice%20display%20with%20LaTeX%20and%20MathJax%20(python3).html
+
+    Parameter:
+        p (numpy Polynomial object): such as p = np.poly1d(poly_params)
+    
+    Return:
+        Latex string.
+    """
+    coefs = p.coef  # List of coefficient, sorted by increasing degrees
+    coefs = [round(item, 3) for item in coefs]
+    res = ""  # The resulting string
+    for i, a in enumerate(coefs):
+        if int(a) == a:  # Remove the trailing .0
+            a = int(a)
+        if i == 0:  # First coefficient, no need for X
+            if a > 0:
+                res += "{a} + ".format(a=a)
+            elif a < 0:  # Negative a is printed like (a)
+                res += "({a}) + ".format(a=a)
+            # a = 0 is not displayed 
+        elif i == 1:  # Second coefficient, only X and not X**i
+            if a == 1:  # a = 1 does not need to be displayed
+                res += "X + "
+            elif a > 0:
+                res += "{a} \;X + ".format(a=a)
+            elif a < 0:
+                res += "({a}) \;X + ".format(a=a)
+        else:
+            if i == 3 and (a != 0 | len(coefs) > 4):
+                res += '$ \n $' # line break
+            if a == 1:
+                # A special care needs to be addressed to put the exponent in {..} in LaTeX
+                res += "X^{i} + ".format(i="{%d}" % i)
+            elif a > 0:
+                res += "{a} \;X^{i} + ".format(a=a, i="{%d}" % i)
+            elif a < 0:
+                res += "({a}) \;X^{i} + ".format(a=a, i="{%d}" % i)
+
+    return "$ Y= " + res[:-3] + "$" if res else ""
