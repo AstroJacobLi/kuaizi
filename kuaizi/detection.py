@@ -11,6 +11,7 @@ from astropy.coordinates import SkyCoord
 
 from kuaizi.mock import Data
 
+
 def interpolate(data_lr, data_hr):
     ''' Interpolate low resolution data to high resolution
 
@@ -26,21 +27,29 @@ def interpolate(data_lr, data_hr):
     interp: numpy array
         the images in data_lr interpolated to the grid of data_hr
     '''
-    frame_lr = scarlet.Frame(data_lr.images.shape, wcs = data_lr.wcs, channels = data_lr.channels)
-    frame_hr = scarlet.Frame(data_hr.images.shape, wcs = data_hr.wcs, channels = data_hr.channels)
+    frame_lr = scarlet.Frame(data_lr.images.shape,
+                             wcs=data_lr.wcs, channels=data_lr.channels)
+    frame_hr = scarlet.Frame(data_hr.images.shape,
+                             wcs=data_hr.wcs, channels=data_hr.channels)
 
-    coord_lr0 = (np.arange(data_lr.images.shape[1]), np.arange(data_lr.images.shape[1]))
-    coord_hr = (np.arange(data_hr.images.shape[1]), np.arange(data_hr.images.shape[1]))
-    coord_lr = scarlet.resampling.convert_coordinates(coord_lr0, frame_lr, frame_hr)
+    coord_lr0 = (np.arange(data_lr.images.shape[1]), np.arange(
+        data_lr.images.shape[1]))
+    coord_hr = (np.arange(data_hr.images.shape[1]), np.arange(
+        data_hr.images.shape[1]))
+    coord_lr = scarlet.resampling.convert_coordinates(
+        coord_lr0, frame_lr, frame_hr)
 
     interp = []
     for image in data_lr.images:
-        interp.append(scarlet.interpolation.sinc_interp(image[None, :, :], coord_hr, coord_lr, angle=None)[0].T)
+        interp.append(scarlet.interpolation.sinc_interp(
+            image[None, :, :], coord_hr, coord_lr, angle=None)[0].T)
     return np.array(interp)
 
 # Vanilla detection: SEP
-def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
-    deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
+
+
+def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30,
+                      deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Source detection using Source Extractor (actually SEP). 
 
@@ -81,14 +90,14 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
         minarea=minarea,
         deblend_nthresh=deblend_nthresh,
         deblend_cont=deblend_cont,
-        sky_subtract=sky_subtract, 
+        sky_subtract=sky_subtract,
         show_fig=show_fig,
         **kwargs)
 
     obj_cat = result[0]
     arg_ind = obj_cat.argsort('flux', reverse=True)
     obj_cat.sort('flux', reverse=True)
-    obj_cat['index'] = np.arange(len(obj_cat)) 
+    obj_cat['index'] = np.arange(len(obj_cat))
     segmap = result[1]
     segmap = np.append(-1, np.argsort(arg_ind))[segmap] + 1
 
@@ -98,12 +107,13 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
     else:
         return obj_cat, segmap
 
-def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1, 
-    sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30, 
-    deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
+
+def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1,
+                      sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30,
+                      deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
-    
+
     Parameters
     ----------
     detect_image: 2-D numpy array
@@ -138,30 +148,31 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
     fig: `matplotlib.pyplot.figure` object
 
     '''
-    Sw = Starlet(detect_image, lvl=wavelet_lvl) # wavelet decomposition
+    Sw = Starlet(detect_image, lvl=wavelet_lvl)  # wavelet decomposition
     w = Sw.coefficients
     iw = Sw.image
 
     if high_freq_lvl != 0:
-        w[:, (high_freq_lvl):, :, :] = 0 # remove low frequency features
+        w[:, (high_freq_lvl):, :, :] = 0  # remove low frequency features
         # w: from high to low
 
     if low_freq_lvl != 0:
-        w[:, :(low_freq_lvl), :, :] = 0 # remove high frequency features
+        w[:, :(low_freq_lvl), :, :] = 0  # remove high frequency features
 
-    high_freq_image = Starlet(coefficients=w).image[0] # image with high-frequency features highlighted
+    # image with high-frequency features highlighted
+    high_freq_image = Starlet(coefficients=w).image[0]
 
     result = vanilla_detection(
-        high_freq_image, 
+        high_freq_image,
         mask=mask,
-        sigma=sigma, 
-        b=b, 
-        f=f, 
+        sigma=sigma,
+        b=b,
+        f=f,
         minarea=minarea,
         deblend_nthresh=deblend_nthresh,
         deblend_cont=deblend_cont,
-        sky_subtract=sky_subtract, 
-        show_fig=show_fig, 
+        sky_subtract=sky_subtract,
+        show_fig=show_fig,
         **kwargs)
 
     if show_fig is True:
@@ -171,8 +182,8 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
         obj_cat, segmap = result
         return obj_cat, segmap
 
-    
-def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5, 
+
+def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5,
                 match_gaia=True, show_fig=True, visual_gaia=True, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
@@ -210,7 +221,8 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         background level for each dataset
     '''
     if len(datas) == 1:
-        hr_images = datas[0].images / np.sum(datas[0].images, axis=(1, 2))[:, None, None]
+        hr_images = datas[0].images / \
+            np.sum(datas[0].images, axis=(1, 2))[:, None, None]
         # Detection image as the sum over all images
         detect_image = np.sum(hr_images, axis=0)
     else:
@@ -221,11 +233,12 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         # Normalisation of the interpolate low res images
         interp = interp / np.sum(interp, axis=(1, 2))[:, None, None]
         # Normalisation of the high res data
-        hr_images = data_hr.images / np.sum(data_hr.images, axis=(1, 2))[:, None, None]
+        hr_images = data_hr.images / \
+            np.sum(data_hr.images, axis=(1, 2))[:, None, None]
         # Detection image as the sum over all images
         detect_image = np.sum(interp, axis=0) + np.sum(hr_images, axis=0)
         detect_image *= np.sum(data_hr.images)
-    
+
     if np.size(detect_image.shape) == 3:
         detect = detect_image.mean(axis=0)
     else:
@@ -236,9 +249,11 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         detect = convolve(detect.astype(float), Gaussian2DKernel(conv_radius))
 
     if method == 'wavelet':
-        result = wavelet_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+        result = wavelet_detection(
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
     else:
-        result = vanilla_detection(detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+        result = vanilla_detection(
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
 
     obj_cat = result[0]
     segmap = result[1]
@@ -246,23 +261,29 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     ## RA and Dec
     if len(datas) == 1:
         ra, dec = datas[0].wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        obj_cat.add_columns([Column(data=ra, name='ra'), Column(data=dec, name='dec')])
+        obj_cat.add_columns([Column(data=ra, name='ra'),
+                             Column(data=dec, name='dec')])
     else:
-        ra_lr, dec_lr = data_lr.wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        ra_hr, dec_hr = data_hr.wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
-        obj_cat.add_columns([Column(data=ra_lr, name='ra_lr'), Column(data=dec_lr, name='dec_lr')])
-        obj_cat.add_columns([Column(data=ra_hr, name='ra_hr'), Column(data=dec_lr, name='dec_hr')])
-    
-    ## Reorder columns
+        ra_lr, dec_lr = data_lr.wcs.wcs_pix2world(
+            obj_cat['x'], obj_cat['y'], 0)
+        ra_hr, dec_hr = data_hr.wcs.wcs_pix2world(
+            obj_cat['x'], obj_cat['y'], 0)
+        obj_cat.add_columns(
+            [Column(data=ra_lr, name='ra_lr'), Column(data=dec_lr, name='dec_lr')])
+        obj_cat.add_columns(
+            [Column(data=ra_hr, name='ra_hr'), Column(data=dec_lr, name='dec_hr')])
+
+    # Reorder columns
     colnames = obj_cat.colnames
     for item in ['dec', 'ra', 'y', 'x', 'index']:
         if item in colnames:
             colnames.remove(item)
             colnames.insert(0, item)
     obj_cat = obj_cat[colnames]
-    obj_cat.add_column(Column(data=[None]  * len(obj_cat), name='obj_type'), index=0)
+    obj_cat.add_column(
+        Column(data=[None] * len(obj_cat), name='obj_type'), index=0)
 
-    if len(datas) ==1:
+    if len(datas) == 1:
         bg_rms = mad_wavelet(datas[0].images)
     else:
         bg_rms = []
@@ -270,17 +291,18 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
             bg_rms.append(mad_wavelet(data.images))
 
     if match_gaia:
-        obj_cat.add_column(Column(data=[None]  * len(obj_cat), name='gaia_coord'))
+        obj_cat.add_column(
+            Column(data=[None] * len(obj_cat), name='gaia_coord'))
         if len(datas) == 1:
             w = datas[0].wcs
             pixel_scale = w.to_header()['PC2_2'] * 3600
         else:
             w = data_hr.wcs
             pixel_scale = w.to_header()['PC2_2'] * 3600
-        
+
         # Retrieve GAIA catalog
         gaia_stars = image_gaia_stars(
-            detect, w, pixel_scale=pixel_scale, 
+            detect, w, pixel_scale=pixel_scale,
             verbose=True, visual=visual_gaia)
         # Cross-match with SExtractor catalog
         from astropy.coordinates import SkyCoord, match_coordinates_sky
@@ -291,10 +313,13 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         psf_ind = temp[flag]
         star_mag = star_mag[flag]
         bright_star_flag = star_mag < 19.0
-        obj_cat['obj_type'][psf_ind[bright_star_flag]] = scarlet.source.ExtendedSource
-        obj_cat['obj_type'][psf_ind[~bright_star_flag]] = scarlet.source.PointSource
-        ## we also use the coordinates from Gaia for bright stars
-        obj_cat['gaia_coord'][psf_ind] = np.array(gaia_stars[['ra', 'dec']])[flag]
+        obj_cat['obj_type'][psf_ind[bright_star_flag]
+                            ] = scarlet.source.ExtendedSource
+        obj_cat['obj_type'][psf_ind[~bright_star_flag]
+                            ] = scarlet.source.PointSource
+        # we also use the coordinates from Gaia for bright stars
+        obj_cat['gaia_coord'][psf_ind] = np.array(
+            gaia_stars[['ra', 'dec']])[flag]
 
         # Cross-match for a second time: to deal with splitted bright stars
         temp_cat = obj_cat.copy(copy_data=True)
@@ -303,7 +328,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
                                                 SkyCoord(ra=temp_cat['ra'], dec=temp_cat['dec'], unit='deg'), nthneighbor=1)
         flag2 = dist2 < 1 * u.arcsec
         psf_ind2 = temp_cat[temp2[flag2]]['index'].data
-        ## we also use the coordinates from Gaia for bright stars
+        # we also use the coordinates from Gaia for bright stars
         obj_cat.remove_rows(psf_ind2)
         #obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
         #obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
