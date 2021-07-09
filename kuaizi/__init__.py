@@ -44,7 +44,7 @@ from . import utils
 import warnings
 warnings.simplefilter('ignore')
 
-__all__ = ["utils"]
+__all__ = ["utils", "fitting", "download", "detection", "display", "measure", "wavelet", "mock"]
 __name__ = 'kuaizi'
 __author__ = ['Jiaxuan Li']
 
