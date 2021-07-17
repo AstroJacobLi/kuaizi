@@ -930,8 +930,22 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 # Free parameter for our target galaxy
                 if obj['target'] == 1 and ref_source is not None:
                     src = [copy.deepcopy(ref_source)]
+                    src[0].brightness = Flux(obj_temp['flux'])
                 if obj['target'] == 1:
-                    [src[0].freezeParam(key) for key in freeze_dict if key in src[0].namedparams and freeze_dict[key] is True]
+                    for item in freeze_dict:
+                        if item == 'shape.ab' and freeze_dict[item]:
+                            src[0][src[0].getNamedParamIndex('shape')].freezeParam('ab')
+                        if item == 'shape.phi' and freeze_dict[item]:
+                            src[0][src[0].getNamedParamIndex('shape')].freezeParam('phi')
+                        if item == 'shape.re' and freeze_dict[item]:
+                            src[0][src[0].getNamedParamIndex('shape')].freezeParam('re')
+                        if item == 'shape' and freeze_dict[item] and item in src[0].namedparams:
+                            src[0].freezeParam(item)
+                        if item in ['pos', 'sersicindex'] and freeze_dict[item] and item in src[0].namedparams:
+                            src[0].freezeParam(item)
+                    
+                    #[src[0].freezeParam(key) for key in freeze_dict if key in src[0].namedparams and freeze_dict[key] is True]
+
                 trac_obj = Tractor([tim], src)
                 trac_obj.freezeParam('images')
 
@@ -1341,7 +1355,6 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
 
     obj_cat_sep.sort('flux', reverse=True)
 
-
     catalog_c = SkyCoord(obj_cat_sep['ra'], obj_cat_sep['dec'], unit='deg')
     dist = coord.separation(catalog_c)
     cen_obj_ind = np.argsort(dist)[0]
@@ -1397,7 +1410,7 @@ def _regularize_attr(item):
     item = item.replace('sersicindex.SersicIndex', 'sersic')
     return item
 
-def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale):
+def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, zeropoint=kuaizi.HSC_zeropoint):
     '''
     Write the properties of our target galaxy (only) into a dictionary. 
     Note: this only gives you the properties in one band.
@@ -1425,10 +1438,10 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale):
 
     keys_to_extract = [item for item in attri if f'source{i}.' in item]
     source_values = {key.replace(f'source{i}.', ''): values[key] for key in keys_to_extract}
-    source_values['flux'] *= 10**((22.5 - kuaizi.HSC_zeropoint) / 2.5) # in nanomaggy
+    source_values['flux'] *= 10**((22.5 - zeropoint) / 2.5) # in nanomaggy
 
     source_invvar = {key.replace(f'source{i}.', '') + '_ivar': invvars[key] for key in keys_to_extract}
-    source_invvar['flux_ivar'] *= 10**(- 2 * (22.5 - kuaizi.HSC_zeropoint) / 2.5) # in nanomaggy^-2
+    source_invvar['flux_ivar'] *= 10**(- 2 * (22.5 - zeropoint) / 2.5) # in nanomaggy^-2
 
     source_output = dict(**source_values, **source_invvar)
 
@@ -1470,5 +1483,10 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale):
         source_output['dec'] = float(dec)
         source_output['ra_ivar'] = float(ra_ivar)
         source_output['dec_ivar'] = float(dec_ivar)
+
+    ### Pixel to arcsec
+    if 're' in source_output.keys():
+        source_output['re'] *= pixel_scale
+        source_output['re_ivar'] /= pixel_scale**2
 
     return source_output
