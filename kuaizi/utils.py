@@ -47,7 +47,7 @@ def set_env(project='HSC', name='HSC_LSBG', data_dir='Research/Data/'):
     return data_dir
 
 
-def set_matplotlib(style='JL', usetex=True, fontsize=13):
+def set_matplotlib(style='JL', usetex=True, fontsize=13, figsize=(6, 5)):
     '''
     Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
 
@@ -56,57 +56,57 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13):
     '''
 
     import matplotlib.pyplot as plt
+    from matplotlib.colorbar import Colorbar
     from matplotlib import rcParams
     import kuaizi
     # Use JL as a template
     pkg_path = kuaizi.__path__[0]
-    if style == 'default':
-        plt.style.use(os.path.join(pkg_path, 'mplstyle/default.mplstyle'))
-    else:
-        plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
-        rcParams.update({'font.size': fontsize,
-                         'text.usetex': usetex})
-        if style == 'SM':
+    plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
+    rcParams.update({'font.size': fontsize,
+                     'figure.figsize': "{0}, {1}".format(figsize[0], figsize[1]),
+                     'text.usetex': usetex})
+
+    if style == 'SM':
+        rcParams.update({
+            "figure.figsize": "6, 6",
+            "axes.linewidth": 0.6,
+            "xtick.major.width": 0.5,
+            "xtick.minor.width": 0.3,
+            "ytick.major.width": 0.5,
+            "ytick.minor.width": 0.3,
+            "font.family": "monospace",
+            "font.stretch": "semi-expanded",
+            # The default edge colors for scatter plots.
+            "scatter.edgecolors": "black",
+            "mathtext.bf": "monospace:bold",
+            "mathtext.cal": "monospace:bold",
+            "mathtext.it": "monospace:italic",
+            "mathtext.rm": "monospace",
+            "mathtext.sf": "monospace",
+            "mathtext.tt": "monospace",
+            "mathtext.fallback": "cm",
+            "mathtext.default": 'it'
+        })
+
+        if usetex is True:
             rcParams.update({
-                "figure.figsize": "6, 6",
-                "axes.linewidth": 0.6,
-                "xtick.major.width": 0.5,
-                "xtick.minor.width": 0.3,
-                "ytick.major.width": 0.5,
-                "ytick.minor.width": 0.3,
-                "font.family": "monospace",
-                "font.stretch": "semi-expanded",
-                # The default edge colors for scatter plots.
-                "scatter.edgecolors": "black",
-                "mathtext.bf": "monospace:bold",
-                "mathtext.cal": "monospace:bold",
-                "mathtext.it": "monospace:italic",
-                "mathtext.rm": "monospace",
-                "mathtext.sf": "monospace",
-                "mathtext.tt": "monospace",
-                "mathtext.fallback": "cm",
-                "mathtext.default": 'it'
+                "text.latex.preamble": '\n'.join([
+                    '\\usepackage{amsmath}'
+                    '\\usepackage[T1]{fontenc}',
+                    '\\usepackage{courier}',
+                    '\\usepackage[variablett]{lmodern}',
+                    '\\usepackage[LGRgreek]{mathastext}',
+                    '\\renewcommand{\\rmdefault}{\\ttdefault}'
+                ])
             })
 
-            if usetex is True:
-                rcParams.update({
-                    "text.latex.preamble": '\n'.join([
-                        '\\usepackage{amsmath}'
-                        '\\usepackage[T1]{fontenc}',
-                        '\\usepackage{courier}',
-                        '\\usepackage[variablett]{lmodern}',
-                        '\\usepackage[LGRgreek]{mathastext}',
-                        '\\renewcommand{\\rmdefault}{\\ttdefault}'
-                    ])
-                })
-
-        if style == 'nature':
-            rcParams.update({
-                "font.family": "sans-serif",
-                # The default edge colors for scatter plots.
-                "scatter.edgecolors": "black",
-                "mathtext.fontset": "stixsans"
-            })
+    if style == 'nature':
+        rcParams.update({
+            "font.family": "sans-serif",
+            # The default edge colors for scatter plots.
+            "scatter.edgecolors": "black",
+            "mathtext.fontset": "stixsans"
+        })
 
 
 def set_logger(logger_name='fitting_wavelet_obs_tigress', file_name='candy', level='INFO'):
