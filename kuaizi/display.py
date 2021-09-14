@@ -481,6 +481,139 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
         return axes
 
 
+def display_rgb(images,
+                mask=None,
+                ax=None,
+                stretch=2,
+                Q=1,
+                minimum=-0.2,
+                pixel_scale=0.168,
+                scale_bar=True,
+                physical_scale=None,
+                scale_bar_length=5.0,
+                scale_bar_fontsize=20,
+                scale_bar_y_offset=0.5,
+                scale_bar_color='w',
+                scale_bar_loc='left',
+                add_text=None,
+                usetex=True,
+                text_fontsize=30,
+                text_y_offset=0.80,
+                text_color='w',
+                xsize=8.0,
+                ysize=8.0, 
+                hide_ticks=False):
+    """
+    Display multi-band image in RGB using ``arcsinh`` stretching.
+    
+    Parameters:
+        images (numpy 3-D array): the images array, dimension follows (Number of filters, Height, Width). 
+        pixel_scale (float): The pixel size, in unit of "arcsec/pixel".
+        xsize (int): Width of the image, default = 8.
+        ysize (int): Height of the image, default = 8.
+        ax (``matplotlib.pyplot.axes`` object): The user could provide axes on which the figure will be drawn.
+        stretch (float): 
+        Q (float): 
+        scale_bar (bool): Whether show scale bar or not.
+        physical_scale (bool): comoving physical scale, in "kpc/arcsec".
+        scale_bar_length (float): The length of scale bar.
+        scale_bar_y_offset (float): Offset of scale bar on y-axis.
+        scale_bar_fontsize (float): Fontsize of scale bar ticks.
+        scale_bar_color (str): Color of scale bar.
+        scale_bar_loc (str): Scale bar position, options are "left" and "right".
+        add_text (str): The text you want to add to the figure.
+        usetex (bool): whether render the text in LaTeX.
+        text_fontsize (float): Fontsize of text.
+        text_y_offset (float): Offset of text on y-axis.
+        text_color (str): Color of text.
+
+    Returns:
+        ax: If the input ``ax`` is not ``None``.
+
+    """
+    from scarlet.display import img_to_rgb, AsinhMapping
+
+    if ax is None:
+        fig = plt.figure(figsize=(xsize, ysize))
+        ax1 = fig.add_subplot(111)
+    else:
+        ax1 = ax
+
+    img_rgb = img_to_rgb(images, norm=AsinhMapping(minimum=minimum, stretch=stretch, Q=Q))
+    
+    show = ax1.imshow(img_rgb, origin='lower')
+    
+    if mask is not None:
+        plt.imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+
+    # Put scale bar on the image
+    (img_size_x, img_size_y) = images[0].shape
+    if physical_scale is not None:
+        pixel_scale *= physical_scale
+    if scale_bar:
+        if scale_bar_loc == 'left':
+            scale_bar_x_0 = int(img_size_x * 0.04)
+            scale_bar_x_1 = int(img_size_x * 0.04 +
+                                (scale_bar_length / pixel_scale))
+        else:
+            scale_bar_x_0 = int(img_size_x * 0.95 -
+                                (scale_bar_length / pixel_scale))
+            scale_bar_x_1 = int(img_size_x * 0.95)
+        scale_bar_y = int(img_size_y * 0.10)
+        scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+        scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+        if physical_scale is not None:
+            if scale_bar_length > 1000:
+                scale_bar_text = r'$%d\ \mathrm{Mpc}$' % int(
+                    scale_bar_length / 1000)
+            else:
+                scale_bar_text = r'$%d\ \mathrm{kpc}$' % int(scale_bar_length)
+        else:
+            if scale_bar_length < 60:
+                scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+            elif 60 < scale_bar_length < 3600:
+                scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+            else:
+                scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+        scale_bar_text_size = scale_bar_fontsize
+
+        ax1.plot(
+            [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+            linewidth=3,
+            c=scale_bar_color,
+            alpha=1.0)
+        ax1.text(
+            scale_bar_text_x,
+            scale_bar_text_y,
+            scale_bar_text,
+            fontsize=scale_bar_text_size,
+            horizontalalignment='center',
+            color=scale_bar_color)
+    if add_text is not None:
+        text_x_0 = int(img_size_x*0.08)
+        text_y_0 = int(img_size_y*text_y_offset)
+        if usetex:
+            ax.text(text_x_0, text_y_0,
+                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax.text(text_x_0, text_y_0, add_text,
+                    fontsize=text_fontsize, color=text_color)
+
+    if hide_ticks:
+        # Hide ticks and tick labels
+        ax1.tick_params(
+            labelbottom=False,
+            labelleft=False,
+            axis=u'both',
+            which=u'both',
+            length=0)
+        ax1.axis('off')
+
+    if ax is None:
+        return fig
+    return ax1
+
+
 def draw_circles(img, catalog, colnames=['x', 'y'], header=None, ax=None, circle_size=30,
                  pixel_scale=0.168, color='r', **kwargs):
     """
