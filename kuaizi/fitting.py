@@ -7,20 +7,19 @@ import dill
 import time
 import copy
 
-import astropy.units as u
-import matplotlib.pyplot as plt
+import sep
 import numpy as np
 import scarlet
 from scarlet.source import StarletSource
 
-import sep
 from astropy import wcs
-from astropy.convolution import Box2DKernel, Gaussian2DKernel, convolve
-from astropy.coordinates import SkyCoord, match_coordinates_sky
+import astropy.units as u
 from astropy.io import fits
 from astropy.table import Column, Table
+from astropy.convolution import Gaussian2DKernel, convolve
+from astropy.coordinates import SkyCoord, match_coordinates_sky
 
-from astropy.utils.data import clear_download_cache, download_file
+import matplotlib.pyplot as plt
 
 # Initialize `unagi`
 # from unagi import config, hsc, plotting
@@ -30,7 +29,7 @@ from astropy.utils.data import clear_download_cache, download_file
 import kuaizi as kz
 from kuaizi import HSC_pixel_scale, HSC_zeropoint
 from kuaizi.detection import Data
-from kuaizi.display import SEG_CMAP, display_single
+from kuaizi.display import display_single, display_rgb, SEG_CMAP
 
 sys.setrecursionlimit(10000)
 plt.rcParams['font.size'] = 15
@@ -1864,25 +1863,40 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
         return blend
 
 
-def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.8, prefix='mockgal',
-                     bright=False, index=0, model_dir='./Model', figure_dir='./Figure',
+def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.8, bright=False,
+                     prefix='mockgal', index=0, model_dir='./Model', figure_dir='./Figure',
                      show_figure=True, tigress=False, logger=None):
     '''
-    This is a fitting function for internal use. It fits the galaxy using Starlet model, and apply a mask after fitting.
+    This is a Python inner function for fitting galaxy using Starlet (wavelet) model, and apply a mask after fitting.
 
-    data (kuaizi.mock.Data class): a useful class which incorporates all information of a galaxy.
-    bright (bool): whether treat this galaxy as a VERY BRIGHT GALAXY. This will omit compact sources. 
+    Parameters:
+        data (`kuaizi.mock.Data`): a Python class which contains information of a galaxy.
+        coord (`astropy.coordinate.SkyCoord`): coordiante (in RA, Dec) of the galaxy.
+        pixel_scale (float): pixel scale of the input image, in arcsec / pixel. Default is for HSC.
+        starlet_thresh (float): this number controls how many high-frequency components are remained in the model.
+            Larger value gives smoother modeling. Typically we use 0.5 to 1.
+        bright (bool): whether treat this galaxy as a VERY BRIGHT GALAXY. This will omit compact sources. 
+        prefix (str): the prefix for output files.
+        index (int): the unique index of the galaxy, such as 214.
+        model_dir (str): directory for output modeling files.
+        figure_dir (str): directory for output figures. 
+        show_figure (bool): if True, show the figure displaying fitting results.
+        tigress (bool): if True, use the GAIA catalog on Tigress. Otherwise query GAIA catalog on internet.
+            When running this function on Tiger computing nodes, internet connection is off, so you have to set `tigress=True`.
+        logger (`logging.Logger`): a dedicated robot who writes down the log. 
+            If not provided, a Logger will be generated automatically.
+
+    Returns:
+        blend
 
     '''
-    lsbg_coord = coord
+    __name__ = "_fitting_wavelet"
+
     if logger is None:
         from .utils import set_logger
-        logger = set_logger('_fitting_wavelet',
-                            f'{prefix}-{index}.log')
-    if max(data.images.shape) * pixel_scale > 200:
-        first_dblend_cont = 0.07
-    else:
-        first_dblend_cont = 0.01
+        logger = set_logger(__name__, f'{prefix}-{index}.log')
+
+    lsbg_coord = coord
 
     # 2 whitespaces before "-", i.e., 4 whitespaces before word
     print('  - Detect sources and make mask')
@@ -1902,15 +1916,22 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         logger=logger)
 
     # Set the weights of saturated star centers to zero
+    # In order to make the box size estimation more accurate.
     temp = np.copy(data.masks)
     for i in range(len(data.channels)):
         temp[i][~msk_star_ori.astype(bool)] = 0
         data.weights[i][temp[i].astype(bool)] = 0.0
 
     # This vanilla detection with very low sigma finds out where is the central object and its footprint
+    # if cutout is lareger than 200 arcsec => large galaxy, less aggressive deblend
+    if max(data.images.shape) * pixel_scale > 200:
+        first_dblend_cont = 0.07
+    else:
+        first_dblend_cont = 0.01
+
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
-        lvl=2,
+        lvl=2,  # a.k.a., "sigma"
         mask=msk_star_ori,
         method='vanilla',
         convolve=False,
@@ -1928,10 +1949,11 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     catalog_c = SkyCoord(obj_cat_ori['ra'], obj_cat_ori['dec'], unit='deg')
     dist = lsbg_coord.separation(catalog_c)
+    # ori = original, i.e., first SEP run
     cen_indx_ori = obj_cat_ori[np.argsort(dist)[0]]['index']
     cen_obj = obj_cat_ori[cen_indx_ori]
 
-    # Better position for cen_obj
+    # Better position for cen_obj, THIS IS PROBLEMATIC!!!
     x, y, _ = sep.winpos(data.images.mean(
         axis=0), cen_obj['x'], cen_obj['y'], 6)
     ra, dec = data.wcs.wcs_pix2world(x, y, 0)
@@ -1956,6 +1978,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         channels=list(data.channels))
     observation = observation.match(model_frame)
 
+    ############################################
+    ########### First box estimation ###########
+    ############################################
+
     cen_obj = obj_cat_ori[cen_indx_ori]
     starlet_source = StarletSource(model_frame,
                                    (cen_obj['ra'], cen_obj['dec']),
@@ -1966,22 +1992,25 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
     # The box is way too large
     if starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (bright):
+        # The box is way too large
         min_grad = 0.03
-        small_box = True
+        smaller_box = True
     elif starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (~bright):
         # not bright but large box: something must be wrong! min_grad should be larger
         min_grad = 0.05
-        small_box = True
+        smaller_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (bright):
+        # If box is large and gal is bright
         min_grad = 0.02
-        small_box = True
+        smaller_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
+        # If box is large and gal is not bright
         min_grad = 0.01
-        small_box = True
+        smaller_box = True
     else:
-        small_box = False
+        smaller_box = False
 
-    if small_box:
+    if smaller_box:
         starlet_source = scarlet.StarletSource(model_frame,
                                                (cen_obj['ra'], cen_obj['dec']),
                                                observation,
@@ -1991,7 +2020,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     starlet_extent = kz.display.get_extent(
         starlet_source.bbox)  # [x1, x2, y1, y2]
-    # extra enlarge
+
+    # extra padding, to enlarge the box
     starlet_extent[0] -= 5
     starlet_extent[2] -= 5
     starlet_extent[1] += 5
@@ -2013,6 +2043,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         ax.add_patch(rect)
 
     if gaia_cat is not None:
+        # Find stars within the wavelet box, and mask them.
         star_flag = [(item[0] > starlet_extent[0]) & (item[0] < starlet_extent[1]) &
                      (item[1] > starlet_extent[2]) & (
                          item[1] < starlet_extent[3])
@@ -2036,6 +2067,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     else:
         star_cat = []
         msk_star = np.copy(msk_star_ori)
+
+    ############################################
+    ####### Source detection and masking #######
+    ############################################
 
     # This step masks out high frequency sources by doing wavelet transformation
     obj_cat, segmap_highfreq, bg_rms = kz.detection.makeCatalog([data],
@@ -2062,10 +2097,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     # Don't mask out objects that fall in the segmap of the central object and the Starlet box
     segmap = segmap_highfreq.copy()
-    # overlap_flag is for objects which fall in the footprint of central galaxy in the fist SEP detection
+    # overlap_flag is for objects which fall in the footprint
+    # of central galaxy in the fist SEP detection
     overlap_flag = [(segmap_ori == (cen_indx_ori + 1))[item]
                     for item in list(zip(obj_cat['y'].astype(int), obj_cat['x'].astype(int)))]
     overlap_flag = np.array(overlap_flag)
+
     # box_flat is for objects which fall in the initial Starlet box
     box_flag = np.unique(
         segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
@@ -2073,9 +2110,10 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         box_flag = np.delete(np.sort(box_flag), 0)
         overlap_flag[box_flag] = True
     if len(overlap_flag) > 0:
+        # obj_cat_cpct is the catalog for compact sources
         obj_cat_cpct = obj_cat[overlap_flag]
 
-    # Remove the source if it is the central galaxy
+    # Remove the source from `obj_cat_cpct` if it is the central galaxy
     if dist[cen_indx_highfreq] < 1 * u.arcsec:
         obj_cat_cpct.remove_rows(
             np.where(obj_cat_cpct['index'] == cen_indx_highfreq)[0])
@@ -2129,6 +2167,8 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     else:
         obj_cat_big = obj_cat
 
+    # `obj_cat_big` is catalog of the big and high SNR objects in the image
+
     smooth_radius = 5
     gaussian_threshold = 0.01
     mask_conv = np.copy(segmap)
@@ -2145,27 +2185,36 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         layer[seg_mask_large.astype(bool)] = 0
 
     # Remove compact objects that are too close to the central
+    # We don't want to shred the central galaxy
     catalog_c = SkyCoord(obj_cat_cpct['ra'], obj_cat_cpct['dec'], unit='deg')
     dist = cen_obj_coord.separation(catalog_c)
     obj_cat_cpct.remove_rows(np.where(dist < 3 * u.arcsec)[0])
-    # Remove objects that are already masked!
+
+    # Remove objects in `obj_cat_cpct` that are already masked!
+    # (since our final mask is combined from three masks)
     inside_flag = [
         seg_mask_large[item] for item in list(
             zip(obj_cat_cpct['y'].astype(int), obj_cat_cpct['x'].astype(int)))
     ]
     obj_cat_cpct.remove_rows(np.where(inside_flag)[0])
+
     # Remove big objects that are toooo near to the target
     catalog_c = SkyCoord(obj_cat_big['ra'], obj_cat_big['dec'], unit='deg')
     dist = cen_obj_coord.separation(catalog_c)
     #obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
     obj_cat_big.remove_rows(np.where(
-        dist < 2 * np.sqrt(cen_obj['a'] * cen_obj['b']) * pixel_scale * u.arcsec)[0])
-    # Remove objects that are already masked!
+        dist < 2 * np.sqrt(cen_obj['a'] * cen_obj['b']) * pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
+
+    # Remove objects in `obj_cat_big` that are already masked!
     inside_flag = [
         (data.weights[0] == 0)[item] for item in list(
             zip(obj_cat_big['y'].astype(int), obj_cat_big['x'].astype(int)))
     ]
     obj_cat_big.remove_rows(np.where(inside_flag)[0])
+
+    ############################################
+    ####### Add sources and render scene #######
+    ############################################
 
     # Construct `scarlet` frames and observation
     model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(data.channels))
@@ -2185,6 +2234,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # STARLET_MASK!!! contains the mask for irrelavant objects (also very nearby objects),
     # as well as larger bright star mask
     # This is used to help getting the SED initialization correct.
+    # When estimating the starlet box and SED, we need to mask out saturated pixels and nearby bright stars.
     starlet_mask = ((np.sum(observation.weights == 0, axis=0)
                      != 0) + msk_star_ori + (~((segmap_ori == 0) | (segmap_ori == cen_indx_ori + 1)))).astype(bool)
 
@@ -2193,17 +2243,20 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # Add central Starlet source
     src = obj_cat_ori[cen_indx_ori]
     # Find a better box, not too large, not too small
-    if small_box:
+    if smaller_box:
         min_grad_range = np.arange(min_grad, 0.3, 0.05)
     else:
         min_grad_range = np.arange(-0.2, 0.3, 0.05)  # I changed -0.3 to -0.2
 
+    # We calculate the ratio of contaminants' area over the box area
+    # Then the box size is decided based on this ratio.
     contam_ratio_list = []
     for k, min_grad in enumerate(min_grad_range):
         if k == len(min_grad_range) - 1:
-            # if min_grad = 0.4 and contam_ratio is still very large,
-            # we choose the min_grad with minimum contam_ratio
+            # if min_grad reaches its maximum, and `contam_ratio` is still very large,
+            # we choose the min_grad with the minimum `contam_ratio`
             min_grad = min_grad_range[np.argmin(contam_ratio_list)]
+
         starlet_source = StarletSource(
             model_frame,
             (src['ra'], src['dec']),
@@ -2219,7 +2272,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         contam_ratio = 1 - \
             np.sum((segbox == 0) | (segbox == cen_indx_ori + 1)) / \
             np.sum(np.ones_like(segbox))
-        if (contam_ratio <= 0.08 and (~small_box)) or (contam_ratio <= 0.10 and (small_box or bright)):
+        if (contam_ratio <= 0.08 and (~smaller_box)) or (contam_ratio <= 0.10 and (smaller_box or bright)):
             break
         else:
             contam_ratio_list.append(contam_ratio)
@@ -2235,10 +2288,12 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     starlet_source.center = (
         np.array(starlet_source.bbox.shape) // 2 + starlet_source.bbox.origin)[1:]
     sources.append(starlet_source)
+    # Finish adding the starlet source
 
     # Only model "real compact" sources
     if len(obj_cat_big) > 0:
         # remove intersection between cpct and big objects
+        # if an object is both cpct and big, we think it is big
         cpct_coor = SkyCoord(
             ra=np.array(obj_cat_cpct['ra']) * u.degree,
             dec=np.array(obj_cat_cpct['dec']) * u.degree)
@@ -2252,6 +2307,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if len(star_cat) > 0 and len(cpct) > 0:
         # remove intersection between cpct and stars
+        # if an object is both cpct and star, we think it is star
         star = SkyCoord(ra=star_cat['ra'], dec=star_cat['dec'], unit='deg')
         cpct_coor = SkyCoord(
             ra=np.array(cpct['ra']) * u.degree,
@@ -2306,7 +2362,6 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if len(star_cat) > 0:
         for k, src in enumerate(star_cat):
-            # if src['phot_g_mean_mag'] > 20:
             try:
                 if src['phot_g_mean_mag'] < 18:
                     new_source = scarlet.source.ExtendedSource(
@@ -2364,6 +2419,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     if not show_figure:
         plt.close()
 
+    ############################################
+    ################# Fitting ##################
+    ############################################
     try:
         if bright:
             e_rel_list = [5e-4, 1e-5]  # otherwise it will take forever....
@@ -2471,6 +2529,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         print(
             f'  - Components {sed_ind} are considered as the target galaxy.')
 
+        ############################################
+        ################# Final mask ##################
+        ############################################
         # Only mask bright stars!!!
         logger.info(
             '  - Masking stars and other sources that are modeled, to deal with leaky flux issue.')
@@ -2758,32 +2819,53 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
     return blend
 
 
-def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', starlet_thresh=0.8, prefix='candy', pixel_scale=HSC_pixel_scale,
-                                zp=HSC_zeropoint, model_dir='./Model', figure_dir='./Figure', show_figure=False,
+def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
+                                starlet_thresh=0.8, pixel_scale=HSC_pixel_scale, bright_thresh=17.0,
+                                prefix='candy', model_dir='./Model', figure_dir='./Figure', show_figure=False,
                                 logger=None, global_logger=None, fail_logger=None):
     '''
-    Run scarlet wavelet modeling on Tiger.
+    Run scarlet wavelet modeling on Tiger, modified on 09/13/2021. 
 
-    env_dict (dict): dictionary indication file directory, such as 
-        `env_dict = {'project': 'HSC', 'name': 'LSBG', 'data_dir': '/tigress/jiaxuanl/Data'}`/
+    Parameters:
+        env_dict (dict): dictionary indicating the file directories, such as 
+            `env_dict = {'project': 'HSC', 'name': 'LSBG', 'data_dir': '/tigress/jiaxuanl/Data'}`
+        lsbg (one row in `astropy.Table`): the galaxy to be modeled. 
+        name (str): the column name for the index of `lsbg`.
+        channels (str): bandpasses to be used, such as 'grizy'.
+        starlet_thresh (float): this number controls how many high-frequency components are remained in the model.
+            Larger value gives smoother modeling. Typically we use 0.5 to 1.
+        pixel_scale (float): pixel scale of the input image, in arcsec / pixel. Default is for HSC.
+        bright_thresh (float): magnitude threshold for bright galaxies, default is 17.0.
+        prefix (str): the prefix for output files.
+        model_dir (str): directory for output modeling files.
+        figure_dir (str): directory for output figures. 
+        show_figure (bool): if True, show the figure displaying fitting results.
+        logger (`logging.Logger`): a dedicated robot who writes down the log. 
+            If not provided, a Logger will be generated automatically.
+        global_logger (`logging.Logger`): the logger used to pass the log within this function to outside.
+        fail_logger (`logging.Logger`): the logger used to take notes for failed cases.
+
+    Returns:
+        blend (scarlet.blend object)
 
     '''
+    __name__ = "fitting_wavelet_obs_tigress"
 
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
-    import unagi
+    import unagi  # for HSC saturation mask
 
     index = lsbg[name]
     # whether this galaxy is a very bright one
-    bright = (lsbg['mag_auto_i'] < 17)
+    bright = (lsbg['mag_auto_i'] < bright_thresh)
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
 
     if logger is None:
         from .utils import set_logger
-        logger = set_logger('fitting_wavelet_obs_tigress',
-                            os.path.join(model_dir, f'{prefix}-{index}.log'), level='info')
+        logger = set_logger(__name__, os.path.join(
+            model_dir, f'{prefix}-{index}.log'), level='info')
 
     logger.info(f'Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
     print(f'### Running scarlet wavelet modeling for `{lsbg["prefix"]}`')
@@ -2794,33 +2876,36 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
         print(
             f"    This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
 
-    print(f'    Working directory: {os.getcwd()}')
     logger.info(f'Working directory: {os.getcwd()}')
+    print(f'    Working directory: {os.getcwd()}')
 
     kz.utils.set_env(**env_dict)
     kz.utils.set_matplotlib(style='default')
 
     try:
+        #### Deal with possible exceptions on bandpasses ###
         assert isinstance(channels, str), 'Input channels must be a string!'
         if len(set(channels) & set('grizy')) == 0:
             raise ValueError('The input channels must be a subset of "grizy"!')
 
         overlap = [i for i, item in enumerate('grizy') if item in channels]
 
+        #### Deal with possible exceptions on files (images, PSFs) ###
         file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
             [os.path.isfile(f"{lsbg['prefix']}_{filt}.fits") for filt in channels])
         if not file_exist_flag:
             raise FileExistsError(
-                f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+                f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete! Please check!')
 
         file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
             [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
         default_exist_flag = np.all([os.path.isfile(
             f'/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/psf_{filt}.fits') for filt in channels])
+        # This is the flag confirming the default PSFs exist.
 
         if not file_exist_flag:
             logger.info(
-                f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+                f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete! Please check!')
 
             if default_exist_flag:
                 logger.info(f'We use the default HSC PSFs instead.')
@@ -2828,48 +2913,53 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy', st
                             for filt in channels]
             else:
                 raise FileExistsError(
-                    f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete!')
+                    f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete! The default PSFs are also missing! Please check!')
         else:
             psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
                         for filt in channels]
 
-        # useful for query GAIA
+        # Structure the data
         lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
-
         cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits")
                   for filt in channels]
 
-        # Reconstructure data
         images = np.array([hdu[1].data for hdu in cutout])
-        # note: all bands share the same WCS here
+        # note: all bands share the same WCS here, but not necessarily true.
         w = wcs.WCS(cutout[0][1].header)
         weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
         weights[np.isinf(weights)] = 0.0
         psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
         psfs = scarlet.ImagePSF(np.array(psf_pad))
+        # saturation mask and interpolation mask from HSC S18A
         sat_mask = np.array([sum(unagi.mask.Mask(
             hdu[2].data, data_release='s18a').extract(['INTRP', 'SAT'])) for hdu in cutout])
         data = Data(images=images, weights=weights, masks=sat_mask,
                     wcs=w, psfs=psfs, channels=channels)
+
+        # Collect free RAM
         del cutout, psf_list
         del images, w, weights, psf_pad, psfs
         gc.collect()
 
         blend = _fitting_wavelet(
-            data, lsbg_coord, starlet_thresh=starlet_thresh, prefix=prefix,
-            bright=bright, index=index, pixel_scale=pixel_scale,
-            model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure, tigress=True, logger=logger)
+            data, lsbg_coord, starlet_thresh=starlet_thresh,
+            prefix=prefix, bright=bright, index=index, pixel_scale=pixel_scale,
+            model_dir=model_dir, figure_dir=figure_dir, show_figure=show_figure,
+            tigress=True, logger=logger)
+
         if global_logger is not None:
             global_logger.info(
                 f'Task succeeded for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+
         gc.collect()
+
         return blend
 
     except Exception as e:
         logger.error(e)
         print(e)
         if bright:
-            logger.error(f'Task failed for bright galaxy `{lsbg["prefix"]}`')
+            logger.error(f'Task failed for BRIGHT galaxy `{lsbg["prefix"]}`')
         else:
             logger.error(f'Task failed for `{lsbg["prefix"]}`')
 
