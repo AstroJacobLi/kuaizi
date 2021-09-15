@@ -33,3 +33,7 @@ Once we have a final sample, we will move catalogs, modeling outputs to `tigress
 ### Image Gallery
 
 Cutout images of the candy sample: http://tigress-web.princeton.edu/~jiaxuanl/candy/cutout_figure/page1.html
+
+
+### Structural measurement
+pip install statmorph --user
