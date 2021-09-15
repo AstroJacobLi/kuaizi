@@ -5,7 +5,12 @@ import sep
 import os
 import copy
 
-# Measurements should be done before convolving any real PSF! So, don't render the scene!
+#############################################
+# Use Statmorph to measure galaxy morphology#
+#############################################
+
+# Measurements should be done before convolving any
+# real PSF! So, don't render the scene!
 
 
 def max_pixel(component):
@@ -176,13 +181,13 @@ def flux_radius(components, observation=None, frac=0.5, weight_order=0):
     depth = model.shape[0]
     r_frac = []
 
-    ## sep.sum_ellipse is very slow! Try to improve!
+    # sep.sum_ellipse is very slow! Try to improve!
     if depth > 1:
         for i in range(depth):
             r_max = max(model.shape)
             r_ = np.linspace(0, r_max, 500)
             flux_ = sep.sum_ellipse(
-                model[i], x_cen, y_cen, 1, 1 * q[i], theta[i], r=r_)[0]
+                model[i], [x_cen], [y_cen], 1, 1 * q[i], theta[i], r=r_)[0]
             flux_ /= total_flux[i]
             func = UnivariateSpline(r_, flux_ - frac, s=0)
             r_frac.append(func.roots()[0])
@@ -190,7 +195,7 @@ def flux_radius(components, observation=None, frac=0.5, weight_order=0):
         r_max = max(model.shape)
         r_ = np.linspace(0, r_max, 500)
         flux_ = sep.sum_ellipse(
-            model[0], x_cen, y_cen, 1, 1 * q[0], theta[0], r=r_)[0]
+            model[0], [x_cen], [y_cen], 1, 1 * q[0], theta[0], r=r_)[0]
         flux_ /= total_flux[0]
         func = UnivariateSpline(r_, flux_ - frac, s=0)
         r_frac.append(func.roots()[0])
@@ -373,44 +378,119 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, frac=0.5, zeropoint=27.0, pixel_scale=0.168, 
-                    weight_order=0, out_prefix=None, show_fig=False):
+def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=27.0,
+                    out_prefix=None, show_fig=True, **kwargs):
+    """
+    Measure the structural parameters of the galaxy, after modeling with scarlet.
+
+    Parameters:
+        components (list of Scarlet sources): a list of sources that will be blended with observation
+        observation (scarlet.observation): observation data
+        aggr_mask (2-D binary array): the aggressive mask, which is generated during modeling
+        sigma (float): the threshold when generating a segmentation map for `statmorph`
+        zeropoint (float): photometric zeropoint of the input data
+        out_prefix (str): the prefix for each key in output dictionary
+        show_fig (bool): if True, a default `statmorph` figure will be shown
+
+    Returns:
+        measure_dict (dict): a dictionary containing all measurements
+    """
+    # 调用statmorph，除了flux/mag/SB之外，其他的所有信息，所有band都一样
+    # max_pix_postion的时候，是不是先smooth一下？
+    import statmorph
+
+    min_cutout_size = max([comp.bbox.shape[1] for comp in components])
+
+    blend = scarlet.Blend(components, observation)
+    models = blend.get_model()
+    weights = observation.weights
+    psfs = observation.psf.get_model()
+    if aggr_mask is None:
+        mask = (weights.sum(axis=0) == 0)
+    else:
+        mask = aggr_mask | (weights.sum(axis=0) == 0)
+
+    # Flux and magnitude in each band
     measure_dict = {}
-    _cen = centroid(components, observation)
-    measure_dict['x_cen'] = _cen[2]
-    measure_dict['y_cen'] = _cen[1]
-    w = observation.model_frame.wcs
-    ra, dec = w.wcs_pix2world(measure_dict['x_cen'], measure_dict['y_cen'], 0)
-    measure_dict['ra_cen'] = float(ra)
-    measure_dict['dec_cen'] = float(dec)
-
-    _cen = winpos(components, observation)
-    measure_dict['x_cen_winpos'] = _cen[1].mean()
-    measure_dict['y_cen_winpos'] = _cen[0].mean()
-    ra, dec = w.wcs_pix2world(
-        measure_dict['x_cen_winpos'], measure_dict['y_cen_winpos'], 0)
-    measure_dict['ra_cen_winpos'] = float(ra)
-    measure_dict['dec_cen_winpos'] = float(dec)
-
     measure_dict['flux'] = flux(components, observation)
+    SED = (measure_dict['flux'] / measure_dict['flux'][0])
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
-    measure_dict['R50'] = flux_radius(
-        components, observation, frac=frac) * pixel_scale  # arcsec
-    _shape = shape(components, observation,
-                   weight_order=weight_order, show_fig=show_fig)
-    measure_dict['q'] = _shape['q']
-    measure_dict['pa'] = _shape['pa']
-    measure_dict['SB0'] = mu_central(components, observation, method='centroid',
-                                     zeropoint=zeropoint, pixel_scale=pixel_scale)
-    measure_dict['SB0_winpos'] = mu_central(components, observation, method='winpos',
-                                            zeropoint=zeropoint, pixel_scale=pixel_scale)
+
+    # We take the model and weight map in g-band. Such that we can use the SED to get
+    # surface brightness in other bands.
+    # A sky background is estimated on the original image,
+    # and we run `sep` to generate a 1-sigma segmentation map.
+    # Then we run `statmorph` using that segmap
+
+    filt = 0
+    img = models[filt]
+    rms = sep.Background(observation.data[filt], mask=mask).globalrms
+    _, segmap = sep.extract(img, sigma, err=rms,
+                            mask=mask, segmentation_map=True)
+
+    source_morphs = statmorph.source_morphology(
+        img, segmap, weightmap=np.sqrt(weights[filt]),
+        n_sigma_outlier=15, min_cutout_size=min_cutout_size, cutout_extent=2,
+        mask=mask, psf=psfs[filt])
+    morph = source_morphs[0]
+
+    measure_dict['xc_centroid'] = morph.xc_centroid
+    measure_dict['yc_centroid'] = morph.yc_centroid
+    measure_dict['xc_peak'] = morph.xc_peak
+    measure_dict['yc_peak'] = morph.yc_peak
+    measure_dict['ellipticity_centroid'] = morph.ellipticity_centroid
+    measure_dict['elongation_centroid'] = morph.elongation_centroid
+    measure_dict['orientation_centroid'] = morph.orientation_centroid
+    measure_dict['xc_asymmetry'] = morph.xc_asymmetry
+    measure_dict['yc_asymmetry'] = morph.yc_asymmetry
+    measure_dict['ellipticity_asymmetry'] = morph.ellipticity_asymmetry
+    measure_dict['elongation_asymmetry'] = morph.elongation_asymmetry
+    measure_dict['orientation_asymmetry'] = morph.orientation_asymmetry
+    measure_dict['rpetro_circ'] = morph.rpetro_circ
+    measure_dict['rpetro_ellip'] = morph.rpetro_ellip
+    measure_dict['rhalf_circ'] = morph.rhalf_circ
+    measure_dict['rhalf_ellip'] = morph.rhalf_ellip
+    measure_dict['r20'] = morph.r20
+    measure_dict['r50'] = morph.r50
+    measure_dict['r80'] = morph.r80
+    measure_dict['SB_0_circ'] = morph.SB_0_circ * SED   # in counts per pixel
+    measure_dict['SB_0_ellip'] = morph.SB_0_ellip * SED   # in counts per pixel
+    measure_dict['SB_eff_circ'] = morph.SB_eff_circ * \
+        SED  # in counts per pixel
+    measure_dict['SB_eff_ellip'] = morph.SB_eff_ellip * \
+        SED  # in counts per pixel
+    measure_dict['Gini'] = morph.gini
+    measure_dict['M20'] = morph.m20
+    measure_dict['F(G, M20)'] = morph.gini_m20_bulge
+    measure_dict['S(G, M20)'] = morph.gini_m20_merger
+    measure_dict['sn_per_pixel'] = morph.sn_per_pixel
+    measure_dict['C'] = morph.concentration
+    measure_dict['A'] = morph.asymmetry
+    measure_dict['S'] = morph.smoothness
+    measure_dict['sersic_amplitude'] = morph.sersic_amplitude
+    measure_dict['sersic_rhalf'] = morph.sersic_rhalf
+    measure_dict['sersic_n'] = morph.sersic_n
+    measure_dict['sersic_xc'] = morph.sersic_xc
+    measure_dict['sersic_yc'] = morph.sersic_yc
+    measure_dict['sersic_ellip'] = morph.sersic_ellip
+    measure_dict['sersic_theta'] = morph.sersic_theta
+    measure_dict['sky_mean'] = morph.sky_mean
+    measure_dict['sky_median'] = morph.sky_median
+    measure_dict['sky_sigma'] = morph.sky_sigma
+    measure_dict['flag'] = morph.flag
+    measure_dict['flag_sersic'] = morph.flag_sersic
+
+    if show_fig:
+        from statmorph.utils.image_diagnostics import make_figure
+        fig = make_figure(morph, **kwargs)
+
     measure_dict_new = {}
     if out_prefix is not None:
         for key in measure_dict.keys():
             measure_dict_new['_'.join([out_prefix, key])] = measure_dict[key]
         measure_dict = measure_dict_new
 
-    return measure_dict
+    return measure_dict, morph
 
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0,
@@ -463,7 +543,8 @@ def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='L
         slices = tuple((src._model_frame_slices[1:], src._model_slices[1:])
                        for src in components)
         # Inv-variance map in the full scene
-        full_invvar = np.zeros(blend.model_frame.shape[1:], dtype=blend.model_frame.dtype)
+        full_invvar = np.zeros(
+            blend.model_frame.shape[1:], dtype=blend.model_frame.dtype)
         # the inv-variance of background is 0???
         full_invvar = scarlet.blend._add_models(
             *invvar, full_model=full_invvar, slices=slices)
