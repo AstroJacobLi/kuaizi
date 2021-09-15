@@ -47,7 +47,7 @@ def set_env(project='HSC', name='HSC_LSBG', data_dir='Research/Data/'):
     return data_dir
 
 
-def set_matplotlib(style='JL', usetex=True, fontsize=13, figsize=(6, 5)):
+def set_matplotlib(style='JL', usetex=True, fontsize=13, figsize=(6, 5), dpi=60):
     '''
     Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
 
@@ -61,10 +61,15 @@ def set_matplotlib(style='JL', usetex=True, fontsize=13, figsize=(6, 5)):
     import kuaizi
     # Use JL as a template
     pkg_path = kuaizi.__path__[0]
-    plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
+    if style == 'default':
+        plt.style.use(os.path.join(pkg_path, 'mplstyle/default.mplstyle'))
+    else:
+        plt.style.use(os.path.join(pkg_path, 'mplstyle/JL.mplstyle'))
+
     rcParams.update({'font.size': fontsize,
                      'figure.figsize': "{0}, {1}".format(figsize[0], figsize[1]),
-                     'text.usetex': usetex})
+                     'text.usetex': usetex,
+                     'figure.dpi': dpi})
 
     if style == 'SM':
         rcParams.update({
