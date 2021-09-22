@@ -501,11 +501,11 @@ def display_rgb(images,
                 text_y_offset=0.80,
                 text_color='w',
                 xsize=8.0,
-                ysize=8.0, 
+                ysize=8.0,
                 hide_ticks=False):
     """
     Display multi-band image in RGB using ``arcsinh`` stretching.
-    
+
     Parameters:
         images (numpy 3-D array): the images array, dimension follows (Number of filters, Height, Width). 
         pixel_scale (float): The pixel size, in unit of "arcsec/pixel".
@@ -539,12 +539,14 @@ def display_rgb(images,
     else:
         ax1 = ax
 
-    img_rgb = img_to_rgb(images, norm=AsinhMapping(minimum=minimum, stretch=stretch, Q=Q))
-    
+    img_rgb = img_to_rgb(images, norm=AsinhMapping(
+        minimum=minimum, stretch=stretch, Q=Q))
+
     show = ax1.imshow(img_rgb, origin='lower')
-    
+
     if mask is not None:
-        plt.imshow(mask.astype(float), origin='lower', alpha=0.1, cmap='Greys_r')
+        plt.imshow(mask.astype(float), origin='lower',
+                   alpha=0.1, cmap='Greys_r')
 
     # Put scale bar on the image
     (img_size_x, img_size_y) = images[0].shape
@@ -913,7 +915,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         blend = scarlet.Blend(gal_sources, observation)
 
     if zoomin_size is not None:
-        y_cen, x_cen = blend.sources[0].center
+        y_cen, x_cen = blend.sources[0].center.astype(int)
         _, y_img_size, x_img_size = observation.data.shape
         # x_cen = observation.model_frame.shape[2] // 2
         # y_cen = observation.model_frame.shape[1] // 2
