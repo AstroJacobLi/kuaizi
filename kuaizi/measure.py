@@ -424,8 +424,8 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
 
     filt = 0
     img = models[filt]
-    rms = sep.Background(observation.data[filt], mask=mask).globalrms
-    _, segmap = sep.extract(img, sigma, err=rms,
+    bkg = sep.Background(observation.data[filt], mask=mask)
+    _, segmap = sep.extract(img - bkg.back(), sigma, err=bkg.globalrms,
                             mask=mask, segmentation_map=True)
 
     source_morphs = statmorph.source_morphology(
