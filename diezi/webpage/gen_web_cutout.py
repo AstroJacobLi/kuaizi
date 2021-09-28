@@ -6,22 +6,21 @@ import re
 import numpy as np
 import kuaizi as kz
 # from astropy.table import Table
-from shutil import copyfile
+from shutil import copy
 
 # FOR NSA SAMPLE
-# DATADIR = '/scratch/gpfs/jiaxuanl/Data'
-# CATALOG_DIR = '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/nsa_test_sample_210927.fits'
-# FIGURE_DIR = '/tigress/jiaxuanl/public_html/NSA/cutout_RGB'
+# FIGURE_DIR = '/tigress/jiaxuanl/public_html/NSA/cutout_RGB/figure'
+# WEBPAGE_DIR = '/tigress/jiaxuanl/public_html/NSA/cutout_RGB'
 # sample_name = 'NSA'
 
 
 def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_num=7, row_num=4):
     '''
-    This function writes HTML webpage for displaying RGB cutout images. 
+    This function writes HTML webpage for displaying RGB cutout images.
 
 
     Parameters:
-        FIGURE_DIR (str): the directory of the RGB cutout figure, 
+        FIGURE_DIR (str): the directory of the RGB cutout figure,
             such as `FIGURE_DIR = '/tigress/jiaxuanl/public_html/NSA/cutout_RGB/figure'`.
         WEBPAGE_DIR (str): the directory for the generated HTML file,
             such as `WEBPAGE_DIR = '/tigress/jiaxuanl/public_html/NSA/cutout_RGB/'`.
@@ -53,14 +52,11 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_n
     print('Total pages:', page_num)
 
     # Copy the css in `kuaizi/diezi/css` to `public_html`
-    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/myjs.js',
-             f'{WEBPAGE_DIR}/myjs.js')
-    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/mystyle.css',
-             f'{WEBPAGE_DIR}/mystyle.css')
+    copy('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/myjs.js', WEBPAGE_DIR)
+    copy('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/mystyle.css', WEBPAGE_DIR)
 
     for k in range(page_num):
-        f = open(
-            f'{WEBPAGE_DIR}/page{k + 1}.html', 'w')
+        f = open(os.path.join(WEBPAGE_DIR, f'page{k + 1}.html'), 'w')
         f.write(
             '<!DOCTYPE html> \n<html><head> \n<link rel="stylesheet" type="text/css" href="mystyle.css">\n')
         f.write('<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>\n')
