@@ -53,9 +53,9 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_n
     print('Total pages:', page_num)
 
     # Copy the css in `kuaizi/diezi/css` to `public_html`
-    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/css/myjs.js',
+    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/myjs.js',
              f'{WEBPAGE_DIR}/myjs.js')
-    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/css/mystyle.css',
+    copyfile('/home/jiaxuanl/Research/Packages/kuaizi/diezi/webpage/css/mystyle.css',
              f'{WEBPAGE_DIR}/mystyle.css')
 
     for k in range(page_num):
