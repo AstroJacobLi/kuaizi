@@ -426,7 +426,12 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
     img = models[filt]
     bkg = sep.Background(observation.data[filt], mask=mask)
     _, segmap = sep.extract(img - bkg.back(), sigma, err=bkg.globalrms,
+                            deblend_cont=1,
                             mask=mask, segmentation_map=True)
+
+    # Currently still doesn't work for multiple-component objects. Need to define a better segmap.
+    cen_ind = segmap[components[0].center[0], components[0].center[1]]
+    segmap[segmap != cen_ind] = 0
 
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
