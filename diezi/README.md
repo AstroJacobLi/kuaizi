@@ -3,7 +3,7 @@ Diezi (碟子): Fill a small dish with HSC low surface brightness galaxies
 
 This repo is for the notebook and scripts used for modeling LSBGs in HSC using scarlet.
 
-`diezi/setup_env.sh` can be used on `Tiger` and `Tigressdata` to setup the proper environment for the task. Under LSST Pipeline, only Python 3.7.8 is available.
+`diezi/setup_env.sh` can be used on `Tiger` and `Tigressdata` to setup the proper environment for the task. Under LSST Pipeline, only Python 3.7.8 is available. Please run `diezi/setup_env.sh` before running any code in `diezi`.
 
 
 **Working directories:**

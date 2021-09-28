@@ -16,17 +16,12 @@ import lsst.log
 Log = lsst.log.Log()
 Log.setLevel(lsst.log.ERROR)
 
-# everything should be downloaded to /tigress/jiaxuanl/Data/HSC/LSBG/Cutout
-
-kz.utils.set_env(project='HSC', name='LSBG',
-                 data_dir='/tigress/jiaxuanl/Data/')
-
 DATA_ROOT = '/tigress/HSC/DR/s18a_wide'
 PIXEL_SCALE = 0.168  # arcsec / pixel
 
 
 # Cutout speed is about 18s for one galaxy in 5 bands
-def batch_cutout(obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
+def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
                  ra_name='ra', dec_name='dec',
                  name='Seq', prefix='s18a_wide', output='./Cutout',
                  label='deepCoadd_calexp', root=DATA_ROOT,
@@ -38,6 +33,8 @@ def batch_cutout(obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     see https://github.com/AstroJacobLi/diezi/blob/main/setup_env.sh.
 
     Parameters:
+        data_dir (str): the directory for all Data, such as `/scrach/gpfs/jiaxuanl/Data`. 
+            `/scratch/gpfs` is recommended! But don't download it directly to `/tigress/`!
         obj_cat_dir (str): the directory of object catalogs.
         size (float): cutout size.
         unit (str): unit of cutout size, use [arcsec, arcmin, degree, pixel]。
@@ -59,6 +56,9 @@ def batch_cutout(obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     Notes:
         The files will be saved in FITS format. 
     '''
+    kz.utils.set_env(project='HSC', name='LSBG',
+                     data_dir=data_dir)
+
     t0 = perf_counter()
 
     butler = dafPersist.Butler(root)
