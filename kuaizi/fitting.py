@@ -297,7 +297,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
         print(
             f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
-        for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
+        for i, e_rel in enumerate([5e-4, 5e-5, 1e-5, 1e-6]):
             blend.fit(150, e_rel)
             if len(blend.loss) > 50:  # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
@@ -655,7 +655,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
         print(
             f'Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
-        for i, e_rel in enumerate([5e-4, 1e-5, 5e-5, 1e-6]):
+        for i, e_rel in enumerate([5e-4, 5e-5, 1e-5, 1e-6]):
             blend.fit(150, e_rel)
             if len(blend.loss) > 50:  # must have more than 50 iterations
                 recent_loss = np.mean(blend.loss[-10:])
@@ -1938,7 +1938,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         match_gaia=False,
         show_fig=show_figure,
         visual_gaia=False,
-        b=128,
+        b=80,  # 128
         f=3,
         pixel_scale=pixel_scale,
         minarea=20,
@@ -2263,7 +2263,7 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
             observation,
             star_mask=starlet_mask,  # bright stars are masked when estimating morphology
             satu_mask=data.masks,  # saturated pixels are masked when estimating SED
-            thresh=0.01,
+            thresh=0.05,  # 0.01
             min_grad=min_grad,
             starlet_thresh=starlet_thresh)
         starlet_extent = kz.display.get_extent(starlet_source.bbox)
