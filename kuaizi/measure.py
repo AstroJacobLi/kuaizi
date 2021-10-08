@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sep
 import os
 import copy
+from astropy.convolution import convolve, Gaussian2DKernel
 
 #############################################
 # Use Statmorph to measure galaxy morphology#
@@ -378,7 +379,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=27.0,
+def makeMeasurement(components, observation, aggr_mask=None, sigma=1, 
+                    zeropoint=27.0, pixel_scale=0.168,
                     out_prefix=None, show_fig=True, **kwargs):
     """
     Measure the structural parameters of the galaxy, after modeling with scarlet.
@@ -389,6 +391,7 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
         aggr_mask (2-D binary array): the aggressive mask, which is generated during modeling
         sigma (float): the threshold when generating a segmentation map for `statmorph`
         zeropoint (float): photometric zeropoint of the input data
+        pixel_scale (float): the angular size of pixel, default is 0.168 (for HSC)
         out_prefix (str): the prefix for each key in output dictionary
         show_fig (bool): if True, a default `statmorph` figure will be shown
 
@@ -413,7 +416,7 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
     # Flux and magnitude in each band
     measure_dict = {}
     measure_dict['flux'] = flux(components, observation)
-    SED = (measure_dict['flux'] / measure_dict['flux'][0])
+    SED = (measure_dict['flux'] / measure_dict['flux'][0]) # normalized against g-band
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
 
     # We take the model and weight map in g-band. Such that we can use the SED to get
@@ -424,14 +427,18 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
 
     filt = 0
     img = models[filt]
-    bkg = sep.Background(observation.data[filt], mask=mask)
-    _, segmap = sep.extract(img - bkg.back(), sigma, err=bkg.globalrms,
+    bkg = sep.Background(observation.data[filt], bh=32, bw=32, mask=mask)
+    _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms,
                             deblend_cont=1,
                             mask=mask, segmentation_map=True)
 
-    # Currently still doesn't work for multiple-component objects. Need to define a better segmap.
-    cen_ind = segmap[components[0].center[0], components[0].center[1]]
-    segmap[segmap != cen_ind] = 0
+    # Only select relevant detections. 
+    cen_ind = [segmap[int(comp.center[0]), int(comp.center[1])] for comp in components]
+    segmap[~np.add.reduce([segmap == ind for ind in cen_ind]).astype(bool)] = 0
+    segmap = (segmap > 0)
+    segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
+    
+    img[~segmap] = np.nan
 
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
@@ -458,12 +465,10 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
     measure_dict['r20'] = morph.r20
     measure_dict['r50'] = morph.r50
     measure_dict['r80'] = morph.r80
-    measure_dict['SB_0_circ'] = morph.SB_0_circ * SED   # in counts per pixel
-    measure_dict['SB_0_ellip'] = morph.SB_0_ellip * SED   # in counts per pixel
-    measure_dict['SB_eff_circ'] = morph.SB_eff_circ * \
-        SED  # in counts per pixel
-    measure_dict['SB_eff_ellip'] = morph.SB_eff_ellip * \
-        SED  # in counts per pixel
+    measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (pixel_scale**2)) + zeropoint   # in mag per arcsec2
+    measure_dict['SB_0_ellip'] = -2.5 * np.log10(morph.SB_0_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_circ'] = -2.5 * np.log10(morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_ellip'] = -2.5 * np.log10(morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['Gini'] = morph.gini
     measure_dict['M20'] = morph.m20
     measure_dict['F(G, M20)'] = morph.gini_m20_bulge
@@ -497,6 +502,57 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1, zeropoint=
 
     return measure_dict, morph
 
+
+def _write_to_row(row, measurement):
+    '''
+    Write the output of `makeMeasurement` to a Row of astropy.table.Table.
+
+    Parameters:
+        row (astropy.table.Row): one row of the table.
+        measurement (dict): the output dictionary of `kuaizi.measure.makeMeasurement`
+
+    Returns:
+        row (astropy.table.Row)
+    '''
+    row['flux'] = measurement['flux']
+    row['mag'] = measurement['mag']
+    row['SB_0'] = measurement['SB_0_circ']
+    row['SB_eff_circ'] = measurement['SB_eff_circ']
+    row['SB_eff_ellip'] = measurement['SB_eff_ellip']
+
+    row['xc_cen'] = measurement['xc_centroid']
+    row['yc_cen'] = measurement['yc_centroid']
+    row['xc_sym'] = measurement['xc_asymmetry']
+    row['yc_sym'] = measurement['yc_asymmetry']
+    row['ell_cen'] = measurement['ellipticity_centroid']
+    row['ell_sym'] = measurement['ellipticity_asymmetry']
+    row['PA_cen'] = measurement['orientation_centroid']
+    row['PA_sym'] = measurement['orientation_asymmetry']
+
+    row['rhalf_circ'] = measurement['rhalf_circ']
+    row['rhalf_ellip'] = measurement['rhalf_ellip']
+    row['r20'] = measurement['r20']
+    row['r50'] = measurement['r50']
+    row['r80'] = measurement['r80']
+    row['Gini'] = measurement['Gini']
+    row['M20'] = measurement['M20']
+    row['F(G,M20)'] = measurement['F(G, M20)']
+    row['S(G,M20)'] = measurement['S(G, M20)']
+
+    row['C'] = measurement['C']
+    row['A'] = measurement['A']
+    row['S'] = measurement['S']
+    row['sersic_n'] = measurement['sersic_n']
+    row['sersic_rhalf'] = measurement['sersic_rhalf']
+    row['sersic_ell'] = measurement['sersic_ellip']
+    row['sersic_PA'] = measurement['sersic_theta']
+    row['sersic_xc'] = measurement['sersic_xc']
+    row['sersic_yc'] = measurement['sersic_yc']
+    row['sersic_amp'] = measurement['sersic_amplitude']
+    row['flag'] = measurement['flag']
+    row['flag_sersic'] = measurement['flag_sersic']
+
+    return row
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0,
                    zeropoint=27.0, pixel_scale=0.168, save_fig=True):
