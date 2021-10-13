@@ -13,7 +13,7 @@ kz.utils.set_env(project='HSC', name='LSBG',
                  data_dir='/scratch/gpfs/jiaxuanl/Data')
 
 lsbg_cat = Table.read(
-    '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/NSA/nsa_cutout_cat.fits')
+    '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/NSA/nsa_cutout_cat_1007.fits')
 lsbg_cat.sort('viz-id')
 
 
