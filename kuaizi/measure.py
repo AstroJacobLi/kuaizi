@@ -379,7 +379,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, aggr_mask=None, sigma=1, 
+def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, sigma=1,
                     zeropoint=27.0, pixel_scale=0.168,
                     out_prefix=None, show_fig=True, **kwargs):
     """
@@ -397,6 +397,8 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1,
 
     Returns:
         measure_dict (dict): a dictionary containing all measurements
+    """
+
     """
     # 调用statmorph，除了flux/mag/SB之外，其他的所有信息，所有band都一样
     # max_pix_postion的时候，是不是先smooth一下？
@@ -439,11 +441,73 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1,
     segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
     
     img[~segmap] = np.nan
+    """
+    import statmorph
+
+    min_cutout_size = max([comp.bbox.shape[1] for comp in components])
+    if len(components) > 1:
+        raise ValueError('The number of components must be 1.')
+    comp = components[0]
+    bbox = comp.bbox
+    models = comp.get_model()  # PSF-free model
+    models = observation.render(models)  # PSF-convoled model
+
+    data = observation.data
+    weights = observation.weights
+    psfs = observation.psf.get_model()
+    if aggr_mask is None:
+        mask = (weights.sum(axis=0) == 0)
+    else:
+        mask = aggr_mask | (weights.sum(axis=0) == 0)
+
+    data = data[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
+                bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    data = np.ascontiguousarray(data)
+    mask = mask[bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
+                bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    mask = np.ascontiguousarray(mask)
+    weights = weights[:, bbox.origin[1]:bbox.origin[1] +
+                      bbox.shape[1], bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    weights = np.ascontiguousarray(weights)
+
+    # Flux and magnitude in each band
+    measure_dict = {}
+    measure_dict['flux'] = flux(components, observation)
+    # normalized against g-band
+    SED = (measure_dict['flux'] / measure_dict['flux'][0])
+    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
+
+    # We take the model and weight map in g-band. Such that we can use the SED to get
+    # surface brightness in other bands.
+    # A sky background is estimated on the original image,
+    # and we run `sep` to generate a 1-sigma segmentation map.
+    # Then we run `statmorph` using that segmap
+
+    filt = 0
+    img = models[filt]
+
+    if makesegmap:
+        bkg = sep.Background(data[filt], bh=12, bw=12, mask=mask)
+        _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms, minarea=1,
+                                deblend_cont=1,
+                                mask=mask, segmentation_map=True)
+
+        # Only select relevant detections.
+        cen_ind = [segmap[int(comp.center[0] - bbox.origin[1]),
+                          int(comp.center[1] - bbox.origin[2])] for comp in components]
+        segmap[~np.add.reduce(
+            [segmap == ind for ind in cen_ind]).astype(bool)] = 0
+        segmap = (segmap > 0)
+        segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
+
+        img[~segmap] = np.nan
+    else:
+        segmap = np.ones_like(img)
 
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
         n_sigma_outlier=15, min_cutout_size=min_cutout_size, cutout_extent=2,
-        mask=mask, psf=psfs[filt])
+        mask=mask, psf=None)  # psfs[filt]
     morph = source_morphs[0]
 
     measure_dict['xc_centroid'] = morph.xc_centroid
@@ -465,10 +529,14 @@ def makeMeasurement(components, observation, aggr_mask=None, sigma=1,
     measure_dict['r20'] = morph.r20
     measure_dict['r50'] = morph.r50
     measure_dict['r80'] = morph.r80
-    measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (pixel_scale**2)) + zeropoint   # in mag per arcsec2
-    measure_dict['SB_0_ellip'] = -2.5 * np.log10(morph.SB_0_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
-    measure_dict['SB_eff_circ'] = -2.5 * np.log10(morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
-    measure_dict['SB_eff_ellip'] = -2.5 * np.log10(morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (
+        pixel_scale**2)) + zeropoint   # in mag per arcsec2
+    measure_dict['SB_0_ellip'] = -2.5 * np.log10(
+        morph.SB_0_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_circ'] = -2.5 * np.log10(
+        morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_ellip'] = -2.5 * np.log10(
+        morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['Gini'] = morph.gini
     measure_dict['M20'] = morph.m20
     measure_dict['F(G, M20)'] = morph.gini_m20_bulge
@@ -553,6 +621,7 @@ def _write_to_row(row, measurement):
     row['flag_sersic'] = measurement['flag_sersic']
 
     return row
+
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0,
                    zeropoint=27.0, pixel_scale=0.168, save_fig=True):
