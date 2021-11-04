@@ -37,8 +37,8 @@ HSC_binray_mask_dict = {0: 'BAD',
 
 from pkg_resources import get_distribution, DistributionNotFound
 from .utils import set_env, set_matplotlib
-from . import measure
-from . import detection
+#from . import measure
+#from . import detection
 from . import display
 from . import utils
 import warnings
