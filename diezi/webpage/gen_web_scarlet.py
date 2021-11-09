@@ -11,14 +11,14 @@ from shutil import copy
 from astropy.table import Table
 
 
-def webpage_scarlet(CATALOG_DIR, FIGURE_DIR, WEBPAGE_DIR, sample_name, ind_name, row_num=10):
+def webpage_scarlet(CATALOG_DIR, FIGURE_DIR, WEBPAGE_DIR, sample_name, ind_name, suffix='wavelet', row_num=10):
     lsbg_cat = Table.read(CATALOG_DIR)
     lsbg_cat.sort(ind_name)
 
     # get the indices of successful modeling
     figlist = os.listdir(FIGURE_DIR)
     # only select png
-    figlist = [item for item in figlist if '-zoomin-wavelet.png' in item]
+    figlist = [item for item in figlist if f'-zoomin-{suffix}.png' in item]
     ind_array = np.asarray([re.findall('-\d+-', item)[0].strip('-')
                             for item in figlist], dtype=int)
     ind_array.sort()
@@ -42,6 +42,9 @@ def webpage_scarlet(CATALOG_DIR, FIGURE_DIR, WEBPAGE_DIR, sample_name, ind_name,
         f'Failed {len(fail_log_array)} galaxies (based on checking log files):', fail_log_array)
 
     # Copy figures to public_html
+    if not os.path.exists(WEBPAGE_DIR):
+        os.mkdir(WEBPAGE_DIR)
+
     if not os.path.isdir(os.path.join(WEBPAGE_DIR, 'figure')):
         os.mkdir(os.path.join(WEBPAGE_DIR, 'figure'))
 
@@ -49,7 +52,7 @@ def webpage_scarlet(CATALOG_DIR, FIGURE_DIR, WEBPAGE_DIR, sample_name, ind_name,
         copy(
             os.path.join(FIGURE_DIR, file), os.path.join(WEBPAGE_DIR, 'figure'))
 
-    # Count figures in public_html/candy/scarlet_zoomin
+    # Count figures in public_html/sample_name/scarlet_zoomin
     print(f'You have {len(ind_array)} galaxies to be displayed')
 
     page_num = len(lsbg_cat) // (row_num) + 1
@@ -116,9 +119,21 @@ def webpage_scarlet(CATALOG_DIR, FIGURE_DIR, WEBPAGE_DIR, sample_name, ind_name,
                     f'   <figure><h1>Failed!</h1><figcaption>{sample_name.upper()} {ind}</figcaption> </figure>\n')
 
             elif ind in ind_array:
-                f.write(f'<div class="row" id="candy{ind}"> \n')
                 f.write(
-                    f'   <figure><img src="{FIGURE_DIR}/{sample_name.lower()}-{ind}-zoomin-wavelet.png" style="width:100%"> <figcaption>{sample_name.upper()} {ind}</figcaption> </figure>\n')
+                    f'<div class="row" id="{sample_name.upper()}{ind}"> \n')
+                caption = ''
+                # caption = f'{sample_name.upper()} {ind} ()'
+                gal = lsbg_cat[lsbg_cat['viz-id'] == ind][0]
+                if gal['is_galaxy'] >= 1:
+                    caption += f'<p style="color:red;">{sample_name.upper()} {ind} Galaxy</p>'
+                if gal['is_candy'] >= 1:
+                    caption += f'<p style="color:green;">{sample_name.upper()} {ind} Candy</p>'
+                if gal['is_junk'] + gal['is_cirrus'] + gal['is_outskirts'] + gal['is_tidal'] >= 1:
+                    caption += f'<p style="color:black;">{sample_name.upper()} {ind} Junk</p>'
+                if gal['good_votes'] + gal['bad_votes'] == 0:
+                    caption += f'<p style="color:orange;">{sample_name.upper()} {ind} No votes!</p>'
+                f.write(
+                    f'   <figure><img src="{FIGURE_DIR}/{sample_name.lower()}-{ind}-zoomin-{suffix}.png" style="width:100%"> <figcaption>{caption}</figcaption> </figure>\n')
 
             f.write(f'</div> \n\n')
 

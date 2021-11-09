@@ -14,7 +14,7 @@ from shutil import copy
 # sample_name = 'NSA'
 
 
-def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_num=7, row_num=4):
+def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLET_DIR=None, col_num=7, row_num=4):
     '''
     This function writes HTML webpage for displaying RGB cutout images.
 
@@ -34,6 +34,8 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_n
         None
     '''
     # find existing cutout rgb images
+    if not os.path.isdir(WEBPAGE_DIR):
+        os.mkdir(WEBPAGE_DIR)
     os.chdir(WEBPAGE_DIR)
     # change to relative path, as required by HTML
     FIGURE_DIR = os.path.relpath(FIGURE_DIR)
@@ -61,11 +63,12 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_n
             '<!DOCTYPE html> \n<html><head> \n<link rel="stylesheet" type="text/css" href="mystyle.css">\n')
         f.write('<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>\n')
         f.write('<script type="text/javascript" src="myjs.js"></script> \n')
-        f.write(f'<title>{sample_name.upper()} Sample Cutout</title> \n')
+        f.write(
+            f'<title>{sample_name.upper()} {sample_title} Sample Cutout</title> \n')
         f.write('\n\n</head><body> \n\n')
 
         f.write(
-            f'<div class="header"> \n<h1>{sample_name.upper()} Sample Cutout</h1> \n</div> \n\n')
+            f'<div class="header"> \n<h1>{sample_name.upper()} {sample_title} Sample Cutout</h1> \n</div> \n\n')
         f.write('<div class="navigator"> \n')
 
         # Write navigator
@@ -98,10 +101,10 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, SCARLET_DIR=None, col_n
             if ind >= len(index_list):
                 f.write('</div> \n')
                 break
-            page = int(np.ceil((ind + 1) / 20))
             f.write(
                 f'      <figure> <img src="{FIGURE_DIR}/{sample_name.lower()}_{index_list[ind]}_cutout.png" id="{sample_name}{index_list[ind]}">')
             if SCARLET_DIR is not None:
+                page = int(np.ceil((ind + 1) / 10))
                 f.write(
                     f'<figcaption><a class="clickable" target="_blank" href="{SCARLET_DIR}/page{page}.html#{sample_name}{index_list[ind]}">{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
             if (i + 1) % col_num == 0:

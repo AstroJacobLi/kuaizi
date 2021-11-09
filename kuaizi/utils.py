@@ -147,7 +147,8 @@ def set_logger(logger_name='fitting_wavelet_obs_tigress', file_name='candy', lev
     return logger
 
 
-def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5,
+def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5, 
+                convolve=False, conv_radius=None,
                 deblend_nthresh=32, deblend_cont=0.005, clean_param=1.0,
                 sky_subtract=False, flux_auto=True, flux_aper=None, show_fig=False,
                 verbose=True, logger=None):
@@ -181,6 +182,11 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     # Subtract a mean sky value to achieve better object detection
     b = b  # Box size
     f = f  # Filter width
+    
+    # if convolve: 
+    #     from astropy.convolution import convolve, Gaussian2DKernel
+    #     img = convolve(img.astype(float), Gaussian2DKernel(conv_radius))
+
     try:
         bkg = sep.Background(img, bw=b, bh=b, fw=f, fh=f)
     except ValueError as e:
@@ -190,10 +196,17 @@ def extract_obj(img, mask=None, b=64, f=3, sigma=5, pixel_scale=0.168, minarea=5
     data_sub = img - bkg.back()
 
     sigma = sigma
+
     if sky_subtract:
         input_data = data_sub
     else:
         input_data = img
+
+    if convolve: 
+        from astropy.convolution import convolve, Gaussian2DKernel
+        input_data = convolve(input_data.astype(float), Gaussian2DKernel(conv_radius))
+        bkg = sep.Background(input_data, bw=b, bh=b, fw=f, fh=f)
+        input_data -= bkg.globalback
 
     objects, segmap = sep.extract(input_data,
                                   sigma,

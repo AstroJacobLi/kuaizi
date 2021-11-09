@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # Define pixel scale of different surveys, unit = arcsec / pixel
+import warnings
+from pkg_resources import get_distribution, DistributionNotFound
 HSC_pixel_scale = 0.168
 DECaLS_pixel_scale = 0.262
 Dragonfly_pixel_scale = 2.5
@@ -35,19 +37,20 @@ HSC_binray_mask_dict = {0: 'BAD',
                         15: 'SENSOR_EDGE',
                         16: 'INEXACT_PSF'}
 
-from pkg_resources import get_distribution, DistributionNotFound
-from .utils import set_env, set_matplotlib
-from . import measure
-from . import detection
-from . import display
-from . import utils
-import warnings
+# from . import measure # do not import measure here, it will require scarlet/autograd
+
 warnings.simplefilter('ignore')
 
-__all__ = ["utils", "fitting", "download", "detection", "display", "measure", "wavelet", "mock"]
+__all__ = ["utils", "fitting", "download", "detection",
+           "display", "measure", "wavelet", "mock"]
 __name__ = 'kuaizi'
 __author__ = ['Jiaxuan Li']
 
+from . import utils
+from . import display
+from . import measure
+from . import detection
+from .utils import set_env, set_matplotlib
 
 # Version
 try:

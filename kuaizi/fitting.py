@@ -3148,13 +3148,13 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     cen_obj = obj_cat_ori[cen_indx_ori]
 
     # Better position for cen_obj, THIS IS PROBLEMATIC!!!
-    # x, y, _ = sep.winpos(data.images.mean(
-    #     axis=0), cen_obj['x'], cen_obj['y'], 6)
-    # ra, dec = data.wcs.wcs_pix2world(x, y, 0)
-    # cen_obj['x'] = x
-    # cen_obj['y'] = y
-    # cen_obj['ra'] = ra
-    # cen_obj['dec'] = dec
+    x, y, _ = sep.winpos(data.images.mean(
+        axis=0), cen_obj['x'], cen_obj['y'], 6)
+    ra, dec = data.wcs.wcs_pix2world(x, y, 0)
+    cen_obj['x'] = x
+    cen_obj['y'] = y
+    cen_obj['ra'] = ra
+    cen_obj['dec'] = dec
     cen_obj_coord = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
 
     # We roughly guess the box size of the Starlet model
@@ -3269,9 +3269,9 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # This step masks out high frequency sources by doing wavelet transformation
     obj_cat, segmap_highfreq, bg_rms = kz.detection.makeCatalog([data],
                                                                 mask=msk_star,
-                                                                lvl=2.,  # 2.5
+                                                                lvl=3.,  # 2.5
                                                                 method='wavelet',
-                                                                high_freq_lvl=2,  # 3
+                                                                high_freq_lvl=1,  # 3
                                                                 wavelet_lvl=4,
                                                                 match_gaia=False,
                                                                 show_fig=show_figure,
@@ -3446,7 +3446,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     sources.append(new_source)
 
     # Only model "real compact" sources
-    if len(obj_cat_big) > 0:
+    if len(obj_cat_big) > 0 and len(obj_cat_cpct) > 0:
         # remove intersection between cpct and big objects
         # if an object is both cpct and big, we think it is big
         cpct_coor = SkyCoord(
@@ -3475,10 +3475,10 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         # for bright galaxy, we don't include these compact sources into modeling,
         # due to the limited computation resources
         for k, src in enumerate(cpct):
-            if src['fwhm_custom'] < 3:
+            if src['fwhm_custom'] < 5:
                 new_source = scarlet.source.PointSource(
                     model_frame, (src['ra'], src['dec']), observation)
-            elif src['fwhm_custom'] >= 3 and src['fwhm_custom'] < 5:
+            elif src['fwhm_custom'] >= 5 and src['fwhm_custom'] < 10:
                 new_source = scarlet.source.CompactExtendedSource(
                     model_frame, (src['ra'], src['dec']), observation)
             else:

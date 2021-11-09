@@ -378,28 +378,32 @@ def cutout_one(butler, skymap, obj, band, label, psf):
     prefix, ra, dec, radius = obj['prefix'], obj['ra'], obj['dec'], obj['radius']
     prefix = '_'.join([prefix, band.lower().strip()])
 
+    # Make a new folder if necessary
+    if not os.path.isdir(os.path.split(prefix)[0]):
+        os.makedirs(os.path.split(prefix)[0], exist_ok=True)
+
     try:
         cutout = generate_cutout(
             butler, skymap, ra, dec, band=band, label=label, radius=radius, psf=psf)
+        
+        if psf:  # whether download PSF
+            img, psf = cutout
+            if isinstance(psf, type(None)):  # cannot compute PSF here
+                print(f'    - Cannot compute PSF for {prefix}')
+            else:
+                psf.writeFits("{:s}_psf.fits".format(prefix))
+
+            if isinstance(img, type(None)):  # cannot compute PSF here
+                print(f'    - Cannot get cutout for {prefix}')
+            else:
+                img.writeFits("{:s}.fits".format(prefix))
+        else:
+            cutout.writeFits("{:s}.fits".format(prefix))
+
     except Exception as e:
         print(f'    - Cannot generate cutout for {prefix}')
         print(e)
 
-    # Make a new folder is necessary
-    if not os.path.isdir(os.path.split(prefix)[0]):
-        os.makedirs(os.path.split(prefix)[0], exist_ok=True)
+    
 
-    if psf:  # whether download PSF
-        img, psf = cutout
-        if isinstance(psf, type(None)):  # cannot compute PSF here
-            print(f'    - Cannot compute PSF for {prefix}')
-        else:
-            psf.writeFits("{:s}_psf.fits".format(prefix))
-
-        if isinstance(img, type(None)):  # cannot compute PSF here
-            print(f'    - Cannot get cutout for {prefix}')
-        else:
-            img.writeFits("{:s}.fits".format(prefix))
-
-    else:
-        cutout.writeFits("{:s}.fits".format(prefix))
+    

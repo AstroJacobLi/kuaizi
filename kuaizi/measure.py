@@ -445,12 +445,16 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     import statmorph
 
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
-    if len(components) > 1:
-        raise ValueError('The number of components must be 1.')
-    comp = components[0]
-    bbox = comp.bbox
-    models = comp.get_model()  # PSF-free model
+    # Multi-components enabled
+    _blend = scarlet.Blend(components, observation)
+    lower_left = np.min([np.array(comp.bbox.origin) for comp in components], axis=0)
+    upper_right = np.max([np.array(comp.bbox.origin) + np.array(comp.bbox.shape) for comp in components], axis=0)
+    bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
+
+    models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
+    models = models[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
+            bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
 
     data = observation.data
     weights = observation.weights

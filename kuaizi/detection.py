@@ -48,7 +48,8 @@ def interpolate(data_lr, data_hr):
 # Vanilla detection: SEP
 
 
-def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30,
+def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, 
+                      convolve=False, conv_radius=None, deblend_nthresh=30,
                       deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Source detection using Source Extractor (actually SEP). 
@@ -91,6 +92,8 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
         deblend_nthresh=deblend_nthresh,
         deblend_cont=deblend_cont,
         sky_subtract=sky_subtract,
+        convolve=convolve,
+        conv_radius=conv_radius,
         show_fig=show_fig,
         **kwargs)
 
@@ -109,7 +112,7 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, de
 
 
 def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, high_freq_lvl=1,
-                      sigma=3, b=64, f=3, minarea=5, deblend_nthresh=30,
+                      sigma=3, b=64, f=3, minarea=5, convolve=False, conv_radius=None, deblend_nthresh=30,
                       deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
     Perform wavelet transform before detecting sources. This enable us to emphasize features with high frequency or low frequency.
@@ -172,6 +175,8 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
         deblend_nthresh=deblend_nthresh,
         deblend_cont=deblend_cont,
         sky_subtract=sky_subtract,
+        convolve=convolve,
+        conv_radius=conv_radius,
         show_fig=show_fig,
         **kwargs)
 
@@ -249,16 +254,13 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     else:
         detect = detect_image
 
-    if convolve:
-        from astropy.convolution import convolve, Box2DKernel, Gaussian2DKernel
-        detect = convolve(detect.astype(float), Gaussian2DKernel(conv_radius))
-
+    # we better subtract background first, before convolve
     if method == 'wavelet':
         result = wavelet_detection(
-            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, convolve=convolve, conv_radius=conv_radius, **kwargs)
     else:
         result = vanilla_detection(
-            detect, mask=mask, sigma=lvl, show_fig=show_fig, **kwargs)
+            detect, mask=mask, sigma=lvl, show_fig=show_fig, convolve=convolve, conv_radius=conv_radius, **kwargs)
 
     obj_cat = result[0]
     segmap = result[1]

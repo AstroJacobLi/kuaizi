@@ -1166,7 +1166,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     # In Figure 1, we'd like to show boxes for all sources.
     # The zoomin cutout should be centered at the target galaxy.
     if zoomin_size is not None:
-        y_cen, x_cen = blend.sources[0].center
+        y_cen, x_cen = blend.sources[0].center.astype(int)
         _, y_img_size, x_img_size = observation.data.shape
         # x_cen = observation.model_frame.shape[2] // 2
         # y_cen = observation.model_frame.shape[1] // 2
