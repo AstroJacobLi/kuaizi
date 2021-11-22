@@ -4,7 +4,17 @@ import matplotlib.pyplot as plt
 import sep
 import os
 import copy
+import gc
+import statmorph
+
+import kuaizi as kz
+from kuaizi.display import display_single
+from scarlet.source import StarletSource
+from astropy.coordinates import SkyCoord, match_coordinates_sky
 from astropy.convolution import convolve, Gaussian2DKernel
+import astropy.units as u
+from astropy.io import fits
+import astropy.wcs as wcs
 
 #############################################
 # Use Statmorph to measure galaxy morphology#
@@ -447,14 +457,16 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
     # Multi-components enabled
     _blend = scarlet.Blend(components, observation)
-    lower_left = np.min([np.array(comp.bbox.origin) for comp in components], axis=0)
-    upper_right = np.max([np.array(comp.bbox.origin) + np.array(comp.bbox.shape) for comp in components], axis=0)
+    lower_left = np.min([np.array(comp.bbox.origin)
+                        for comp in components], axis=0)
+    upper_right = np.max([np.array(comp.bbox.origin) +
+                         np.array(comp.bbox.shape) for comp in components], axis=0)
     bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
 
     models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
     models = models[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
-            bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+                    bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
 
     data = observation.data
     weights = observation.weights
@@ -613,6 +625,8 @@ def _write_to_row(row, measurement):
 
     row['C'] = measurement['C']
     row['A'] = measurement['A']
+    row['A_outer'] = measurement['A_outer']
+    row['A_shape'] = measurement['A_shape']
     row['S'] = measurement['S']
     row['sersic_n'] = measurement['sersic_n']
     row['sersic_rhalf'] = measurement['sersic_rhalf']
@@ -768,3 +782,551 @@ def cal_mue(n, Re, mag):
     mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1)
                                                  * np.pi) + 2.5 * bn(n) / np.log(10) - 5 * n * np.log10(bn(n))
     return mu
+
+
+def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright=False,
+                   show_figure=False, show_figure_statmorph=True, figure_dir='./Figures/',
+                   tigress=True, logger=None, **kwargs):
+    if logger is None:
+        from .utils import set_logger
+        logger = set_logger(__name__, f'measure_img.log')
+
+    lsbg_coord = coord
+
+    # 2 whitespaces before "-", i.e., 4 whitespaces before word
+    print('  - Detect sources and make mask')
+    logger.info('  - Detect sources and make mask')
+    print('    Query GAIA stars...')
+    logger.info('    Query GAIA stars...')
+    gaia_cat, msk_star_ori = kz.utils.gaia_star_mask(  # Generate a mask for GAIA bright stars
+        data.images.mean(axis=0),  # averaged image
+        data.wcs,
+        pixel_scale=pixel_scale,
+        gaia_bright=19.5,
+        mask_a=694.7,
+        mask_b=3.8,
+        factor_b=1.0,  # 0.7,
+        factor_f=1.4,  # 1.0,
+        tigress=tigress,
+        logger=logger)
+
+    # Replace the vanilla detection with a convolved vanilla detection
+    if max(data.images.shape) * pixel_scale > 200:
+        first_dblend_cont = 0.07
+    else:
+        first_dblend_cont = 0.02
+    obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
+        [data],
+        lvl=4,  # a.k.a., "sigma"
+        mask=msk_star_ori,
+        method='vanilla',
+        convolve=True,
+        conv_radius=2,
+        match_gaia=False,
+        show_fig=show_figure,
+        visual_gaia=False,
+        b=80,
+        f=3,
+        pixel_scale=pixel_scale,
+        minarea=20,
+        deblend_nthresh=48,
+        deblend_cont=first_dblend_cont,  # 0.01, 0.05, 0.07, I changed it to 0.1
+        sky_subtract=True,
+        logger=logger)
+
+    catalog_c = SkyCoord(obj_cat_ori['ra'], obj_cat_ori['dec'], unit='deg')
+    dist = lsbg_coord.separation(catalog_c)
+    # ori = original, i.e., first SEP run
+    cen_indx_ori = obj_cat_ori[np.argsort(dist)[0]]['index']
+    cen_obj = obj_cat_ori[cen_indx_ori]
+
+    # Better position for cen_obj, THIS IS PROBLEMATIC!!!
+    x, y, _ = sep.winpos(data.images.mean(
+        axis=0), cen_obj['x'], cen_obj['y'], 6)
+    ra, dec = data.wcs.wcs_pix2world(x, y, 0)
+    cen_obj['x'] = x
+    cen_obj['y'] = y
+    cen_obj['ra'] = ra
+    cen_obj['dec'] = dec
+    cen_obj_coord = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
+
+    # We roughly guess the box size of the Starlet model
+    model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(data.channels))
+    model_frame = scarlet.Frame(
+        data.images.shape,
+        wcs=data.wcs,
+        psf=model_psf,
+        channels=list(data.channels))
+    observation = scarlet.Observation(
+        data.images,
+        wcs=data.wcs,
+        psf=data.psfs,
+        weights=data.weights,
+        channels=list(data.channels))
+    observation = observation.match(model_frame)
+
+    ############################################
+    ########### First box estimation ###########
+    ############################################
+
+    cen_obj = obj_cat_ori[cen_indx_ori]
+    starlet_source = StarletSource(model_frame,
+                                   (cen_obj['ra'], cen_obj['dec']),
+                                   observation,
+                                   thresh=0.01,
+                                   min_grad=-0.01,  # the initial guess of box size is as large as possible
+                                   starlet_thresh=5e-3)
+    # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
+    # The box is way too large
+    if starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (bright):
+        # The box is way too large
+        min_grad = 0.03
+        smaller_box = True
+    elif starlet_source.bbox.shape[1] > 0.9 * data.images[0].shape[0] and (~bright):
+        # not bright but large box: something must be wrong! min_grad should be larger
+        min_grad = 0.05
+        smaller_box = True
+    elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (bright):
+        # If box is large and gal is bright
+        min_grad = 0.02
+        smaller_box = True
+    elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
+        # If box is large and gal is not bright
+        min_grad = 0.01
+        smaller_box = True
+    else:
+        smaller_box = False
+
+    if smaller_box:
+        starlet_source = scarlet.StarletSource(model_frame,
+                                               (cen_obj['ra'], cen_obj['dec']),
+                                               observation,
+                                               thresh=0.01,
+                                               min_grad=min_grad,  # the initial guess of box size is as large as possible
+                                               starlet_thresh=5e-3)
+
+    starlet_extent = kz.display.get_extent(
+        starlet_source.bbox)  # [x1, x2, y1, y2]
+
+    # extra padding, to enlarge the box
+    starlet_extent[0] -= 5
+    starlet_extent[2] -= 5
+    starlet_extent[1] += 5
+    starlet_extent[3] += 5
+
+    if show_figure:
+        # Show the Starlet initial box
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax = display_single(data.images.mean(axis=0), ax=ax)
+        from matplotlib.patches import Rectangle
+        box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
+        rect = Rectangle(
+            (starlet_extent[0], starlet_extent[2]),
+            starlet_extent[1] - starlet_extent[0],
+            starlet_extent[3] - starlet_extent[2],
+            **box_kwargs
+        )
+        ax = plt.gca()
+        ax.add_patch(rect)
+
+    if gaia_cat is not None:
+        # Find stars within the wavelet box, and mask them.
+        star_flag = [(item[0] > starlet_extent[0]) & (item[0] < starlet_extent[1]) &
+                     (item[1] > starlet_extent[2]) & (
+                         item[1] < starlet_extent[3])
+                     for item in np.asarray(
+            data.wcs.wcs_world2pix(gaia_cat['ra'], gaia_cat['dec'], 0), dtype=int).T]
+        # "star_cat" is a catalog for GAIA stars which fall in the Starlet box
+        star_cat = gaia_cat[star_flag]
+
+        _, msk_star = kz.utils.gaia_star_mask(  # Generate GAIA mask only for stars outside of the Starlet box
+            data.images.mean(axis=0),
+            data.wcs,
+            gaia_stars=gaia_cat[~np.array(star_flag)],
+            pixel_scale=pixel_scale,
+            gaia_bright=19.5,
+            mask_a=694.7,
+            mask_b=3.8,
+            factor_b=0.8,
+            factor_f=0.6,
+            tigress=tigress,
+            logger=logger)
+    else:
+        star_cat = []
+        msk_star = np.copy(msk_star_ori)
+
+    ############################################
+    ####### Source detection and masking #######
+    ############################################
+
+    # This step masks out high frequency sources by doing wavelet transformation
+    obj_cat, segmap_highfreq, bg_rms = kz.detection.makeCatalog([data],
+                                                                mask=msk_star,
+                                                                lvl=2.,  # 2.5
+                                                                method='wavelet',
+                                                                high_freq_lvl=2,  # 3
+                                                                wavelet_lvl=4,
+                                                                match_gaia=False,
+                                                                show_fig=show_figure,
+                                                                visual_gaia=False,
+                                                                b=24,
+                                                                f=3,
+                                                                pixel_scale=pixel_scale,
+                                                                minarea=3,
+                                                                deblend_nthresh=30,
+                                                                deblend_cont=0.03,
+                                                                sky_subtract=True,
+                                                                logger=None)
+
+    catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
+    dist = cen_obj_coord.separation(catalog_c)
+    cen_indx_highfreq = obj_cat[np.argsort(dist)[0]]['index']
+
+    # Don't mask out objects that fall in the segmap of the central object and the Starlet box
+    segmap = segmap_highfreq.copy()
+    # overlap_flag is for objects which fall in the footprint
+    # of central galaxy in the fist SEP detection
+    overlap_flag = [(segmap_ori == (cen_indx_ori + 1))[item]
+                    for item in list(zip(obj_cat['y'].astype(int), obj_cat['x'].astype(int)))]
+    overlap_flag = np.array(overlap_flag)
+
+    # # `box_flag` is for objects which fall in the initial Starlet box
+    # box_flag = np.unique(
+    #     segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]) - 1
+    # if len(box_flag) > 0:
+    #     box_flag = np.delete(np.sort(box_flag), 0)
+    #     overlap_flag[box_flag] = True
+    # if len(overlap_flag) > 0:
+    #     obj_cat_cpct = obj_cat[overlap_flag] # obj_cat_cpct is the catalog for compact sources
+
+    # Remove the source from `obj_cat_cpct` if it is the central galaxy
+    # if dist[cen_indx_highfreq] < 1 * u.arcsec:
+    #     obj_cat_cpct.remove_rows(
+    #         np.where(obj_cat_cpct['index'] == cen_indx_highfreq)[0])
+
+    overlap_flag |= (dist < 1 * u.arcsec)
+
+    for ind in np.where(overlap_flag)[0]:
+        segmap[segmap == ind + 1] = 0
+
+    smooth_radius = 3
+    gaussian_threshold = 0.01
+    mask_conv = np.copy(segmap)
+    mask_conv[mask_conv > 0] = 1
+    mask_conv = convolve(mask_conv.astype(
+        float), Gaussian2DKernel(smooth_radius))
+    # This `seg_mask` only masks compact sources
+    seg_mask = (mask_conv >= gaussian_threshold)
+
+    # This step masks out bright and large contamination, which is not well-masked in previous step
+    obj_cat, segmap_big, bg_rms = kz.detection.makeCatalog(
+        [data],
+        lvl=4.5,  # relative agressive threshold
+        method='vanilla',
+        match_gaia=False,
+        show_fig=False,
+        visual_gaia=False,
+        b=64,
+        f=3,
+        pixel_scale=pixel_scale,
+        minarea=20,   # only want large things
+        deblend_nthresh=36,
+        deblend_cont=0.01,
+        sky_subtract=True,
+        logger=None)
+
+    catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
+    dist = cen_obj_coord.separation(catalog_c)
+    cen_indx_big = obj_cat_ori[np.argsort(dist)[0]]['index']
+
+    # mask out big objects that are NOT identified in the high_freq step
+    segmap = segmap_big.copy()
+    # segbox = segmap[starlet_extent[2]:starlet_extent[3], starlet_extent[0]:starlet_extent[1]]
+    # box_flag = np.unique(segbox) - 1
+    # if len(box_flag) > 0:
+    #     box_flag = np.delete(np.sort(box_flag), 0)
+    #     for ind in box_flag:
+    #         if np.sum(segbox == ind + 1) / np.sum(segmap == ind + 1) > 0.5: segmap[segmap == ind + 1] = 0
+    #     box_flag = np.delete(box_flag, np.where(box_flag == cen_indx_big)[
+    #         0])  # dont include the central galaxy
+    #     obj_cat_big = obj_cat[box_flag]
+    # else:
+    #     obj_cat_big = obj_cat
+    segmap[segmap == cen_indx_big + 1] = 0
+    for ind in np.where(dist < 2 * u.arcsec)[0]:
+        segmap[segmap == ind + 1] = 0
+    # `obj_cat_big` is catalog of the big/high SNR objects in the image
+
+    smooth_radius = 5
+    gaussian_threshold = 0.01
+    mask_conv = np.copy(segmap)
+    mask_conv[mask_conv > 0] = 1
+    mask_conv = convolve(mask_conv.astype(
+        float), Gaussian2DKernel(smooth_radius))
+    # This `seg_mask_large` masks large bright sources
+    seg_mask_large = (mask_conv >= gaussian_threshold)
+
+    mask = (seg_mask_large + seg_mask + msk_star.astype(bool))
+
+    # Crop the image for measurement
+    components = [starlet_source]
+    min_cutout_size = max([comp.bbox.shape[1] for comp in components])
+
+    lower_left = np.min([np.array(comp.bbox.origin)
+                        for comp in components], axis=0)
+    upper_right = np.max([np.array(comp.bbox.origin) +
+                         np.array(comp.bbox.shape) for comp in components], axis=0)
+    bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
+    bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
+    bbox.shape = tuple(int(i * 1.5) for i in bbox.shape)
+    bbox.origin = tuple(bbox.center[i] - bbox.shape[i] // 2 for i in range(3))
+
+    images = data.images
+    weights = data.weights
+    psfs = data.psfs.get_model()
+
+    images = images[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
+                    bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    images = np.ascontiguousarray(images)
+    mask = mask[bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
+                bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    mask = np.ascontiguousarray(mask)
+    weights = weights[:, bbox.origin[1]:bbox.origin[1] +
+                      bbox.shape[1], bbox.origin[2]:bbox.origin[2] + bbox.shape[2]]
+    weights = np.ascontiguousarray(weights)
+
+    ############ Very rough photometry ##############
+    measure_dict = {}
+    measure_dict['flux'] = (images * (~mask.astype(bool))).sum(axis=(1, 2))
+    # normalized against g-band
+    SED = (measure_dict['flux'] / measure_dict['flux'][0])
+    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
+
+    # We take the model and weight map in g-band. Such that we can use the SED to get
+    # surface brightness in other bands.
+    # A sky background is estimated on the original image,
+    # and we run `sep` to generate a 1-sigma segmentation map.
+    # Then we run `statmorph` using that segmap
+    sigma = 2
+    filt = 2
+    img = np.average(images, weights=weights.sum(axis=(1, 2)),
+                     axis=0)  # This is the average image
+    # img = images[filt]#models[filt]
+    bkg = sep.Background(img, bh=12, bw=12, mask=mask)
+    _, segmap = sep.extract(img, sigma, err=bkg.globalrms, minarea=1,
+                            deblend_cont=1,
+                            mask=None, segmentation_map=True)
+
+    # mask = np.copy(segmap)
+
+    # cen_ind = [segmap[int(comp.center[0] - comp.bbox.origin[1]),
+    #                   int(comp.center[1] - comp.bbox.origin[2])] for comp in components]
+    cen_ind = [segmap[int(bbox.center[1] - bbox.origin[1]),
+                      int(bbox.center[2] - bbox.origin[2])] for comp in components]
+    segmap[~np.add.reduce([segmap == ind for ind in cen_ind]).astype(bool)] = 0
+
+    segmap = (segmap > 0)
+    segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
+
+    source_morphs = statmorph.source_morphology(
+        img, segmap, weightmap=np.sqrt(weights[filt]),
+        n_sigma_outlier=10, min_cutout_size=min_cutout_size,
+        cutout_extent=2.,
+        skybox_size=24,
+        # petro_extent_cas=1,
+        # petro_fraction_gini=0.1,
+        mask=mask,
+        psf=psfs[filt], **kwargs)
+    morph = source_morphs[0]
+
+    measure_dict['xc_centroid'] = morph.xc_centroid
+    measure_dict['yc_centroid'] = morph.yc_centroid
+    measure_dict['xc_peak'] = morph.xc_peak
+    measure_dict['yc_peak'] = morph.yc_peak
+    measure_dict['ellipticity_centroid'] = morph.ellipticity_centroid
+    measure_dict['elongation_centroid'] = morph.elongation_centroid
+    measure_dict['orientation_centroid'] = morph.orientation_centroid
+    measure_dict['xc_asymmetry'] = morph.xc_asymmetry
+    measure_dict['yc_asymmetry'] = morph.yc_asymmetry
+    measure_dict['ellipticity_asymmetry'] = morph.ellipticity_asymmetry
+    measure_dict['elongation_asymmetry'] = morph.elongation_asymmetry
+    measure_dict['orientation_asymmetry'] = morph.orientation_asymmetry
+    measure_dict['rpetro_circ'] = morph.rpetro_circ
+    measure_dict['rpetro_ellip'] = morph.rpetro_ellip
+    measure_dict['rhalf_circ'] = morph.rhalf_circ
+    measure_dict['rhalf_ellip'] = morph.rhalf_ellip
+    measure_dict['r20'] = morph.r20
+    measure_dict['r50'] = morph.r50
+    measure_dict['r80'] = morph.r80
+    measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (
+        pixel_scale**2)) + zeropoint   # in mag per arcsec2
+    measure_dict['SB_0_ellip'] = -2.5 * np.log10(
+        morph.SB_0_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_circ'] = -2.5 * np.log10(
+        morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_ellip'] = -2.5 * np.log10(
+        morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['Gini'] = morph.gini
+    measure_dict['M20'] = morph.m20
+    measure_dict['F(G, M20)'] = morph.gini_m20_bulge
+    measure_dict['S(G, M20)'] = morph.gini_m20_merger
+    measure_dict['sn_per_pixel'] = morph.sn_per_pixel
+    measure_dict['C'] = morph.concentration
+    measure_dict['A'] = morph.asymmetry
+    measure_dict['A_outer'] = morph.outer_asymmetry
+    measure_dict['A_shape'] = morph.shape_asymmetry
+    measure_dict['S'] = morph.smoothness
+    measure_dict['sersic_amplitude'] = morph.sersic_amplitude
+    measure_dict['sersic_rhalf'] = morph.sersic_rhalf
+    measure_dict['sersic_n'] = morph.sersic_n
+    measure_dict['sersic_xc'] = morph.sersic_xc
+    measure_dict['sersic_yc'] = morph.sersic_yc
+    measure_dict['sersic_ellip'] = morph.sersic_ellip
+    measure_dict['sersic_theta'] = morph.sersic_theta
+    measure_dict['sky_mean'] = morph.sky_mean
+    measure_dict['sky_median'] = morph.sky_median
+    measure_dict['sky_sigma'] = morph.sky_sigma
+    measure_dict['flag'] = morph.flag
+    measure_dict['flag_sersic'] = morph.flag_sersic
+
+    from statmorph.utils.image_diagnostics import make_figure
+    fig = make_figure(morph, **kwargs)
+    plt.savefig(os.path.join(figure_dir, 'statmorph_' +
+                str(index) + '.png'), dpi=100, bbox_inches='tight')
+    if show_figure_statmorph:
+        plt.show()
+    else:
+        plt.close()
+    # measure_dict_new = {}
+    # if out_prefix is not None:
+    #     for key in measure_dict.keys():
+    #         measure_dict_new['_'.join([out_prefix, key])] = measure_dict[key]
+    #     measure_dict = measure_dict_new
+
+    return measure_dict, morph
+
+
+def measure_image_tigress(env_dict, lsbg, name='viz-id', channels='griz',
+                          pixel_scale=0.168, bright_thresh=17.0,
+                          prefix='nsa', output_dir='./Measure', figure_dir='./Figure', show_figure_statmorph=False,
+                          logger=None, global_logger=None, fail_logger=None):
+    __name__ = "fitting_vanilla_obs_tigress"
+
+    from kuaizi.utils import padding_PSF
+    from kuaizi.mock import Data
+    import unagi  # for HSC saturation mask
+
+    index = lsbg[name]
+    # whether this galaxy is a very bright one
+    bright = (lsbg['mag_auto_i'] < bright_thresh)
+
+    if logger is None:
+        from .utils import set_logger
+        logger = set_logger(__name__, os.path.join(
+            output_dir, f'{prefix}-{index}.log'), level='info')
+
+    if bright:
+        logger.info(
+            f"This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
+        print(
+            f"    This galaxy is very bright, with i-mag = {lsbg['mag_auto_i']:.2f}")
+
+    logger.info(f'Working directory: {os.getcwd()}')
+    print(f'    Working directory: {os.getcwd()}')
+
+    kz.utils.set_env(**env_dict)
+    # kz.utils.set_matplotlib(style='default')
+
+    try:
+        #### Deal with possible exceptions on bandpasses ###
+        assert isinstance(channels, str), 'Input channels must be a string!'
+        if len(set(channels) & set('grizy')) == 0:
+            raise ValueError('The input channels must be a subset of "grizy"!')
+
+        overlap = [i for i, item in enumerate('grizy') if item in channels]
+
+        #### Deal with possible exceptions on files (images, PSFs) ###
+        file_exist_flag = np.all(lsbg['image_flag'][overlap]) & np.all(
+            [os.path.isfile(f"{lsbg['prefix']}_{filt}.fits") for filt in channels])
+        if not file_exist_flag:
+            raise FileExistsError(
+                f'The image files of `{lsbg["prefix"]}` in `{channels}` are not complete! Please check!')
+
+        file_exist_flag = np.all(lsbg['psf_flag'][overlap]) & np.all(
+            [os.path.isfile(f"{lsbg['prefix']}_{filt}_psf.fits") for filt in channels])
+        default_exist_flag = np.all([os.path.isfile(
+            f'/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/psf_{filt}.fits') for filt in channels])
+        # This is the flag confirming the default PSFs exist.
+
+        if not file_exist_flag:
+            logger.info(
+                f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete! Please check!')
+
+            if default_exist_flag:
+                logger.info(f'We use the default HSC PSFs instead.')
+                psf_list = [fits.open(f'/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout/psf_{filt}.fits')
+                            for filt in channels]
+            else:
+                raise FileExistsError(
+                    f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete! The default PSFs are also missing! Please check!')
+        else:
+            psf_list = [fits.open(f"{lsbg['prefix']}_{filt}_psf.fits")
+                        for filt in channels]
+
+        # Structure the data
+        lsbg_coord = SkyCoord(ra=lsbg['ra'], dec=lsbg['dec'], unit='deg')
+        cutout = [fits.open(f"{lsbg['prefix']}_{filt}.fits")
+                  for filt in channels]
+
+        images = np.array([hdu[1].data for hdu in cutout])
+        # note: all bands share the same WCS here, but not necessarily true.
+        w = wcs.WCS(cutout[0][1].header)
+        weights = 1.0 / np.array([hdu[3].data for hdu in cutout])
+        weights[np.isinf(weights)] = 0.0
+        psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
+        psfs = scarlet.ImagePSF(np.array(psf_pad))
+        # saturation mask and interpolation mask from HSC S18A
+        sat_mask = np.array([sum(unagi.mask.Mask(
+            hdu[2].data, data_release='s18a').extract(['INTRP', 'SAT'])) for hdu in cutout])
+        data = Data(images=images, weights=weights, masks=sat_mask,
+                    wcs=w, psfs=psfs, channels=channels)
+
+        # Collect free RAM
+        del cutout, psf_list
+        del images, w, weights, psf_pad, psfs
+        gc.collect()
+
+        measurement, morph = _measure_image(data, lsbg_coord, index, bright=bright,
+                                            pixel_scale=pixel_scale,
+                                            zeropoint=27.0, tigress=True,
+                                            show_figure=False, show_figure_statmorph=show_figure_statmorph,
+                                            figure_dir=figure_dir,
+                                            logger=logger)
+
+        if global_logger is not None:
+            global_logger.info(
+                f'Image measurement Task succeeded for `{lsbg["prefix"]}` in `{channels}`.')
+
+        gc.collect()
+
+        return measurement
+
+    except Exception as e:
+        logger.error(e)
+        print(e)
+        if bright:
+            logger.error(
+                f'Vanilla Task failed for BRIGHT galaxy `{lsbg["prefix"]}`')
+        else:
+            logger.error(f'Vanilla Task failed for `{lsbg["prefix"]}`')
+
+        logger.info('\n')
+        if fail_logger is not None:
+            fail_logger.error(
+                f'Vanilla Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+
+        if global_logger is not None:
+            global_logger.error(
+                f'Vanilla Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
+
+        return measurement
