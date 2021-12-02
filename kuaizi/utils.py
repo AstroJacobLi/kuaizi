@@ -396,18 +396,18 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
         gaia_results (`astropy.table.Table` object): a catalog of matched stars.
     """
     # Central coordinate
-    ra_cen, dec_cen = wcs.all_pix2world(image.shape[0] / 2,
-                                        image.shape[1] / 2,
+    ra_cen, dec_cen = wcs.all_pix2world(image.shape[1] / 2,
+                                        image.shape[0] / 2,
                                         0)
     img_cen_ra_dec = SkyCoord(
         ra_cen, dec_cen, unit=('deg', 'deg'), frame='icrs')
 
     # Width and height of the search box
     img_search_x = Quantity(pixel_scale * (image.shape)
-                            [0] * size_buffer, u.arcsec)
-    img_search_y = Quantity(pixel_scale * (image.shape)
                             [1] * size_buffer, u.arcsec)
-
+    img_search_y = Quantity(pixel_scale * (image.shape)
+                            [0] * size_buffer, u.arcsec)
+    
     # Search for stars
     if tap_url is not None:
         with suppress_stdout():
@@ -471,8 +471,8 @@ def image_gaia_stars(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_b=3.5,
                 alpha=0.9,
                 marker='+')
 
-            ax1.set_xlim(0, image.shape[0])
-            ax1.set_ylim(0, image.shape[1])
+            ax1.set_xlim(0, image.shape[1])
+            ax1.set_ylim(0, image.shape[0])
 
         return gaia_results
 
