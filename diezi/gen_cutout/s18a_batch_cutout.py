@@ -89,12 +89,12 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
         print(
             f'    - Generate cutouts for {len(cat)} galaxies in {filt}-band.')
 
-        if njobs <= 1:
-            _ = [cutout_one(butler, skymap, obj, filt, label, psf)
-                 for obj in cat]
-        else:
-            Parallel(n_jobs=njobs)(delayed(cutout_one)(
-                butler, skymap, obj, filt, label, psf) for obj in cat)
+#         if njobs <= 1:
+#             _ = [cutout_one(butler, skymap, obj, filt, label, psf)
+#                  for obj in cat]
+#         else:
+#             Parallel(n_jobs=njobs)(delayed(cutout_one)(
+#                 butler, skymap, obj, filt, label, psf) for obj in cat)
 
     print(f'Elapsed time: {(perf_counter() - t0):.2f} s')
 

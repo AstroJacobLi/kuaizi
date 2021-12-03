@@ -36,6 +36,11 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
     # find existing cutout rgb images
     if not os.path.isdir(WEBPAGE_DIR):
         os.mkdir(WEBPAGE_DIR)
+    else:
+        import glob
+        fileList = glob.glob(WEBPAGE_DIR + '*.html', recursive=True)
+        [os.remove(file) for file in fileList];
+    
     os.chdir(WEBPAGE_DIR)
     # change to relative path, as required by HTML
     FIGURE_DIR = os.path.relpath(FIGURE_DIR)
