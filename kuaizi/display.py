@@ -481,6 +481,36 @@ def display_multiple(data_array, text=None, ax=None, scale_bar=True, **kwargs):
         return axes
 
 
+def display_HSC_cutout_rgb(images, ax=None, half_width=None):
+    import scarlet
+    from scarlet.display import AsinhMapping
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5, 5))
+
+    # Crop
+    if half_width is not None:
+        if half_width * 2 < min(images.shape[1], images.shape[2]):
+            cen = (images.shape[1] // 2, images.shape[2] // 2)
+            images = images[:, cen[0] - half_width:cen[0] +
+                            half_width, cen[1] - half_width:cen[1] + half_width]
+
+    # Norm color
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    _images = images * f_c[:, np.newaxis, np.newaxis]
+
+    # Display
+    norm = AsinhMapping(minimum=-0.15, stretch=1.2, Q=3)
+
+    img_rgb = scarlet.display.img_to_rgb(_images, norm=norm)
+    plt.imshow(img_rgb, origin='lower')
+    ax.axis('off')
+
+    if ax is None:
+        return fig
+    return ax
+
+
 def display_rgb(images,
                 mask=None,
                 ax=None,

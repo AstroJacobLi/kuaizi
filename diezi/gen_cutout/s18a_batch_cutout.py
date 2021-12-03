@@ -24,7 +24,8 @@ PIXEL_SCALE = 0.168  # arcsec / pixel
 def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
                  ra_name='ra', dec_name='dec',
                  name='Seq', prefix='s18a_wide', output='./Cutout',
-                 label='deepCoadd_calexp', root=DATA_ROOT,
+                 catalog_dir='./Catalog', catalog_suffix='',
+                 label='deepCoadd_calexp', root=DATA_ROOT, overwrite=False,
                  njobs=1, psf=True):
     '''
     Generate cutout for objects in a given catalog in multiple bands. 
@@ -65,8 +66,20 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     skymap = butler.get('deepCoadd_skyMap', immediate=True)
     print('\n Number of jobs:', njobs)
 
-    obj_cat = Table.read(obj_cat_dir)
+    obj_cat = Table.read(obj_cat_dir)[100:]
     print('\n Number of galaxies:', len(obj_cat))
+
+    # Adaptive cutout size# Normal objects, use 0.7 arcmin cutout.
+    # Radius > 20 arcsec, use 1.0 arcmin cutout.
+    # Radius > 30 arcsec, use 2.0 arcmin cutout.
+    cutout_size = np.ones(len(obj_cat)) * 0.7 * u.arcmin
+
+    cutout_size[obj_cat['flux_radius_ave_i'] >
+                20] = 1.0 * u.arcmin  # shoud be larger
+    cutout_size[obj_cat['flux_radius_ave_i'] >
+                30] = 1.5 * u.arcmin  # should be larger
+
+    obj_cat['cutout_size'] = cutout_size.value
 
     if label.strip() not in ['deepCoadd', 'deepCoadd_calexp']:
         raise ValueError(
@@ -89,12 +102,12 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
         print(
             f'    - Generate cutouts for {len(cat)} galaxies in {filt}-band.')
 
-#         if njobs <= 1:
-#             _ = [cutout_one(butler, skymap, obj, filt, label, psf)
-#                  for obj in cat]
-#         else:
-#             Parallel(n_jobs=njobs)(delayed(cutout_one)(
-#                 butler, skymap, obj, filt, label, psf) for obj in cat)
+        if njobs <= 1:
+            _ = [cutout_one(butler, skymap, obj, filt, label, psf, overwrite=overwrite)
+                 for obj in cat]
+        else:
+            Parallel(n_jobs=njobs)(delayed(cutout_one)(
+                butler, skymap, obj, filt, label, psf, overwrite=overwrite) for obj in cat)
 
     print(f'Elapsed time: {(perf_counter() - t0):.2f} s')
 
@@ -115,7 +128,8 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     cat['psf_flag'] = psf_flag
 
     cat.write(os.path.join(
-        output, f'{prefix}_cutout_cat.fits'), format='fits', overwrite=True)
+        catalog_dir, f'{prefix}_cutout_cat_{catalog_suffix}.fits'),
+        format='fits', overwrite=True)
 
 
 if __name__ == '__main__':

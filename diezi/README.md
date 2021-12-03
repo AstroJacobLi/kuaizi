@@ -18,10 +18,16 @@ Cutouts (and corresponding PSFs) with size of 0.6 arcmin in 5 bands takes 11 Mb.
 
 After pickling, one galaxy in 5 bands takes 7.1 Mb. 
 
-Thumb of rule: test the script/notebook on `tiger`, run the whole sample on `/tiger/scratch/gpfs/jiaxuanl`, only copy the figures to `/tigress/jiaxuanl/public_html` for displaying. 
+Thumb of rule: test the script/notebook on `tiger`, run the whole sample on `/scratch/gpfs/jiaxuanl/Data/HSC/LSBG`, only copy the figures to `/tigress/jiaxuanl/public_html` for displaying. 
 
 Once we have a final sample, we will move catalogs, modeling outputs to `tigressdata` for storage.
 
+
+### Sample selection
+The sample selection is largely done on my own MacBook: https://github.com/AstroJacobLi/HSC_LSBG/tree/master/sample
+
+#### Milky-Way like hosts
+See https://github.com/AstroJacobLi/HSC_LSBG/blob/master/sample/MW-like/README.md.
 
 ### Work flow
 

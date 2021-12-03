@@ -39,8 +39,8 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
     else:
         import glob
         fileList = glob.glob(WEBPAGE_DIR + '*.html', recursive=True)
-        [os.remove(file) for file in fileList];
-    
+        [os.remove(file) for file in fileList]
+
     os.chdir(WEBPAGE_DIR)
     # change to relative path, as required by HTML
     FIGURE_DIR = os.path.relpath(FIGURE_DIR)
@@ -112,6 +112,10 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
                 page = int(np.ceil((ind + 1) / 10))
                 f.write(
                     f'<figcaption><a class="clickable" target="_blank" href="{SCARLET_DIR}/page{page}.html#{sample_name}{index_list[ind]}">{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
+            else:
+                f.write(
+                    f'<figcaption>{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
+
             if (i + 1) % col_num == 0:
                 f.write('</div> \n\n')
 

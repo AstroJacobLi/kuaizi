@@ -373,7 +373,7 @@ def generate_cutout(butler, skymap, ra, dec, band='i', label='deepCoadd_skyMap',
     return afwImage.ExposureF(stamp, stamp_wcs)
 
 
-def cutout_one(butler, skymap, obj, band, label, psf):
+def cutout_one(butler, skymap, obj, band, label, psf, overwrite=False):
     """Generate cutout for a single object."""
     prefix, ra, dec, radius = obj['prefix'], obj['ra'], obj['dec'], obj['radius']
     prefix = '_'.join([prefix, band.lower().strip()])
@@ -382,28 +382,27 @@ def cutout_one(butler, skymap, obj, band, label, psf):
     if not os.path.isdir(os.path.split(prefix)[0]):
         os.makedirs(os.path.split(prefix)[0], exist_ok=True)
 
-    try:
-        cutout = generate_cutout(
-            butler, skymap, ra, dec, band=band, label=label, radius=radius, psf=psf)
-        
-        if psf:  # whether download PSF
-            img, psf = cutout
-            if isinstance(psf, type(None)):  # cannot compute PSF here
-                print(f'    - Cannot compute PSF for {prefix}')
+    if overwrite or not os.path.exists(prefix + '.fits'):
+        try:
+            cutout = generate_cutout(
+                butler, skymap, ra, dec, band=band, label=label, radius=radius, psf=psf)
+
+            if psf:  # whether download PSF
+                img, psf = cutout
+                if isinstance(psf, type(None)):  # cannot compute PSF here
+                    print(f'    - Cannot compute PSF for {prefix}')
+                else:
+                    psf.writeFits("{:s}_psf.fits".format(prefix))
+
+                if isinstance(img, type(None)):  # cannot compute PSF here
+                    print(f'    - Cannot get cutout for {prefix}')
+                else:
+                    img.writeFits("{:s}.fits".format(prefix))
             else:
-                psf.writeFits("{:s}_psf.fits".format(prefix))
+                cutout.writeFits("{:s}.fits".format(prefix))
 
-            if isinstance(img, type(None)):  # cannot compute PSF here
-                print(f'    - Cannot get cutout for {prefix}')
-            else:
-                img.writeFits("{:s}.fits".format(prefix))
-        else:
-            cutout.writeFits("{:s}.fits".format(prefix))
-
-    except Exception as e:
-        print(f'    - Cannot generate cutout for {prefix}')
-        print(e)
-
-    
-
-    
+        except Exception as e:
+            print(f'    - Cannot generate cutout for {prefix}')
+            print(e)
+    else:
+        print('File exists: {:s}'.format(prefix))
