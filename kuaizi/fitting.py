@@ -6,6 +6,7 @@ import pickle
 import dill
 import time
 import copy
+import traceback
 
 import sep
 import numpy as np
@@ -2411,20 +2412,20 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
 
-    fig = kz.display.display_scarlet_sources(
-        data,
-        sources,
-        show_ind=None,
-        stretch=1,
-        Q=1,
-        minimum=-0.3,
-        show_mark=True,
-        scale_bar_length=10,
-        add_text=f'{prefix}-{index}')
-    plt.savefig(
-        os.path.join(figure_dir, f'{prefix}-{index}-src-wavelet.png'), dpi=70, bbox_inches='tight')
-    if not show_figure:
-        plt.close()
+    # fig = kz.display.display_scarlet_sources(
+    #     data,
+    #     sources,
+    #     show_ind=None,
+    #     stretch=1,
+    #     Q=1,
+    #     minimum=-0.3,
+    #     show_mark=True,
+    #     scale_bar_length=10,
+    #     add_text=f'{prefix}-{index}')
+    # plt.savefig(
+    #     os.path.join(figure_dir, f'{prefix}-{index}-src-wavelet.png'), dpi=70, bbox_inches='tight')
+    # if not show_figure:
+    #     plt.close()
 
     # Star fitting!
     start = time.time()
@@ -3033,7 +3034,7 @@ def fitting_wavelet_mockgal(index=0, starlet_thresh=0.5, prefix='MockLSBG', pixe
 
 
 def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.5, bright=False,
-                     prefix='mockgal', index=0, model_dir='./Model', figure_dir='./Figure',
+                     prefix='mockgal', index=0, model_dir='./Model', figure_dir='./Figure', log_dir='./log',
                      show_figure=True, tigress=False, logger=None):
     '''
     This is a Python inner function for fitting galaxy using Extended (monotonic) model, and apply a mask after fitting.
@@ -3064,8 +3065,8 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     if logger is None:
         from .utils import set_logger
-        logger = set_logger(__name__, f'{prefix}-{index}.log')
-
+        logger = set_logger(__name__, os.path.join(
+            log_dir, f'{prefix}-{index}.log'))
     lsbg_coord = coord
 
     # 2 whitespaces before "-", i.e., 4 whitespaces before word
@@ -3121,7 +3122,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     if max(data.images.shape) * pixel_scale > 200:
         first_dblend_cont = 0.07
     else:
-        first_dblend_cont = 0.02
+        first_dblend_cont = 0.006
     obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
         [data],
         lvl=4,  # a.k.a., "sigma"
@@ -3181,7 +3182,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
                                    (cen_obj['ra'], cen_obj['dec']),
                                    observation,
                                    thresh=0.01,
-                                   min_grad=-0.05,  # the initial guess of box size is as large as possible
+                                   min_grad=-0.01,  # the initial guess of box size is as large as possible
                                    starlet_thresh=5e-3)
     # If the initial guess of the box is way too large (but not bright galaxy), set min_grad = 0.1.
     # The box is way too large
@@ -3199,7 +3200,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         smaller_box = True
     elif starlet_source.bbox.shape[1] > 0.6 * data.images[0].shape[0] and (~bright):
         # If box is large and gal is not bright
-        min_grad = 0.01
+        min_grad = 0.02
         smaller_box = True
     else:
         smaller_box = False
@@ -3216,10 +3217,10 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         starlet_source.bbox)  # [x1, x2, y1, y2]
 
     # extra padding, to enlarge the box
-    starlet_extent[0] -= 5
-    starlet_extent[2] -= 5
-    starlet_extent[1] += 5
-    starlet_extent[3] += 5
+    starlet_extent[0] -= 10
+    starlet_extent[2] -= 10
+    starlet_extent[1] += 10
+    starlet_extent[3] += 10
 
     if show_figure:
         # Show the Starlet initial box
@@ -3269,9 +3270,9 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # This step masks out high frequency sources by doing wavelet transformation
     obj_cat, segmap_highfreq, bg_rms = kz.detection.makeCatalog([data],
                                                                 mask=msk_star,
-                                                                lvl=3.,  # 2.5
+                                                                lvl=2.5,  # 2.5
                                                                 method='wavelet',
-                                                                high_freq_lvl=1,  # 3
+                                                                high_freq_lvl=2,  # 3
                                                                 wavelet_lvl=4,
                                                                 match_gaia=False,
                                                                 show_fig=show_figure,
@@ -3327,7 +3328,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     # This step masks out bright and large contamination, which is not well-masked in previous step
     obj_cat, segmap_big, bg_rms = kz.detection.makeCatalog(
         [data],
-        lvl=4.5,  # relative agressive threshold
+        lvl=4.,  # relative agressive threshold
         method='vanilla',
         match_gaia=False,
         show_fig=show_figure,
@@ -3336,7 +3337,7 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         f=3,
         pixel_scale=pixel_scale,
         minarea=20,   # only want large things
-        deblend_nthresh=30,
+        deblend_nthresh=36,
         deblend_cont=0.01,
         sky_subtract=True,
         logger=logger)
@@ -3578,65 +3579,14 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
     ################# Fitting ##################
     ############################################
     try:
-        if bright:
-            e_rel_list = [5e-4, 1e-5]  # otherwise it will take forever....
-            n_iter = 100
-        else:
-            e_rel_list = [5e-4, 1e-5, 5e-5, 1e-6]
-            n_iter = 150
-
-        blend.fit(n_iter, 1e-4)
-
+        [blend, best_logL, best_erel, best_epoch] = _optimization(
+            blend, bright=bright, logger=logger)
         with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-vanilla.df'), 'wb') as fp:
-            dill.dump([blend, {'starlet_thresh': starlet_thresh,
-                               'e_rel': 1e-4, 'loss': blend.loss[-1]}, None], fp)
+            dill.dump(
+                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': best_erel,
+                         'loss': best_logL}, None], fp)
             fp.close()
-        last_loss = blend.loss[-1]
-        logger.info(
-            f'    Optimizaiton: Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
-        print(
-            f'    Optimizaiton: Succeed for e_rel = 1e-04 with {len(blend.loss)} iterations! Try higher accuracy!')
 
-        for i, e_rel in enumerate(e_rel_list):
-            blend.fit(150, e_rel)
-            if len(blend.loss) > 50:  # must have more than 50 iterations
-                recent_loss = np.mean(blend.loss[-10:])
-                min_loss = np.min(blend.loss[:-10])
-                if recent_loss < min_loss:
-                    logger.info(
-                        f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-                    print(
-                        f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
-                    with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-vanilla.df'), 'wb') as fp:
-                        dill.dump(
-                            [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1]}, None], fp)
-                        fp.close()
-                elif abs((recent_loss - min_loss) / min_loss) < 0.02:
-                    if recent_loss < last_loss:  # better than the saved model
-                        logger.info(
-                            f'    Optimizaiton: I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                        print(
-                            f'    Optimizaiton: I am okay with relative loss difference = {abs((recent_loss - min_loss) / min_loss)}. Fitting stopped.')
-                        with open(os.path.join(model_dir, f'{prefix}-{index}-trained-model-vanilla.df'), 'wb') as fp:
-                            dill.dump(
-                                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1]}, None], fp)
-                            fp.close()
-                        break
-                else:
-                    logger.info(
-                        f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
-                    print(
-                        f'  ! Optimizaiton: Cannot achieve a global optimization with e_rel = {e_rel}.')
-            else:
-                continue
-        if len(blend.loss) < 50:
-            logger.warning(
-                '  ! Might be poor fitting! Iterations less than 50.')
-            print('  ! Might be poor fitting! Iterations less than 50.')
-        logger.info("  - After {1} iterations, logL = {2:.2f}".format(
-            e_rel, len(blend.loss), -blend.loss[-1]))
-        print("  - After {1} iterations, logL = {2:.2f}".format(
-            e_rel, len(blend.loss), -blend.loss[-1]))
         end = time.time()
         logger.info(f'    Elapsed time for fitting: {(end - start):.2f} s')
         print(f'    Elapsed time for fitting: {(end - start):.2f} s')
@@ -3782,7 +3732,8 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         print(f'  - Saving the results as {os.path.abspath(outdir)}')
         with open(os.path.abspath(outdir), 'wb') as fp:
             dill.dump(
-                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': e_rel, 'loss': blend.loss[-1], 'sed_ind': sed_ind}, footprint], fp)
+                [blend, {'starlet_thresh': starlet_thresh, 'e_rel': best_erel, 'epoch': best_epoch,
+                         'loss': best_logL, 'sed_ind': sed_ind}, footprint], fp)
             fp.close()
 
         # Save fitting figure
@@ -3816,13 +3767,13 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
         return blend
     except Exception as e:
         raise ScarletFittingError(
-            prefix, index, starlet_thresh, data.channels, e)
+            prefix, index, starlet_thresh, data.channels, traceback.print_exc())
 
 
-def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
+def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
                                 starlet_thresh=0.5, pixel_scale=HSC_pixel_scale, bright_thresh=17.0,
-                                prefix='candy', model_dir='./Model', figure_dir='./Figure', show_figure=False,
-                                logger=None, global_logger=None, fail_logger=None):
+                                prefix='candy', model_dir='./Model', figure_dir='./Figure', log_dir='./log',
+                                show_figure=False, logger=None, global_logger=None, fail_logger=None):
     '''
     Run scarlet wavelet modeling on Tiger, modified on 09/13/2021. 
 
@@ -3865,7 +3816,7 @@ def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
     if logger is None:
         from .utils import set_logger
         logger = set_logger(__name__, os.path.join(
-            model_dir, f'{prefix}-{index}.log'), level='info')
+            log_dir, f'{prefix}-{index}.log'), level='info')
 
     logger.info(f'Running scarlet vanilla modeling for `{lsbg["prefix"]}`')
     print(f'### Running scarlet vanilla modeling for `{lsbg["prefix"]}`')
@@ -3956,8 +3907,8 @@ def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
         return blend
 
     except Exception as e:
-        logger.error(e)
-        print(e)
+        logger.error(traceback.print_exc())
+        print(traceback.print_exc())
         if bright:
             logger.error(
                 f'Vanilla Task failed for BRIGHT galaxy `{lsbg["prefix"]}`')
@@ -3974,3 +3925,47 @@ def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
                 f'Vanilla Task failed for `{lsbg["prefix"]}` in `{channels}` with `starlet_thresh = {starlet_thresh}`')
 
         return
+
+
+def _optimization(blend, bright=False, logger=None):
+    if bright:
+        e_rel_list = [1e-4, 5e-4, 1e-5]  # otherwise it will take forever....
+        n_iter = 100
+    else:
+        e_rel_list = [1e-4, 5e-4]  # , 5e-5, 1e-5
+        n_iter = 100
+
+    blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
+
+    best_model = blend
+    best_logL = -blend.loss[-1]
+    best_erel = 1e-3
+    best_epoch = 1
+
+    for i, e_rel in enumerate(e_rel_list):
+        for k in range(n_iter // 10):
+            blend.fit(10, e_rel)
+            if -blend.loss[-1] > best_logL:
+                best_model = copy.deepcopy(blend)
+                best_logL = -blend.loss[-1]
+                best_erel = e_rel
+                best_epoch = len(blend.loss)
+
+        logger.info(
+            f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
+        print(
+            f'    Optimizaiton: Succeed for e_rel = {e_rel} with {len(blend.loss)} iterations! Try higher accuracy!')
+
+        if len(blend.loss) <= 50:  # must have more than 50 iterations
+            continue
+
+    if len(blend.loss) < 50:
+        logger.warning(
+            '  ! Might be poor fitting! Iterations less than 50.')
+        print('  ! Might be poor fitting! Iterations less than 50.')
+    logger.info(
+        "  - After {0} iterations, logL = {1:.2f}".format(best_epoch, best_logL))
+    print(
+        "  - After {0} iterations, logL = {1:.2f}".format(best_epoch, best_logL))
+
+    return [best_model, best_logL, best_erel, best_epoch]

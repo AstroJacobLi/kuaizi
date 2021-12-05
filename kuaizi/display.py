@@ -561,6 +561,7 @@ def display_rgb(images,
         ax: If the input ``ax`` is not ``None``.
 
     """
+    import scarlet
     from scarlet.display import img_to_rgb, AsinhMapping
 
     if ax is None:
@@ -569,8 +570,11 @@ def display_rgb(images,
     else:
         ax1 = ax
 
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(images)) * f_c
+
     img_rgb = img_to_rgb(images, norm=AsinhMapping(
-        minimum=minimum, stretch=stretch, Q=Q))
+        minimum=minimum, stretch=stretch, Q=Q), channel_map=channel_map)
 
     show = ax1.imshow(img_rgb, origin='lower')
 
@@ -809,8 +813,11 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
     weights = data.weights
     mask = (np.sum(data.weights == 0, axis=0) != 0)
     # Display
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(images)) * f_c
     norm = AsinhMapping(minimum=-0.2, stretch=stretch, Q=Q)
-    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+    img_rgb = scarlet.display.img_to_rgb(
+        images, norm=norm, channel_map=channel_map)
     plt.imshow(img_rgb)
 
     if show_mask:
@@ -980,10 +987,14 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
     residual = images - model_
 
     # Create RGB images
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(channels)) * f_c
+
     norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
-    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
-    channel_map = scarlet.display.channels_to_rgb(len(channels))
-    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    img_rgb = scarlet.display.img_to_rgb(
+        images, norm=norm, channel_map=channel_map)
+    model_rgb = scarlet.display.img_to_rgb(
+        model_, norm=norm, channel_map=channel_map)
     norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
@@ -1234,10 +1245,16 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     residual = images - model_
 
     # Create RGB images
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(channels)) * f_c
     norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
-    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
+
+    img_rgb = scarlet.display.img_to_rgb(
+        images, norm=norm, channel_map=channel_map)
     channel_map = scarlet.display.channels_to_rgb(len(channels))
-    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    model_rgb = scarlet.display.img_to_rgb(
+        model_, norm=norm, channel_map=channel_map)
+
     norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
@@ -1320,8 +1337,13 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     residual = images - model_
 
     # Create RGB images
-    img_rgb = scarlet.display.img_to_rgb(images, norm=norm)
-    model_rgb = scarlet.display.img_to_rgb(model_, norm=norm)
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(channels)) * f_c
+
+    img_rgb = scarlet.display.img_to_rgb(
+        images, norm=norm, channel_map=channel_map)
+    model_rgb = scarlet.display.img_to_rgb(
+        model_, norm=norm, channel_map=channel_map)
     norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
