@@ -16,6 +16,8 @@ import astropy.units as u
 from astropy.io import fits
 import astropy.wcs as wcs
 
+import statmorph
+
 #############################################
 # Use Statmorph to measure galaxy morphology#
 #############################################
@@ -389,7 +391,7 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, sigma=1,
+def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, sigma=2,
                     zeropoint=27.0, pixel_scale=0.168,
                     out_prefix=None, show_fig=True, **kwargs):
     """
@@ -408,52 +410,6 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     Returns:
         measure_dict (dict): a dictionary containing all measurements
     """
-
-    """
-    # 调用statmorph，除了flux/mag/SB之外，其他的所有信息，所有band都一样
-    # max_pix_postion的时候，是不是先smooth一下？
-    import statmorph
-
-    min_cutout_size = max([comp.bbox.shape[1] for comp in components])
-
-    blend = scarlet.Blend(components, observation)
-    models = blend.get_model()
-    weights = observation.weights
-    psfs = observation.psf.get_model()
-    if aggr_mask is None:
-        mask = (weights.sum(axis=0) == 0)
-    else:
-        mask = aggr_mask | (weights.sum(axis=0) == 0)
-
-    # Flux and magnitude in each band
-    measure_dict = {}
-    measure_dict['flux'] = flux(components, observation)
-    SED = (measure_dict['flux'] / measure_dict['flux'][0]) # normalized against g-band
-    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
-
-    # We take the model and weight map in g-band. Such that we can use the SED to get
-    # surface brightness in other bands.
-    # A sky background is estimated on the original image,
-    # and we run `sep` to generate a 1-sigma segmentation map.
-    # Then we run `statmorph` using that segmap
-
-    filt = 0
-    img = models[filt]
-    bkg = sep.Background(observation.data[filt], bh=32, bw=32, mask=mask)
-    _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms,
-                            deblend_cont=1,
-                            mask=mask, segmentation_map=True)
-
-    # Only select relevant detections. 
-    cen_ind = [segmap[int(comp.center[0]), int(comp.center[1])] for comp in components]
-    segmap[~np.add.reduce([segmap == ind for ind in cen_ind]).astype(bool)] = 0
-    segmap = (segmap > 0)
-    segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
-    
-    img[~segmap] = np.nan
-    """
-    import statmorph
-
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
     # Multi-components enabled
     _blend = scarlet.Blend(components, observation)
@@ -462,6 +418,9 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     upper_right = np.max([np.array(comp.bbox.origin) +
                          np.array(comp.bbox.shape) for comp in components], axis=0)
     bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
+    bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
+    bbox.shape = tuple(int(i * 1.5) for i in bbox.shape)
+    bbox.origin = tuple(bbox.center[i] - bbox.shape[i] // 2 for i in range(3))
 
     models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
@@ -501,9 +460,11 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
 
     filt = 0
     img = models[filt]
+    data_avg = np.average(data, weights=np.sqrt(
+        weights.sum(axis=(1, 2))), axis=0)
 
     if makesegmap:
-        bkg = sep.Background(data[filt], bh=12, bw=12, mask=mask)
+        bkg = sep.Background(data_avg, bh=12, bw=12, mask=mask)
         _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms, minarea=1,
                                 deblend_cont=1,
                                 mask=mask, segmentation_map=True)
@@ -523,7 +484,7 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
         n_sigma_outlier=15, min_cutout_size=min_cutout_size, cutout_extent=2,
-        mask=mask, psf=None)  # psfs[filt]
+        mask=mask, psf=psfs[filt])
     morph = source_morphs[0]
 
     measure_dict['xc_centroid'] = morph.xc_centroid
@@ -560,6 +521,8 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     measure_dict['sn_per_pixel'] = morph.sn_per_pixel
     measure_dict['C'] = morph.concentration
     measure_dict['A'] = morph.asymmetry
+    measure_dict['A_outer'] = morph.outer_asymmetry
+    measure_dict['A_shape'] = morph.shape_asymmetry
     measure_dict['S'] = morph.smoothness
     measure_dict['sersic_amplitude'] = morph.sersic_amplitude
     measure_dict['sersic_rhalf'] = morph.sersic_rhalf

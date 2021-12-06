@@ -12,4 +12,4 @@ module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python3 vanilla_multiprocess.py --njobs 40 --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' --low 4000 --high 5476 --suffix "" --starlet_thresh 0.5
+python3 vanilla_multiprocess.py --njobs 40 --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' --low 4000 --high 5576 --suffix "" --starlet_thresh 0.5
