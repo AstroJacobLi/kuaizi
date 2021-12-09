@@ -65,9 +65,9 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
     lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
 
     if not os.path.isdir('./Images'):
-        os.mkdir('./Images')
+        os.makedirs('./Images')
     if not os.path.isdir('./PSFs'):
-        os.mkdir('./PSFs')
+        os.makedirs('./PSFs')
 
     size_ang = cutout_halfsize * u.arcmin
     channels = 'griz'
@@ -273,7 +273,7 @@ def _fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
-        os.mkdir('./Figures/')
+        os.makedirs('./Figures/')
     fig = kz.display.display_scarlet_sources(
         data,
         sources,
@@ -358,9 +358,9 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
     lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
 
     if not os.path.isdir('./Images'):
-        os.mkdir('./Images')
+        os.makedirs('./Images')
     if not os.path.isdir('./PSFs'):
-        os.mkdir('./PSFs')
+        os.makedirs('./PSFs')
 
     size_ang = cutout_halfsize * u.arcmin
     channels = 'griz'
@@ -617,7 +617,7 @@ def fitting_less_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_aw
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
-        os.mkdir('./Figures/')
+        os.makedirs('./Figures/')
     fig = kz.display.display_scarlet_sources(
         data,
         sources,
@@ -768,9 +768,9 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
     lsbg_coord = SkyCoord(ra=lsbg['RAJ2000'], dec=lsbg['DEJ2000'], unit='deg')
 
     if not os.path.isdir('./Images'):
-        os.mkdir('./Images')
+        os.makedirs('./Images')
     if not os.path.isdir('./PSFs'):
-        os.mkdir('./PSFs')
+        os.makedirs('./PSFs')
 
     size_ang = cutout_halfsize * u.arcmin
     channels = 'griz'
@@ -1026,7 +1026,7 @@ def fitting_single_comp(lsbg, hsc_dr, cutout_halfsize=1.0, prefix='LSBG', large_
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
-        os.mkdir('./Figures/')
+        os.makedirs('./Figures/')
     fig = kz.display.display_scarlet_sources(
         data,
         sources,
@@ -1378,7 +1378,7 @@ def fitting_single_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
-        os.mkdir('./Figures/')
+        os.makedirs('./Figures/')
     fig = kz.display.display_scarlet_sources(
         data,
         sources,
@@ -1722,7 +1722,7 @@ def fitting_less_comp_mockgal(index=0, prefix='MockLSBG', large_away_factor=3.0,
 
     # Visualize our data and mask and source
     if not os.path.isdir('./Figures'):
-        os.mkdir('./Figures/')
+        os.makedirs('./Figures/')
     fig = kz.display.display_scarlet_sources(
         data,
         sources,
@@ -2408,9 +2408,9 @@ def _fitting_wavelet(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     # Visualize our data and mask and source
     if not os.path.isdir(figure_dir):
-        os.mkdir(figure_dir)
+        os.makedirs(figure_dir)
     if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
+        os.makedirs(model_dir)
 
     # fig = kz.display.display_scarlet_sources(
     #     data,
@@ -2796,9 +2796,9 @@ def fitting_wavelet_observation(lsbg, hsc_dr, cutout_halfsize=1.0, starlet_thres
     psf_dir = './PSFs/'
 
     if not os.path.isdir(img_dir):
-        os.mkdir(img_dir)
+        os.makedirs(img_dir)
     if not os.path.isdir(psf_dir):
-        os.mkdir(psf_dir)
+        os.makedirs(psf_dir)
 
     size_ang = cutout_halfsize * u.arcmin
     channels = 'griz'
@@ -2885,7 +2885,7 @@ def fitting_wavelet_obs_tigress(env_dict, lsbg, name='Seq', channels='grizy',
     bright = (lsbg['mag_auto_i'] < bright_thresh)
 
     if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
+        os.makedirs(model_dir)
 
     if logger is None:
         from .utils import set_logger
@@ -3539,9 +3539,9 @@ def _fitting_vanilla(data, coord, pixel_scale=HSC_pixel_scale, starlet_thresh=0.
 
     # Visualize our data and mask and source
     if not os.path.isdir(figure_dir):
-        os.mkdir(figure_dir)
+        os.makedirs(figure_dir)
     if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
+        os.makedirs(model_dir)
 
     fig = kz.display.display_scarlet_sources(
         data,
@@ -3810,8 +3810,12 @@ def fitting_vanilla_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
     # whether this galaxy is a very bright one
     bright = (lsbg['mag_auto_i'] < bright_thresh)
 
-    if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
+    # if not os.path.isdir(model_dir):
+    #     os.makedirs(model_dir)
+    # if not os.path.isdir(log_dir):
+    #     os.makedirs(log_dir)
+    # if not os.path.isdir(figure_dir):
+    #     os.makedirs(figure_dir)
 
     if logger is None:
         from .utils import set_logger

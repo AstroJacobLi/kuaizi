@@ -35,7 +35,7 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
     '''
     # find existing cutout rgb images
     if not os.path.isdir(WEBPAGE_DIR):
-        os.mkdir(WEBPAGE_DIR)
+        os.makedirs(WEBPAGE_DIR)
     else:
         import glob
         fileList = glob.glob(WEBPAGE_DIR + '*.html', recursive=True)
