@@ -15,6 +15,7 @@ from astropy.convolution import convolve, Gaussian2DKernel
 import astropy.units as u
 from astropy.io import fits
 import astropy.wcs as wcs
+from astropy.table import Table, Column
 
 import statmorph
 
@@ -22,8 +23,8 @@ import statmorph
 # Use Statmorph to measure galaxy morphology#
 #############################################
 
-# Measurements should be done before convolving any
-# real PSF! So, don't render the scene!
+# Measurements should be done after convolving with PSF!
+# Such that we can compare with observation.
 
 
 def max_pixel(component):
@@ -135,26 +136,6 @@ def winpos(components, observation=None):
             y_.append(ywin)
 
     return np.array(y_), np.array(x_)
-
-
-'''
-def cen_peak(component):
-    """Determine position of the pixel with maximum intensity of a model
-
-    TODO: expand to multiple components
-
-    Parameters
-    ----------
-    component: `scarlet.Component` or `scarlet.ComponentTree`
-        Component to analyze
-    """
-    model = component.get_model()
-    peak_set = []
-    for i in range(len(model)):
-        peak_set.append(np.mean(np.where(model[i] == np.max(model[i])), axis=1))
-    peak_set = np.array(peak_set)
-    return peak_set + component.bbox.origin[1:]
-'''
 
 
 def flux_radius(components, observation=None, frac=0.5, weight_order=0):
@@ -503,9 +484,12 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     measure_dict['rpetro_ellip'] = morph.rpetro_ellip
     measure_dict['rhalf_circ'] = morph.rhalf_circ
     measure_dict['rhalf_ellip'] = morph.rhalf_ellip
-    measure_dict['r20'] = morph.r20
-    measure_dict['r50'] = morph.r50
-    measure_dict['r80'] = morph.r80
+    measure_dict['rhalf_circularized'] = morph.rhalf_ellip / \
+        np.sqrt(
+            morph.elongation_asymmetry)  # circularized effective radius, consistent with Greco+18.
+    measure_dict['r20'] = morph.r20  # circular
+    measure_dict['r50'] = morph.r50  # circular
+    measure_dict['r80'] = morph.r80  # circular
     measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (
         pixel_scale**2)) + zeropoint   # in mag per arcsec2
     measure_dict['SB_0_ellip'] = -2.5 * np.log10(
@@ -514,6 +498,8 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
         morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['SB_eff_ellip'] = -2.5 * np.log10(
         morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_avg'] = -2.5 * np.log10(
+        morph.SB_eff_avg * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['Gini'] = morph.gini
     measure_dict['M20'] = morph.m20
     measure_dict['F(G, M20)'] = morph.gini_m20_bulge
@@ -566,6 +552,7 @@ def _write_to_row(row, measurement):
     row['SB_0'] = measurement['SB_0_circ']
     row['SB_eff_circ'] = measurement['SB_eff_circ']
     row['SB_eff_ellip'] = measurement['SB_eff_ellip']
+    row['SB_eff_avg'] = measurement['SB_eff_avg']
 
     row['xc_cen'] = measurement['xc_centroid']
     row['yc_cen'] = measurement['yc_centroid']
@@ -578,6 +565,7 @@ def _write_to_row(row, measurement):
 
     row['rhalf_circ'] = measurement['rhalf_circ']
     row['rhalf_ellip'] = measurement['rhalf_ellip']
+    row['rhalf_circularized'] = measurement['rhalf_circularized']
     row['r20'] = measurement['r20']
     row['r50'] = measurement['r50']
     row['r80'] = measurement['r80']
@@ -602,6 +590,57 @@ def _write_to_row(row, measurement):
     row['flag_sersic'] = measurement['flag_sersic']
 
     return row
+
+
+def initialize_meas_cat(lsbg_cat):
+    length = len(lsbg_cat)
+    bands = 4
+
+    meas_cat = Table([
+        Column(name='ID', length=length, dtype=int),
+        Column(name='flux', length=length, shape=(bands,)),
+        Column(name='mag', length=length, shape=(bands,)),
+        Column(name='SB_0', length=length, shape=(bands,)),
+        Column(name='SB_eff_circ', length=length, shape=(bands,)),
+        Column(name='SB_eff_ellip', length=length, shape=(bands,)),
+        Column(name='SB_eff_avg', length=length, shape=(bands,)),
+        Column(name='xc_cen', length=length),
+        Column(name='yc_cen', length=length),
+        Column(name='xc_sym', length=length),
+        Column(name='yc_sym', length=length),
+        Column(name='ell_cen', length=length),
+        Column(name='ell_sym', length=length),
+        Column(name='PA_cen', length=length),
+        Column(name='PA_sym', length=length),
+        Column(name='rhalf_circ', length=length),
+        Column(name='rhalf_ellip', length=length),
+        Column(name='rhalf_circularized', length=length),
+        Column(name='r20', length=length),
+        Column(name='r50', length=length),
+        Column(name='r80', length=length),
+        Column(name='Gini', length=length),
+        Column(name='M20', length=length),
+        Column(name='F(G,M20)', length=length),
+        Column(name='S(G,M20)', length=length),
+        Column(name='C', length=length),
+        Column(name='A', length=length),
+        Column(name='A_outer', length=length),
+        Column(name='A_shape', length=length),
+        Column(name='S', length=length),
+        Column(name='sersic_n', length=length),
+        Column(name='sersic_rhalf', length=length),
+        Column(name='sersic_ell', length=length),
+        Column(name='sersic_PA', length=length),
+        Column(name='sersic_xc', length=length),
+        Column(name='sersic_yc', length=length),
+        Column(name='sersic_amp', length=length),
+        Column(name='flag', length=length, dtype=bool),
+        Column(name='flag_sersic', length=length, dtype=bool),
+    ])
+    for col in meas_cat.columns:
+        meas_cat[col] = np.nan * meas_cat[col]
+
+    return meas_cat
 
 
 def Sersic_fitting(components, observation=None, file_dir='./Models/', prefix='LSBG', index=0,

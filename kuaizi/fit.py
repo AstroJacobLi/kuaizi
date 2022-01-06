@@ -125,6 +125,13 @@ class ScarletFitter(object):
         self.figure_dir = kwargs.get('figure_dir', './Figure')
         self.model_dir = kwargs.get('model_dir', './Model')
 
+        if not os.path.isdir(self.log_dir):
+            os.makedirs(self.log_dir)
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+        if not os.path.isdir(self.model_dir):
+            os.makedirs(self.model_dir)
+
         self.prefix = kwargs.get('prefix', 'test')
         self.index = kwargs.get('index', 0)
         self.pixel_scale = kwargs.get('pixel_scale', HSC_pixel_scale)
