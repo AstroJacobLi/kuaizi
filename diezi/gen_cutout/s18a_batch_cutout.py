@@ -60,6 +60,11 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     kz.utils.set_env(project='HSC', name='LSBG',
                      data_dir=data_dir)
 
+    if not os.path.isdir(output):
+        os.makedirs(output)
+    if not os.path.isdir(catalog_dir):
+        os.makedirs(catalog_dir)
+
     t0 = perf_counter()
 
     butler = dafPersist.Butler(root)
