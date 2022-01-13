@@ -11,59 +11,10 @@ from functools import partial
 from astropy.table import Table, Column
 
 import dill
-from kuaizi.measure import _write_to_row, makeMeasurement
+from kuaizi.measure import _write_to_row, makeMeasurement, initialize_meas_cat
 
 kz.utils.set_env(project='HSC', name='LSBG',
                  data_dir='/scratch/gpfs/jiaxuanl/Data')
-
-
-def initialize_meas_cat(lsbg_cat):
-    length = len(lsbg_cat)
-    bands = 4
-
-    meas_cat = Table([
-        Column(name='ID', length=length, dtype=int),
-        Column(name='flux', length=length, shape=(bands,)),
-        Column(name='mag', length=length, shape=(bands,)),
-        Column(name='SB_0', length=length, shape=(bands,)),
-        Column(name='SB_eff_circ', length=length, shape=(bands,)),
-        Column(name='SB_eff_ellip', length=length, shape=(bands,)),
-        Column(name='xc_cen', length=length),
-        Column(name='yc_cen', length=length),
-        Column(name='xc_sym', length=length),
-        Column(name='yc_sym', length=length),
-        Column(name='ell_cen', length=length),
-        Column(name='ell_sym', length=length),
-        Column(name='PA_cen', length=length),
-        Column(name='PA_sym', length=length),
-        Column(name='rhalf_circ', length=length),
-        Column(name='rhalf_ellip', length=length),
-        Column(name='r20', length=length),
-        Column(name='r50', length=length),
-        Column(name='r80', length=length),
-        Column(name='Gini', length=length),
-        Column(name='M20', length=length),
-        Column(name='F(G,M20)', length=length),
-        Column(name='S(G,M20)', length=length),
-        Column(name='C', length=length),
-        Column(name='A', length=length),
-        Column(name='A_outer', length=length),
-        Column(name='A_shape', length=length),
-        Column(name='S', length=length),
-        Column(name='sersic_n', length=length),
-        Column(name='sersic_rhalf', length=length),
-        Column(name='sersic_ell', length=length),
-        Column(name='sersic_PA', length=length),
-        Column(name='sersic_xc', length=length),
-        Column(name='sersic_yc', length=length),
-        Column(name='sersic_amp', length=length),
-        Column(name='flag', length=length, dtype=bool),
-        Column(name='flag_sersic', length=length, dtype=bool),
-    ])
-    for col in meas_cat.columns:
-        meas_cat[col] = np.nan * meas_cat[col]
-
-    return meas_cat
 
 
 def measure_vanilla(index, cat, meas_cat, model_dir='/tigress/jiaxuanl/Data/HSC/LSBG/Model/COSMOS', 
