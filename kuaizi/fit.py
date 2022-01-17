@@ -52,8 +52,8 @@ def _optimization(blend, bright=False, logger=None):
     best_epoch = 1
 
     for i, e_rel in enumerate(e_rel_list):
-        for k in range(n_iter // 10):
-            blend.fit(10, e_rel)
+        for k in range(n_iter // 5):
+            blend.fit(5, e_rel)
             if -blend.loss[-1] > best_logL:
                 best_model = copy.deepcopy(blend)
                 best_logL = -blend.loss[-1]
@@ -168,7 +168,10 @@ class ScarletFitter(object):
             factor_f=1.4,  # 1.0,
             tigress=self.tigress,
             logger=self.logger)
-        self.n_stars = len(self.gaia_cat)
+        if self.gaia_cat is None:
+            self.n_stars = 0
+        else:
+            self.n_stars = len(self.gaia_cat)
 
     def _first_detection(self, first_dblend_cont):
         obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
@@ -491,6 +494,26 @@ class ScarletFitter(object):
             channels=list(self.data.channels))
         self.observation = observation.match(self.model_frame)
 
+        # convolve the `observation` with a gaussian kernel, to blur it
+        if self.method == 'vanilla':
+            import sep
+            from astropy.convolution import convolve, Gaussian2DKernel
+            conv_data = np.zeros_like(self.data.images)
+            for i in range(len(self.data.images)):
+                input_data = convolve(
+                    self.data.images[i].astype(float), Gaussian2DKernel(1.))
+                # input_data = self.data.images[i].astype(float)
+                bkg = sep.Background(input_data, bw=32, bh=32, fw=1, fh=1)
+                input_data -= bkg.globalback
+                conv_data[i] = input_data
+            observation = scarlet.Observation(
+                conv_data,
+                wcs=self.data.wcs,
+                psf=self.data.psfs,
+                weights=self.data.weights,
+                channels=list(self.data.channels))
+            self._conv_observation = observation.match(self.model_frame)
+
         # STARLET_MASK!!! contains the mask for irrelavant objects (also very nearby objects),
         # as well as larger bright star mask
         # This is used to help getting the SED initialization correct.
@@ -506,7 +529,7 @@ class ScarletFitter(object):
             # Add central Vanilla source
             new_source = scarlet.source.ExtendedSource(
                 self.model_frame, (src['ra'], src['dec']),
-                self.observation,
+                self._conv_observation,
                 satu_mask=self.data.masks,
                 K=K, thresh=thresh, shifting=shifting, min_grad=min_grad)
             sources.append(new_source)
@@ -542,8 +565,8 @@ class ScarletFitter(object):
                 contam_ratio = 1 - \
                     np.sum((segbox == 0) | (segbox == self.cen_obj['idx'] + 1)) / \
                     np.sum(np.ones_like(segbox))
-                if (contam_ratio <= 0.08 and (~self.smaller_box)) or (
-                        contam_ratio <= 0.10 and (self.smaller_box or self.bright)):
+                if (contam_ratio <= 0.15 and (~self.smaller_box)) or (
+                        contam_ratio <= 0.15 and (self.smaller_box or self.bright)):
                     break
                 else:
                     contam_ratio_list.append(contam_ratio)
@@ -662,6 +685,7 @@ class ScarletFitter(object):
                 sources.append(new_source)
 
         self._sources = sources
+        self.blend = scarlet.Blend(self._sources, self.observation)
 
         print(f'    Total number of sources: {len(sources)}')
         self.logger.info(f'    Total number of sources: {len(sources)}')
@@ -669,7 +693,6 @@ class ScarletFitter(object):
     def _optimize(self):
         # Star fitting!
         start = time.time()
-        self.blend = scarlet.Blend(self._sources, self.observation)
         fig = kz.display.display_scarlet_model(
             self.blend,
             minimum=-0.3,
@@ -870,7 +893,7 @@ class ScarletFitter(object):
             self.final_mask,
             show_ind=self.sed_ind,
             zoomin_size=zoomin_size,
-            minimum=-0.3,
+            minimum=-0.2,
             stretch=1,
             Q=1,
             channels=self.data.channels,
@@ -900,6 +923,9 @@ class ScarletFitter(object):
             # Replace the vanilla detection with a convolved vanilla detection
             first_dblend_cont = 0.07 if max(
                 self.data.images.shape) * self.pixel_scale > 200 else 0.006
+            if self.method == 'wavelet':
+                first_dblend_cont = 0.07 if max(
+                    self.data.images.shape) * self.pixel_scale > 200 else 0.02
             self._first_detection(first_dblend_cont)
 
             self._estimate_box(self.cen_obj)
@@ -917,7 +943,7 @@ class ScarletFitter(object):
                     show_ind=None,
                     stretch=1,
                     Q=1,
-                    minimum=-0.3,
+                    minimum=-0.2,
                     show_mark=True,
                     scale_bar_length=10,
                     add_text=f'{self.prefix}-{self.index}')
@@ -1036,7 +1062,7 @@ def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
         # This is the flag confirming the default PSFs exist.
 
         if not file_exist_flag:
-            fitter.ogger.info(
+            fitter.logger.info(
                 f'The PSF files of `{lsbg["prefix"]}` in `{channels}` are not complete! Please check!')
 
             if default_exist_flag:
