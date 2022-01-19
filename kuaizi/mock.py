@@ -2,7 +2,8 @@ from __future__ import division, print_function
 
 import copy
 import os
-import pickle, dill
+import pickle
+import dill
 import sys
 from contextlib import contextmanager
 
@@ -108,7 +109,7 @@ class MockGal:
         self.channels = bkg.channels
 
     def __del__(self):
-        print('Mock Galaxy deleted.')
+        pass  # print('Mock Galaxy deleted.')
 
     @property
     def bkg(self):
@@ -270,6 +271,11 @@ class MockGal:
         # Finished!!!
         self.model = mock_model  # model only has `images`, `channels`, `psfs`, and `info`!
         self.set_mock()  # mock has other things, including modified variances.
+        ra, dec = self.mock.wcs.wcs_pix2world(
+            [list(map(lambda x: x // 2, self.mock.images[0].shape))[::-1]], 0)[0]
+        self.mock.info = self.model.info
+        self.mock.info['ra'] = ra
+        self.mock.info['dec'] = dec
 
     def from_scarlet(self, scarlet_model_dir, pixel_scale=HSC_pixel_scale):
         from galsim import Image, InterpolatedImage
@@ -286,10 +292,11 @@ class MockGal:
         x2 = x1 + blend.sources[0].bbox.shape[1:][0]
         y2 = y1 + blend.sources[0].bbox.shape[1:][1]
         mask = mask.astype(bool)[x1:x2, y1:y2]
-        mask += np.sum((new_weights[:, x1:x2, y1:y2] == 0), axis=0).astype(bool)
-        
+        mask += np.sum((new_weights[:, x1:x2, y1:y2]
+                       == 0), axis=0).astype(bool)
 
-        mockgal_img = blend.sources[0].get_model() * np.repeat(~mask[np.newaxis, :, :], len(self.channels), axis=0)
+        mockgal_img = blend.sources[0].get_model(
+        ) * np.repeat(~mask[np.newaxis, :, :], len(self.channels), axis=0)
         gal_image = np.empty_like(self.bkg.images)
         for i in range(len(mockgal_img)):
             mockgal = InterpolatedImage(
@@ -300,13 +307,14 @@ class MockGal:
                 scale=pixel_scale, nx=self.bkg.images.shape[2], ny=self.bkg.images.shape[1]).array
 
         # Generate variance map
-        ra, dec = self.bkg.wcs.wcs_pix2world(self.bkg.images.shape[2] / 2, self.bkg.images.shape[1] / 2, 0)
-        info = {'ra': ra, 'dec': dec, 
+        ra, dec = self.bkg.wcs.wcs_pix2world(
+            self.bkg.images.shape[2] / 2, self.bkg.images.shape[1] / 2, 0)
+        info = {'ra': ra, 'dec': dec,
                 'scarlet_model': scarlet_model_dir,
                 'model_type': 'scarlet_lsbg_wvlt_0.5'}
         mock_model = Data(images=gal_image, variances=None,
                           masks=None, channels=self.channels,
-                          wcs=None, weights=None, psfs=self.bkg.psfs, 
+                          wcs=None, weights=None, psfs=self.bkg.psfs,
                           info=info)
 
         # Finished!!!
@@ -439,6 +447,30 @@ class MockGal:
         else:
             raise ValueError(
                 'Other formats are not supported yet. Please use `pkl`.')
+
+    def write_fits(self, output_dir='./', prefix='mockgal', obj_id=0, overwrite=False):
+        # Write FITS file follows HSC convention
+        for i, filt in enumerate(list(self.mock.channels)):
+            hdu1 = fits.HDUList([
+                fits.PrimaryHDU(header=self.mock.wcs.to_header()),  # header
+                fits.ImageHDU(data=self.mock.images[i],
+                              header=self.mock.wcs.to_header(),
+                              name='IMAGE'),  # image
+                fits.ImageHDU(data=self.mock.masks[i].astype(np.int32),
+                              header=self.mock.wcs.to_header(),
+                              name='MASK'),  # mask
+                fits.ImageHDU(data=self.mock.variances[i],
+                              header=self.mock.wcs.to_header(),
+                              name='VARIANCE'),  # variance
+            ])
+
+            fits_file = f'{prefix}_{obj_id}_{filt}' + '.fits'
+            fits_file = os.path.join(output_dir, fits_file)
+            hdu1.writeto(fits_file, overwrite=overwrite)
+
+            hdu2 = fits.PrimaryHDU(data=self.mock.psfs[i])  # PSF
+            hdu2.writeto(fits_file.replace(
+                '.fits', '_psf.fits'), overwrite=overwrite)
 
     @classmethod
     def read(cls, filename, format='pkl'):

@@ -503,7 +503,47 @@ def display_HSC_cutout_rgb(images, ax=None, half_width=None):
     norm = AsinhMapping(minimum=-0.15, stretch=1.2, Q=3)
 
     img_rgb = scarlet.display.img_to_rgb(_images, norm=norm)
-    plt.imshow(img_rgb, origin='lower')
+    ax.imshow(img_rgb, origin='lower')
+    ax.axis('off')
+
+    if ax is None:
+        return fig
+    return ax
+
+
+def display_merian_cutout_rgb(images, filters=list('griz') + ['N708'],
+                              ax=None, half_width=None,
+                              minimum=-0.15,
+                              stretch=1.2, Q=3,
+                              color_norm=None
+                              ):
+    import scarlet
+    from scarlet.display import AsinhMapping
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5, 5))
+
+    # Crop
+    if half_width is not None:
+        if half_width * 2 < min(images.shape[1], images.shape[2]):
+            cen = (images.shape[1] // 2, images.shape[2] // 2)
+            images = images[:, cen[0] - half_width:cen[0] +
+                            half_width, cen[1] - half_width:cen[1] + half_width]
+
+    # Norm color
+    if color_norm is None:
+        color_norm = {'g': 1.9, 'r': 1.2, 'i': 1.0,
+                      'z': 0.85, 'y': 0.5, 'N708': 0.8}
+
+    f_c = np.array([color_norm[filt] for filt in filters])
+    _images = images * f_c[:, np.newaxis, np.newaxis]
+
+    # Display
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+
+    img_rgb = scarlet.display.img_to_rgb(_images, norm=norm)
+
+    ax.imshow(img_rgb, origin='lower')
     ax.axis('off')
 
     if ax is None:
@@ -1587,3 +1627,141 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
 
     if not show:
         plt.close()
+
+
+def plot_measurement(lsbg_cat, meas_cat):
+    junk = (lsbg_cat['bad_votes'] > lsbg_cat['good_votes'])
+    candy = (lsbg_cat['good_votes'] > lsbg_cat['bad_votes']) & (
+        lsbg_cat['is_candy'] > lsbg_cat['is_galaxy'])
+    gal = (~junk) & (~candy)
+    print('# of Candy:', np.sum(candy))
+    print('# of Gal:', np.sum(gal))
+    print('# of Junk:', np.sum(junk))
+
+    g_mag = meas_cat['mag'].data[:, 0]
+    r_mag = meas_cat['mag'].data[:, 1]
+    i_mag = meas_cat['mag'].data[:, 2]
+
+    fig, axes = plt.subplots(2, 4, figsize=(18, 8))
+
+    plt.sca(axes[0, 0])  # color-color figure
+    plt.scatter((g_mag - i_mag)[candy], (g_mag - r_mag)
+                [candy], color='g', zorder=10, label='Candy')
+    plt.scatter((g_mag - i_mag)[junk], (g_mag - r_mag)
+                [junk], color='r', label='junk')
+    plt.scatter((g_mag - i_mag)[gal], (g_mag - r_mag)
+                [gal], color='b', label='gal')
+    color_bound = [0.1, 1.2]
+    half_width = 0.25
+    plt.vlines(color_bound[0], 0.7 * color_bound[0] - half_width,
+               0.7 * color_bound[0] + half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.vlines(color_bound[1], 0.7 * color_bound[1] - half_width,
+               0.7 * color_bound[1] + half_width, color='k', ls='--', lw=2, zorder=12)
+    x = np.linspace(color_bound[0], color_bound[1], 100)
+    plt.plot(x, 0.7 * x - half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.plot(x, 0.7 * x + half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.xlabel('g-i')
+    plt.ylabel('g-r')
+    plt.legend()
+    plt.xlim(-0.5, 2.2)
+    plt.ylim(-0.5, 2.2)
+
+    plt.sca(axes[0, 1])  # SB-color figure
+    plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_0']
+                [:, 0][candy], color='g', zorder=10)
+    plt.scatter((g_mag - i_mag)[junk], meas_cat['SB_0'][:, 0][junk], color='r')
+    plt.scatter((g_mag - i_mag)[gal], meas_cat['SB_0'][:, 0][gal], color='b')
+    plt.xlabel('g-i')
+    plt.ylabel('SB_0_g')
+    plt.axhline(22., color='k', ls='--')
+    plt.axhline(23.5, color='k', ls='--')
+    plt.axvline(color_bound[0], color='k', ls='--', lw=2)
+    plt.axvline(color_bound[1], color='k', ls='--', lw=2)
+    plt.xlim(-0.7, 2.9)
+    plt.ylim(17.9, 28.5)
+
+    plt.sca(axes[0, 2])  # SB-color figure
+    plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_eff_avg']
+                [:, 0][candy], color='g', zorder=10)
+    plt.scatter((g_mag - i_mag)[junk],
+                meas_cat['SB_eff_avg'][:, 0][junk], color='r')
+    plt.scatter((g_mag - i_mag)[gal],
+                meas_cat['SB_eff_avg'][:, 0][gal], color='b')
+    plt.xlabel('g-i')
+    plt.ylabel('SB_eff_g')
+    plt.axhline(23.0, color='k', ls='--')
+    plt.axhline(24.3, color='k', ls='--')
+    plt.axvline(color_bound[0], color='k', ls='--', lw=2)
+    plt.axvline(color_bound[1], color='k', ls='--', lw=2)
+    plt.xlim(-0.7, 2.9)
+    plt.ylim(19, 29)
+
+    plt.sca(axes[0, 3])
+    plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
+                [candy], color='g', zorder=10)
+    plt.scatter(meas_cat['M20'][junk], meas_cat['Gini'][junk], color='r')
+    plt.scatter(meas_cat['M20'][gal], meas_cat['Gini'][gal], color='b')
+    plt.xlabel('M20')
+    plt.ylabel('Gini')
+    plt.xlim(-3, 0)
+    plt.ylim(0.2, 0.9)
+    x = np.linspace(-3, 0, 10)
+    plt.plot(x, -0.14 * x + 0.33, color='orange')
+    x = np.linspace(-3, -1.6, 10)
+    plt.plot(x, 0.136 * x + 0.788, color='orange')
+
+    plt.sca(axes[1, 0])
+    plt.scatter(meas_cat['C'][candy], meas_cat['A']
+                [candy], color='g', zorder=10)
+    plt.scatter(meas_cat['C'][junk], meas_cat['A'][junk], color='r')
+    plt.scatter(meas_cat['C'][gal], meas_cat['A'][gal], color='b')
+    plt.xlim(0.7, 4.8)
+    plt.ylim(-.2, 1.2)
+    plt.axvline(3.3)
+    plt.axhline(0.1)
+    plt.xlabel('C')
+    plt.ylabel('A')
+
+    plt.sca(axes[1, 1])  # SB-R_e figure
+    plt.scatter(meas_cat['SB_0'][:, 0][candy],
+                meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
+    plt.scatter(meas_cat['SB_0'][:, 0][junk],
+                meas_cat['rhalf_circularized'][junk], color='r')
+    plt.scatter(meas_cat['SB_0'][:, 0][~junk],
+                meas_cat['rhalf_circularized'][~junk], color='b')
+    plt.axvline(22., color='k', ls='--')
+    plt.axhline(1.8 / 0.168, color='k', ls='--')
+    plt.axhline(10 / 0.168, color='k', ls='--')
+    plt.yscale('log')
+    plt.xlabel('SB_0_g')
+    plt.ylabel('R_e (pix)')
+    plt.xlim(18, 28)
+
+    plt.sca(axes[1, 2])  # SB-R_e figure
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][candy],
+                meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][junk],
+                meas_cat['rhalf_circularized'][junk], color='r')
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][~junk],
+                meas_cat['rhalf_circularized'][~junk], color='b')
+    plt.axvline(23., color='k', ls='--')
+    plt.axhline(1.8 / 0.168, color='k', ls='--')
+    plt.axhline(10 / 0.168, color='k', ls='--')
+    plt.yscale('log')
+    plt.xlabel('SB_eff_g')
+    plt.ylabel('R_e (pix)')
+    plt.xlim(19, 29)
+
+    plt.sca(axes[1, 3])
+    plt.scatter(meas_cat['rhalf_circularized'][candy],
+                meas_cat['sersic_rhalf'][candy], color='g', zorder=10)
+    plt.scatter(meas_cat['rhalf_circularized'][junk],
+                meas_cat['sersic_rhalf'][junk], color='r',)
+    plt.scatter(meas_cat['rhalf_circularized'][gal],
+                meas_cat['sersic_rhalf'][gal], color='b')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('R_e')
+    plt.ylabel('R_e (Sersic)')
+
+    plt.subplots_adjust(wspace=0.3, hspace=0.2)
