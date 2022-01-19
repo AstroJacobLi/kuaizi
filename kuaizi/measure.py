@@ -400,7 +400,7 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
                          np.array(comp.bbox.shape) for comp in components], axis=0)
     bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
     bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
-    bbox.shape = tuple(int(i * 1.5) for i in bbox.shape)
+    bbox.shape = tuple(int(i * 1.1) for i in bbox.shape)
     bbox.origin = tuple(bbox.center[i] - bbox.shape[i] // 2 for i in range(3))
 
     models = _blend.get_model()  # PSF-free model
@@ -427,10 +427,12 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     weights = np.ascontiguousarray(weights)
 
     # Flux and magnitude in each band
+    filt = 0  # i-band for measurement
+
     measure_dict = {}
     measure_dict['flux'] = flux(components, observation)
-    # normalized against g-band
-    SED = (measure_dict['flux'] / measure_dict['flux'][0])
+    # normalized against i-band
+    SED = (measure_dict['flux'] / measure_dict['flux'][filt])
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
 
     # We take the model and weight map in g-band. Such that we can use the SED to get
@@ -439,7 +441,6 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     # and we run `sep` to generate a 1-sigma segmentation map.
     # Then we run `statmorph` using that segmap
 
-    filt = 0
     img = models[filt]
     data_avg = np.average(data, weights=np.sqrt(
         weights.sum(axis=(1, 2))), axis=0)
@@ -500,6 +501,8 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
         morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['SB_eff_avg'] = -2.5 * np.log10(
         morph.SB_eff_avg * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['flux_circ'] = morph.flux_circ * SED
+    measure_dict['flux_ellip'] = morph.flux_ellip * SED
     measure_dict['Gini'] = morph.gini
     measure_dict['M20'] = morph.m20
     measure_dict['F(G, M20)'] = morph.gini_m20_bulge
@@ -548,6 +551,8 @@ def _write_to_row(row, measurement):
         row (astropy.table.Row)
     '''
     row['flux'] = measurement['flux']
+    row['flux_circ'] = measurement['flux_circ']
+    row['flux_ellip'] = measurement['flux_ellip']
     row['mag'] = measurement['mag']
     row['SB_0'] = measurement['SB_0_circ']
     row['SB_eff_circ'] = measurement['SB_eff_circ']
@@ -600,6 +605,8 @@ def initialize_meas_cat(lsbg_cat):
         Column(name='ID', length=length, dtype=int),
         Column(name='flux', length=length, shape=(bands,)),
         Column(name='mag', length=length, shape=(bands,)),
+        Column(name='flux_circ', length=length, shape=(bands,)),
+        Column(name='flux_ellip', length=length, shape=(bands,)),
         Column(name='SB_0', length=length, shape=(bands,)),
         Column(name='SB_eff_circ', length=length, shape=(bands,)),
         Column(name='SB_eff_ellip', length=length, shape=(bands,)),
@@ -762,6 +769,11 @@ def delta_bn(n):
     temp = 2 - 4 / (405 * n**2) - 2 * 46 / (25515 * n**3) - 3 * 131 / (
         1148175 * n**4) + 4 * 2194697 / (30690717750 * n**5)
     return temp
+
+
+def fn(n):
+    from scipy.special import gamma
+    return n * np.exp(bn(n)) / bn(n)**(2 * n) * gamma(2 * n)
 
 
 def cal_mu0(n, Re, mag):
