@@ -12,4 +12,20 @@ module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python3 vanilla_multiprocess.py --njobs 40 --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' --low 0 --high 100 --suffix "" --starlet_thresh 0.5
+python3 ../script/sclt_multiprocess.py --njobs 30 \
+    --DATADIR "/tigress/jiaxuanl/Data/" \
+    --OUTPUT_DIR "/tigress/jiaxuanl/Data/HSC/LSBG/" \
+    --PREFIX "NSA" \
+    --OUTPUT_SUBDIR "NSA_Z002_004" \
+    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' \
+    --low 0 --high 1000 \
+    --suffix "" --starlet_thresh 0.5 --method 'vanilla'
+
+python3 ../script/vanilla_measure_all.py \
+    --DATADIR '/tigress/jiaxuanl/Data' \
+    --OUTPUT_DIR '/tigress/jiaxuanl/Data/HSC/LSBG/' \
+    --OUTPUT_SUBDIR 'NSA_Z002_004' \
+    --PREFIX 'nsa' \
+    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' \
+    --filename '_lsbg_meas_vanilla.fits' \
+    --low 0 --high 1000 --suffix '_1k_' # --makesegmap True

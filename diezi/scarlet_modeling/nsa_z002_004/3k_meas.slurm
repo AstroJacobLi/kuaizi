@@ -12,4 +12,11 @@ module purge
 . /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python3 vanilla_measure_all.py --low 2000 --high 3000 --suffix '_3k'
+python3 ../script/vanilla_measure_all.py \
+    --DATADIR '/tigress/jiaxuanl/Data' \
+    --OUTPUT_DIR '/tigress/jiaxuanl/Data/HSC/LSBG/' \
+    --OUTPUT_SUBDIR 'NSA_Z002_004' \
+    --PREFIX 'nsa' \
+    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z002_004/nsa_cutout_cat_z002_004.fits' \
+    --filename '_lsbg_meas_vanilla.fits' \
+    --low 2000 --high 3000 --suffix '_3k_'
