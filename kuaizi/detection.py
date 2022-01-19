@@ -48,7 +48,7 @@ def interpolate(data_lr, data_hr):
 # Vanilla detection: SEP
 
 
-def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5, 
+def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5,
                       convolve=False, conv_radius=None, deblend_nthresh=30,
                       deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
@@ -232,7 +232,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
 
     if len(datas) == 1:
         hr_images = datas[0].images / \
-            np.sum(datas[0].images, axis=(1, 2))[:, None, None]
+            np.abs(np.sum(datas[0].images, axis=(1, 2)))[:, None, None]
         # Detection image as the sum over all images
         detect_image = np.sum(hr_images, axis=0)
     else:
