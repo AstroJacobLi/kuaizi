@@ -10,9 +10,9 @@ export CATALOG_DIR="/scratch/gpfs/jiaxuanl/Data/HSC/LSBG"
 # cat['radius'] is always the cutout size we should use!!!!
 python3 ../s18a_batch_cutout.py \
     $DATADIR\
-    $CATALOG_DIR"/Catalog/random_field/lsbg_random_field_1.fits" \
+    $CATALOG_DIR"/Catalog/random_field/lsbg_random_field2.fits" \
     --bands grizy --ra_name ra --dec_name dec \
-    --name "viz-id" --output $OUTPUT_DIR"/Cutout/random_field" \
-    --catalog_dir $OUTPUT_DIR"/Catalog/random_field" --catalog_suffix "random_field" \
-    --size "cutout_size" --prefix "random_field" \
+    --name "viz-id" --output $OUTPUT_DIR"/Cutout/random_field2" \
+    --catalog_dir $OUTPUT_DIR"/Catalog/random_field2" --catalog_suffix "random_field2" \
+    --size "cutout_size" --prefix "random_field2" \
     --njobs 30 --psf True --overwrite False
