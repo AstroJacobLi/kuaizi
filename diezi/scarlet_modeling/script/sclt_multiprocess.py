@@ -10,12 +10,13 @@ from functools import partial
 from astropy.table import Table
 
 
-def run_scarlet_vanilla(index, cat, DATADIR, OUTPUT_DIR, PREFIX, OUTPUT_SUBDIR, starlet_thresh=0.5, global_logger=None, fail_logger=None):
+def run_scarlet(index, cat, DATADIR, OUTPUT_DIR, PREFIX, OUTPUT_SUBDIR, method='vanilla',
+                starlet_thresh=0.5, global_logger=None, fail_logger=None):
     blend = fitting_obs_tigress(
         {'project': 'HSC', 'name': 'LSBG', 'data_dir': DATADIR},
         cat[index],
         name='viz-id',
-        method='vanilla',
+        method=method,
         channels='griz',
         starlet_thresh=starlet_thresh,
         prefix=PREFIX.lower(),
@@ -30,7 +31,8 @@ def run_scarlet_vanilla(index, cat, DATADIR, OUTPUT_DIR, PREFIX, OUTPUT_SUBDIR, 
     return
 
 
-def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_dir, ind_list=None, low=0, high=None, suffix='', starlet_thresh=0.5):
+def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_dir,
+                         method='vanilla', ind_list=None, low=0, high=None, suffix='', starlet_thresh=0.5):
     print('SET ENVIRONMENT')
     kz.utils.set_env(project='HSC', name='LSBG', data_dir=DATADIR)
     print("CURRENT WORKING DIRECTORY:", os.getcwd())
@@ -54,9 +56,9 @@ def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_
     else:
         iterable = np.arange(low, high, 1)
 
-    pool.map(partial(run_scarlet_vanilla, DATADIR=DATADIR, OUTPUT_DIR=OUTPUT_DIR,
+    pool.map(partial(run_scarlet, DATADIR=DATADIR, OUTPUT_DIR=OUTPUT_DIR,
                      OUTPUT_SUBDIR=OUTPUT_SUBDIR, PREFIX=PREFIX,
-                     cat=lsbg_cat, starlet_thresh=starlet_thresh,
+                     cat=lsbg_cat, method=method, starlet_thresh=starlet_thresh,
                      global_logger=global_logger, fail_logger=fail_logger), iterable)
     pool.close()
     pool.join()
