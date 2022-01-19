@@ -463,7 +463,7 @@ class ScarletFitter(object):
         dist = self.cen_obj['coord'].separation(catalog_c)
         #obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
         self.obj_cat_big.remove_rows(np.where(
-            dist < 2 * np.sqrt(self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
+            dist < 1.5 * np.sqrt(self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
 
         # Remove objects in `obj_cat_big` that are already masked!
         inside_flag = [
@@ -501,10 +501,9 @@ class ScarletFitter(object):
             conv_data = np.zeros_like(self.data.images)
             for i in range(len(self.data.images)):
                 input_data = convolve(
-                    self.data.images[i].astype(float), Gaussian2DKernel(1.))
-                # input_data = self.data.images[i].astype(float)
-                bkg = sep.Background(input_data, bw=32, bh=32, fw=1, fh=1)
-                input_data -= bkg.globalback
+                    self.data.images[i].astype(float), Gaussian2DKernel(1.5))
+                bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
+                input_data -= bkg.back()
                 conv_data[i] = input_data
             observation = scarlet.Observation(
                 conv_data,
