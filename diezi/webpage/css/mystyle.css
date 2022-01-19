@@ -60,6 +60,17 @@ background-color: #ddd;
 color: black;
 }
 
+
+a:hover {
+  background-color: #2e0af7; 
+  color: #07f7eb;
+  color: #2beb05;
+  color: #f5a105;
+  color: #f54905;
+  color: #f01307;
+  color: black;
+  }
+
 a.clickable {
   padding: 0 0;
   color: #12aad8;

@@ -14,7 +14,8 @@ from shutil import copy
 # sample_name = 'NSA'
 
 
-def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLET_DIR=None, col_num=7, row_num=4):
+def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLET_DIR=None,
+                   col_num=7, row_num=4, colored_idx=None, color='grey'):
     '''
     This function writes HTML webpage for displaying RGB cutout images.
 
@@ -29,6 +30,8 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
             If not None, a clickable link will be created.
         col_num (int): number of columns on the webpage.
         row_num (int): number of rows on the webpage.
+        colored_idx (list): the index of the images that are shown in a special color.
+        color (str): the special color.
 
     Returns:
         None
@@ -108,13 +111,18 @@ def webpage_cutout(FIGURE_DIR, WEBPAGE_DIR, sample_name, sample_title='', SCARLE
                 break
             f.write(
                 f'      <figure> <img src="{FIGURE_DIR}/{sample_name.lower()}_{index_list[ind]}_cutout.png" id="{sample_name}{index_list[ind]}">')
+            if index_list[ind] in colored_idx:
+                text_color = color
+            else:
+                text_color = 'black'
+
             if SCARLET_DIR is not None:
                 page = int(np.ceil((ind + 1) / 10))
                 f.write(
                     f'<figcaption><a class="clickable" target="_blank" href="{SCARLET_DIR}/page{page}.html#{sample_name}{index_list[ind]}">{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
             else:
                 f.write(
-                    f'<figcaption>{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
+                    f'<figcaption style="color:{text_color};">{sample_name} {index_list[ind]}</a></figcaption></figure> \n')
 
             if (i + 1) % col_num == 0:
                 f.write('</div> \n\n')
