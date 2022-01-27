@@ -231,18 +231,14 @@ def prepare_catalog(cat, size, ra='ra', dec='dec', name=None, unit='arcsec',
     if unit != 'pixel':
         size_arr = [s * u.Unit(unit) for s in size_arr]
 
+    from astropy.table import hstack
+    cutout_table = QTable(
+        [name_arr, list(ra_arr), list(dec_arr), size_arr],
+        names=('prefix', 'ra', 'dec', 'radius')
+    )
     if join:
-        from astropy.table import hstack
-        cutout_table = QTable(
-            [name_arr, size_arr],
-            names=('prefix', 'radius')
-        )
         return hstack([cat, cutout_table])
     else:
-        cutout_table = QTable(
-            [name_arr, list(ra_arr), list(dec_arr), size_arr],
-            names=('prefix', 'ra', 'dec', 'radius')
-        )
         return cutout_table
 
 

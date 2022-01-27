@@ -21,7 +21,8 @@ PIXEL_SCALE = 0.168  # arcsec / pixel
 
 
 # Cutout speed is about 18s for one galaxy in 5 bands
-def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
+def batch_cutout(data_dir, obj_cat_dir, low=0, high=None,
+                 size=1.0, unit='arcmin', bands='grizy',
                  ra_name='ra', dec_name='dec',
                  name='Seq', prefix='s18a_wide', output='./Cutout',
                  catalog_dir='./Catalog', catalog_suffix='',
@@ -71,13 +72,17 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
     skymap = butler.get('deepCoadd_skyMap', immediate=True)
     print('\n Number of jobs:', njobs)
 
-    obj_cat = Table.read(obj_cat_dir)
+    if high is None:
+        high = len(obj_cat_dir)
+    if low is None:
+        low = 0
+    obj_cat = Table.read(obj_cat_dir)[low:high]
     print('\n Number of galaxies:', len(obj_cat))
 
     # Adaptive cutout size# Normal objects, use 0.7 arcmin cutout.
     # Radius > 20 arcsec, use 1.0 arcmin cutout.
     # Radius > 30 arcsec, use 2.0 arcmin cutout.
-    cutout_size = np.ones(len(obj_cat)) * 0.7 * u.arcmin
+    cutout_size = np.ones(len(obj_cat)) * size * u.arcmin
 
     cutout_size[obj_cat['flux_radius_ave_i'] >
                 20] = 1.0 * u.arcmin  # shoud be larger
@@ -101,8 +106,12 @@ def batch_cutout(data_dir, obj_cat_dir, size=1.0, unit='arcmin', bands='grizy',
 
         # Get cutout in each band
         cat = prepare_catalog(
-            obj_cat, size, ra=ra_name, dec=dec_name,
+            obj_cat, "cutout_size", ra=ra_name, dec=dec_name,
             name=name, unit=unit, prefix=prefix, output=output)
+
+        cat.write(os.path.join(
+            catalog_dir, f'{prefix}_cutout_cat_{catalog_suffix}.fits'),
+            format='fits', overwrite=True)
 
         print(
             f'    - Generate cutouts for {len(cat)} galaxies in {filt}-band.')
