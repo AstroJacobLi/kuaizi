@@ -463,7 +463,7 @@ class ScarletFitter(object):
         dist = self.cen_obj['coord'].separation(catalog_c)
         #obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
         self.obj_cat_big.remove_rows(np.where(
-            dist < 1.5 * np.sqrt(self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
+            dist < 1. * np.sqrt(self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
 
         # Remove objects in `obj_cat_big` that are already masked!
         inside_flag = [
@@ -495,23 +495,23 @@ class ScarletFitter(object):
         self.observation = observation.match(self.model_frame)
 
         # convolve the `observation` with a gaussian kernel, to blur it
-        if self.method == 'vanilla':
-            import sep
-            from astropy.convolution import convolve, Gaussian2DKernel
-            conv_data = np.zeros_like(self.data.images)
-            for i in range(len(self.data.images)):
-                input_data = convolve(
-                    self.data.images[i].astype(float), Gaussian2DKernel(1.5))
-                bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
-                input_data -= bkg.back()
-                conv_data[i] = input_data
-            observation = scarlet.Observation(
-                conv_data,
-                wcs=self.data.wcs,
-                psf=self.data.psfs,
-                weights=self.data.weights,
-                channels=list(self.data.channels))
-            self._conv_observation = observation.match(self.model_frame)
+        # if self.method == 'vanilla':
+        import sep
+        from astropy.convolution import convolve, Gaussian2DKernel
+        conv_data = np.zeros_like(self.data.images)
+        for i in range(len(self.data.images)):
+            input_data = convolve(
+                self.data.images[i].astype(float), Gaussian2DKernel(1.5))
+            bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
+            input_data -= bkg.back()
+            conv_data[i] = input_data
+        observation = scarlet.Observation(
+            conv_data,
+            wcs=self.data.wcs,
+            psf=self.data.psfs,
+            weights=self.data.weights,
+            channels=list(self.data.channels))
+        self._conv_observation = observation.match(self.model_frame)
 
         # STARLET_MASK!!! contains the mask for irrelavant objects (also very nearby objects),
         # as well as larger bright star mask
@@ -552,7 +552,7 @@ class ScarletFitter(object):
                 starlet_source = StarletSource(
                     self.model_frame,
                     (src['ra'], src['dec']),
-                    self.observation,
+                    self._conv_observation,
                     star_mask=self.starlet_mask,  # bright stars are masked when estimating morphology
                     satu_mask=self.data.masks,  # saturated pixels are masked when estimating SED
                     thresh=0.05,  # 0.01
@@ -816,8 +816,12 @@ class ScarletFitter(object):
             catalog_c = SkyCoord(
                 self._big_cat['ra'], self._big_cat['dec'], unit='deg')
             dist = self.cen_obj['coord'].separation(catalog_c)
-            near_flag = (
-                dist < 4 * self.cen_obj['a'] * self.pixel_scale * u.arcsec)
+            if self.method == 'wavelet':
+                near_flag = (
+                    dist < 2 * self.cen_obj['a'] * self.pixel_scale * u.arcsec)
+            else:
+                near_flag = (
+                    dist < 4 * self.cen_obj['a'] * self.pixel_scale * u.arcsec)
 
             footprint2 = np.zeros_like(self.segmap_big, dtype=bool)
             # mask ExtendedSources which are modeled
