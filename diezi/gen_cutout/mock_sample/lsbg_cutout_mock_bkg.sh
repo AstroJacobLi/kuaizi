@@ -16,4 +16,4 @@ python3 ../s18a_batch_cutout.py \
     --catalog_dir $OUTPUT_DIR"/Catalog/mock_sample" --catalog_suffix "mock_sample" \
     --size 0.7 --prefix "MockBkg" \
     --njobs 30 --psf True --overwrite False \
-    --low 10 --high 1000
+    --low 0 --high 1000

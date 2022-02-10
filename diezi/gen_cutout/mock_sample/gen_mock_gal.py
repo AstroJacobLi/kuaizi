@@ -121,14 +121,39 @@ def gen_mock_gal(low, high):
                            for filt in list('griz')]
             obj['prefix'] = f'./Cutout/mock_sample/mock_{obj["viz-id"]}'
         except Exception as e:
+            obj = lsbg_cat[ind]
+            obj['viz-id'] = ind
+            obj['ra'] = np.nan
+            obj['dec'] = np.nan
+            obj['mag_auto_i'] = np.nan
+            obj['sersic_n'] = np.nan
+            obj['sersic_rhalf_circ'] = np.nan
+            obj['sersic_ell'] = np.nan
+            obj['sersic_PA'] = np.nan
+            obj['sersic_sed'] = np.ones(len(channels)) * np.nan
+            obj['mags'] = np.ones(len(channels)) * np.nan
+            obj['prefix'] = ''
+
             print('Mockgal failed for id = {}'.format(bkg_id))
             print(e)
             continue
 
+
+    image_flag = []
+    for obj in lsbg_cat:
+        image_flag.append(
+            [os.path.isfile(f"{obj['prefix']}_{filt}.fits") for filt in channels])
+    lsbg_cat['image_flag'] = image_flag
+
+    psf_flag = []
+    for obj in lsbg_cat:
+        psf_flag.append(
+            [os.path.isfile(f"{obj['prefix']}_{filt}_psf.fits") for filt in channels])
+    lsbg_cat['psf_flag'] = psf_flag
+
     lsbg_cat.write(
         f'./Catalog/mock_sample/mock_obj_cat_{low}_{high}.fits', overwrite=True)
-
-
+        
 if __name__ == '__main__':
     fire.Fire(gen_mock_gal)
 

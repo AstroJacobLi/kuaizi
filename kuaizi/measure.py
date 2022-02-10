@@ -392,16 +392,21 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
         measure_dict (dict): a dictionary containing all measurements
     """
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
-    # Multi-components enabled
+
     _blend = scarlet.Blend(components, observation)
-    lower_left = np.min([np.array(comp.bbox.origin)
-                        for comp in components], axis=0)
-    upper_right = np.max([np.array(comp.bbox.origin) +
-                         np.array(comp.bbox.shape) for comp in components], axis=0)
-    bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
-    bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
-    bbox.shape = tuple(int(i * 1.1) for i in bbox.shape)
-    bbox.origin = tuple(bbox.center[i] - bbox.shape[i] // 2 for i in range(3))
+
+    if min_cutout_size < 0.9 * observation.bbox.shape[1]:
+        # Multi-components enabled
+        lower_left = np.min([np.array(comp.bbox.origin)
+                            for comp in components], axis=0)
+        upper_right = np.max([np.array(comp.bbox.origin) +
+                            np.array(comp.bbox.shape) for comp in components], axis=0)
+        bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
+        bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
+        bbox.shape = tuple(int(i * 1.15) for i in bbox.shape)
+        bbox.origin = tuple(bbox.center[i] - bbox.shape[i] // 2 for i in range(3))
+    else:
+        bbox = observation.bbox
 
     models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
@@ -448,7 +453,7 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     if makesegmap:
         bkg = sep.Background(data_avg, bh=12, bw=12, mask=mask)
         _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms, minarea=1,
-                                deblend_cont=1,
+                                deblend_cont=.1, 
                                 mask=mask, segmentation_map=True)
 
         # Only select relevant detections.

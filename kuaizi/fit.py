@@ -200,8 +200,9 @@ class ScarletFitter(object):
         cen_obj = obj_cat_ori[cen_indx_ori]
 
         # Better position for cen_obj, THIS IS PROBLEMATIC!!!
-        x, y, _ = sep.winpos(self.data.images.mean(
-            axis=0), cen_obj['x'], cen_obj['y'], 6)
+        # x, y, _ = sep.winpos(self.data.images.mean(
+        #     axis=0), cen_obj['x'], cen_obj['y'], 6)
+        x, y = cen_obj['x'], cen_obj['y']
         ra, dec = self.data.wcs.wcs_pix2world(x, y, 0)
         cen_obj = dict(cen_obj)
         cen_obj['x'] = x
@@ -411,7 +412,9 @@ class ScarletFitter(object):
 
         catalog_c = SkyCoord(obj_cat['ra'], obj_cat['dec'], unit='deg')
         dist = self.cen_obj['coord'].separation(catalog_c)
-        cen_indx_big = obj_cat[np.argsort(dist)[0]]['index']  # obj_cat_ori
+        cen_indx_big = obj_cat[np.argmin(dist)]['index'] if np.min(dist) < 1. * np.sqrt(
+            self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec else -1
+            # sometimes the central obj are not identified as big obj.
 
         # mask out big objects that are NOT identified in the high_freq step
         segmap = segmap_big.copy()
@@ -534,7 +537,7 @@ class ScarletFitter(object):
             sources.append(new_source)
         else:  # wavelet
             # Find a better box, not too large, not too small
-            if self.smaller_box:
+            if self.smaller_box or self.starlet_thresh > 0.5:
                 min_grad_range = np.arange(min_grad, 0.3, 0.05)
             else:
                 # I changed -0.3 to -0.2
@@ -928,7 +931,7 @@ class ScarletFitter(object):
                 self.data.images.shape) * self.pixel_scale > 200 else 0.006
             if self.method == 'wavelet':
                 first_dblend_cont = 0.07 if max(
-                    self.data.images.shape) * self.pixel_scale > 200 else 0.02
+                    self.data.images.shape) * self.pixel_scale > 200 else 0.006
             self._first_detection(first_dblend_cont)
 
             self._estimate_box(self.cen_obj)

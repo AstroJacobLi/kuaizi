@@ -42,9 +42,9 @@ def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_
     lsbg_cat.sort('viz-id')
 
     fail_logger = kz.utils.set_logger(
-        logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}__fail' + suffix, level='ERROR')
+        logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_fail' + suffix, level='ERROR')
     global_logger = kz.utils.set_logger(
-        logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}__log' + suffix, level='INFO')
+        logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_log' + suffix, level='INFO')
 
     pool = Pool(njobs)
 
