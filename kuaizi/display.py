@@ -255,6 +255,7 @@ def display_single(img,
                    lower_percentile=1.0,
                    upper_percentile=99.0,
                    cmap=IMG_CMAP,
+                   norm=None,
                    scale_bar=True,
                    scale_bar_length=5.0,
                    scale_bar_fontsize=20,
@@ -349,7 +350,7 @@ def display_single(img,
     else:
         zmin, zmax = np.nanmin(img_scale), np.nanmax(img_scale)
 
-    show = ax1.imshow(img_scale, origin='lower', cmap=cmap,
+    show = ax1.imshow(img_scale, origin='lower', cmap=cmap, norm=norm,
                       vmin=zmin, vmax=zmax)
 
     # Hide ticks and tick labels
@@ -1699,7 +1700,8 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.sca(axes[0, 3])
     plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
                 [candy], color='g', zorder=10)
-    plt.scatter(meas_cat['M20'][junk], meas_cat['Gini'][junk], color='r', zorder=11)
+    plt.scatter(meas_cat['M20'][junk], meas_cat['Gini']
+                [junk], color='r', zorder=11)
     plt.scatter(meas_cat['M20'][gal], meas_cat['Gini'][gal], color='b')
     plt.xlabel('M20')
     plt.ylabel('Gini')

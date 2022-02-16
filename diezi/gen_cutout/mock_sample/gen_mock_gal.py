@@ -138,7 +138,6 @@ def gen_mock_gal(low, high):
             print(e)
             continue
 
-
     image_flag = []
     for obj in lsbg_cat:
         image_flag.append(
@@ -153,9 +152,10 @@ def gen_mock_gal(low, high):
 
     lsbg_cat.write(
         f'./Catalog/mock_sample/mock_obj_cat_{low}_{high}.fits', overwrite=True)
-        
+
+
 if __name__ == '__main__':
     fire.Fire(gen_mock_gal)
 
 
-# python gen_mock_gal.py --low 0 --high 10
+# python gen_mock_gal.py --low 0 --high 2000

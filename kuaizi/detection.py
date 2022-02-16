@@ -151,19 +151,21 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
     fig: `matplotlib.pyplot.figure` object
 
     '''
-    Sw = Starlet(detect_image, lvl=wavelet_lvl)  # wavelet decomposition
+    Sw = Starlet.from_image(detect_image)  # wavelet decomposition
+    # Now the number of levels are calculated automatically
+    # Can be accessed as lvl = Sw.scales
     w = Sw.coefficients
     iw = Sw.image
 
     if high_freq_lvl != 0:
-        w[:, (high_freq_lvl):, :, :] = 0  # remove low frequency features
+        w[(high_freq_lvl):, :, :] = 0  # remove low frequency features
         # w: from high to low
 
     if low_freq_lvl != 0:
-        w[:, :(low_freq_lvl), :, :] = 0  # remove high frequency features
+        w[:(low_freq_lvl), :, :] = 0  # remove high frequency features
 
     # image with high-frequency features highlighted
-    high_freq_image = Starlet(coefficients=w).image[0]
+    high_freq_image = Starlet.from_coefficients(w).image
 
     result = vanilla_detection(
         high_freq_image,
@@ -291,11 +293,11 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         Column(data=[None] * len(obj_cat), name='obj_type'), index=0)
 
     if len(datas) == 1:
-        bg_rms = mad_wavelet(datas[0].images)
+        bg_rms = mad_wavelet(detect)
     else:
         bg_rms = []
         for data in datas:
-            bg_rms.append(mad_wavelet(data.images))
+            bg_rms.append(mad_wavelet(detect))
 
     if match_gaia:
         obj_cat.add_column(
