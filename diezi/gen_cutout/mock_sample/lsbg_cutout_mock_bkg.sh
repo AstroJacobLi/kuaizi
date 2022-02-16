@@ -14,6 +14,6 @@ python3 ../s18a_batch_cutout.py \
     --bands griz --ra_name g_ra --dec_name g_dec \
     --name "index" --output $OUTPUT_DIR"/Cutout/mock_sample/bkg/" \
     --catalog_dir $OUTPUT_DIR"/Catalog/mock_sample" --catalog_suffix "mock_sample" \
-    --size 0.7 --prefix "MockBkg" \
-    --njobs 30 --psf True --overwrite False \
-    --low 0 --high 1000
+    --size 1 --prefix "MockBkg" \
+    --njobs 30 --psf True --overwrite True \
+    --low 0 --high 2000
