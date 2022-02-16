@@ -14,9 +14,10 @@ from kuaizi.measure import _write_to_row, makeMeasurement, initialize_meas_cat
 import multiprocess as mp
 mp.freeze_support()
 
+
 def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
                     method='vanilla',
-                    sigma=.5,
+                    sigma=.02,
                     makesegmap=True,
                     global_logger=None):
     lsbg = cat[index]
@@ -37,7 +38,7 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
     try:
         measurement, _ = makeMeasurement(list(np.array(blend.sources)[info['sed_ind']]),
                                          blend.observations[0],
-                                         aggr_mask=mask.astype(bool),
+                                         aggr_mask=None,  # mask.astype(bool),
                                          makesegmap=makesegmap, sigma=sigma,
                                          zeropoint=27.0, out_prefix=None,
                                          show_fig=False, asinh_a=0.02, framealpha=0.7)
@@ -52,8 +53,8 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
     return row
 
 
-def run_all(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, cat_dir, 
-            low=0, high=None, ncpu=16, sigma=.5,
+def run_all(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, cat_dir,
+            low=0, high=None, ncpu=16, sigma=.02,
             method='vanilla',
             # makesegmap=True,
             filename='_lsbg_measure.fits', suffix=''):
@@ -72,43 +73,42 @@ def run_all(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, cat_dir,
 
     if high is None:
         high = len(lsbg_cat)
-    
 
     pwel = mp.Pool(ncpu)
     meas_cat_segmap = pwel.map(partial(measure_obj_row, cat=lsbg_cat, meas_cat=meas_cat_segmap, PREFIX=PREFIX,
-            method=method,
-            model_dir=os.path.join(
-                OUTPUT_DIR, f'Model/{OUTPUT_SUBDIR.lower()}/'),
-            makesegmap=True, sigma=sigma,
-            global_logger=global_logger), range(low, high))
+                                       method=method,
+                                       model_dir=os.path.join(
+                                           OUTPUT_DIR, f'Model/{OUTPUT_SUBDIR.lower()}/'),
+                                       makesegmap=True, sigma=sigma,
+                                       global_logger=global_logger), range(low, high))
     meas_cat_segmap = vstack(meas_cat_segmap)
-    
-    
+
     meas_cat_nosegmap = pwel.map(partial(measure_obj_row, cat=lsbg_cat, meas_cat=meas_cat_nosegmap, PREFIX=PREFIX,
-            method=method,
-            model_dir=os.path.join(
-                OUTPUT_DIR, f'Model/{OUTPUT_SUBDIR.lower()}/'),
-            makesegmap=False,
-            global_logger=global_logger), range(low, high))
+                                         method=method,
+                                         model_dir=os.path.join(
+                                             OUTPUT_DIR, f'Model/{OUTPUT_SUBDIR.lower()}/'),
+                                         makesegmap=False,
+                                         global_logger=global_logger), range(low, high))
     meas_cat_nosegmap = vstack(meas_cat_nosegmap)
 
     meas_cat_segmap['ID'] = meas_cat_segmap['ID'].astype(int)
     if not os.path.isdir(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}')):
         os.makedirs(os.path.join(
             OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}'))
-    meas_cat_segmap.write(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.rstrip(
-        '.fits') + '_' + method + f"_{low}_{high}_" + suffix + 'segmap.fits'), overwrite=True)
-    print('Catalog written to:', os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.rstrip(
-        '.fits') + '_' + method + f"_{low}_{high}_" + suffix + 'segmap.fits'))
+    meas_cat_segmap.write(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.replace(
+        '.fits', '') + '_' + method + f"_{low}_{high}_" + suffix + 'segmap.fits'), overwrite=True)
+    print('Catalog written to:', os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.replace(
+        '.fits', '') + '_' + method + f"_{low}_{high}_" + suffix + 'segmap.fits'))
 
     meas_cat_nosegmap['ID'] = meas_cat_nosegmap['ID'].astype(int)
     if not os.path.isdir(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}')):
         os.makedirs(os.path.join(
             OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}'))
-    meas_cat_nosegmap.write(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.rstrip(
-        '.fits') + '_' + method + f"_{low}_{high}_" + suffix + 'nosegmap.fits'), overwrite=True)
-    print('Catalog written to:', os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.rstrip(
-        '.fits') + '_' + method + f"_{low}_{high}_" + suffix + 'nosegmap.fits'))
+    meas_cat_nosegmap.write(os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.replace(
+        '.fits', '') + '_' + method + f"_{low}_{high}_" + suffix + 'nosegmap.fits'), overwrite=True)
+    print('Catalog written to:', os.path.join(OUTPUT_DIR, f'Catalog/{OUTPUT_SUBDIR.lower()}', filename.replace(
+        '.fits', '') + '_' + method + f"_{low}_{high}_" + suffix + 'nosegmap.fits'))
+
 
 if __name__ == '__main__':
     fire.Fire(run_all)
