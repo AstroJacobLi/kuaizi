@@ -15,7 +15,9 @@ import traceback
 import sep
 import numpy as np
 import scarlet
+import unagi  # for HSC saturation mask
 from scarlet.source import StarletSource
+
 
 from astropy import wcs
 import astropy.units as u
@@ -37,25 +39,27 @@ plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
 def _optimization(blend, bright=False, logger=None):
+    logger.info('  - Optimizing scarlet model...')
+    print('  - Optimizing scarlet model...')
     if bright:
         # , 1e-4  # otherwise it will take forever....
         e_rel_list = [1e-3, 1e-4]
-        n_iter = 100
+        n_iter = [100, 100]
     else:
-        e_rel_list = [1e-4, 5e-4]  # , 5e-5, 1e-5
-        n_iter = 100
+        e_rel_list = [1e-4, 5e-4, 2e-4]  # , 5e-5, 1e-5
+        n_iter = [100, 100, 50]
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
     best_model = blend
     best_logL = -blend.loss[-1]
     best_erel = 1e-3
-    best_epoch = 1
+    best_epoch = 20
 
     for i, e_rel in enumerate(e_rel_list):
-        for k in range(n_iter // 5):
+        for k in range(n_iter[i] // 5):
             blend.fit(5, e_rel)
-            if -blend.loss[-1] > best_logL:
+            if (-blend.loss[-1] > best_logL) and (len(blend.loss) > best_epoch):
                 best_model = copy.deepcopy(blend)
                 best_logL = -blend.loss[-1]
                 best_erel = e_rel
@@ -78,7 +82,7 @@ def _optimization(blend, bright=False, logger=None):
     print(
         "  - After {0} iterations, logL = {1:.2f}".format(best_epoch, best_logL))
 
-    return [best_model, best_logL, best_erel, best_epoch]
+    return [best_model, best_logL, best_erel, best_epoch, blend]
 
 
 class ScarletFittingError(Exception):
@@ -509,9 +513,15 @@ class ScarletFitter(object):
         from astropy.convolution import convolve, Gaussian2DKernel
         conv_data = np.zeros_like(self.data.images)
         for i in range(len(self.data.images)):
-            input_data = convolve(
-                self.data.images[i].astype(float), Gaussian2DKernel(1.5))
-            bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
+            if self.method == 'vanilla':
+                input_data = convolve(
+                    self.data.images[i].astype(float), Gaussian2DKernel(1.5))
+                bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
+            else:
+                input_data = convolve(
+                    self.data.images[i].astype(float), Gaussian2DKernel(2.5))
+                bkg = sep.Background(input_data, bw=80,
+                                     bh=80, fw=2.5, fh=2.5)
             input_data -= bkg.back()
             conv_data[i] = input_data
         observation = scarlet.Observation(
@@ -572,7 +582,7 @@ class ScarletFitter(object):
                 min_grad_range = np.arange(min_grad, 0.3, 0.05)
             else:
                 # I changed -0.3 to -0.2
-                min_grad_range = np.arange(-0.2, 0.3, 0.05)
+                min_grad_range = np.arange(min_grad, 0.3, 0.05)
 
             # We calculate the ratio of contaminants' area over the box area
             # Then the box size is decided based on this ratio.
@@ -611,9 +621,9 @@ class ScarletFitter(object):
                 '  - Wavelet modeling with the following hyperparameters:')
             print(f'  - Wavelet modeling with the following hyperparameters:')
             self.logger.info(
-                f'    min_grad = {min_grad:.2f}, starlet_thresh = {self.starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}), \n monotonic = {self.monotonic}, variance = {self.variance}, scales = {self.scales}.')
+                f'    min_grad = {min_grad:.2f}, starlet_thresh = {self.starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}), \n     monotonic = {self.monotonic}, variance = {self.variance:.5f}, scales = {self.scales}.')
             print(
-                f'    min_grad = {min_grad:.2f}, starlet_thresh = {self.starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}), \n monotonic = {self.monotonic}, variance = {self.variance}, scales = {self.scales}.'
+                f'    min_grad = {min_grad:.2f}, starlet_thresh = {self.starlet_thresh:.2f} (contam_ratio = {contam_ratio:.2f}), \n     monotonic = {self.monotonic}, variance = {self.variance:.5f}, scales = {self.scales}.'
             )
             starlet_source.center = (
                 np.array(starlet_source.bbox.shape) // 2 + starlet_source.bbox.origin)[1:]
@@ -762,7 +772,7 @@ class ScarletFitter(object):
         if not self.show_figure:
             plt.close()
 
-        [self.blend, self.best_logL, self.best_erel, self.best_epoch] = _optimization(
+        [self.blend, self.best_logL, self.best_erel, self.best_epoch, self._blend] = _optimization(
             self.blend, bright=self.bright, logger=self.logger)
         with open(os.path.join(self.model_dir, f'{self.prefix}-{self.index}-trained-model-{self.method}.df'), 'wb') as fp:
             dill.dump(
@@ -952,7 +962,7 @@ class ScarletFitter(object):
 
         fig = kz.display.display_scarlet_results_tigress(
             self.blend,
-            None,  # self.final_mask,
+            self.final_mask,
             show_ind=self.sed_ind,
             zoomin_size=zoomin_size,
             minimum=-0.2,
@@ -962,7 +972,9 @@ class ScarletFitter(object):
             show_loss=True,
             show_mask=False,
             show_mark=False,
-            scale_bar=True)
+            scale_bar=True,
+            add_text=f'{self.prefix}-{self.index}',
+            text_fontsize=20,)
         plt.savefig(
             os.path.join(self.figure_dir, f'{self.prefix}-{self.index}-zoomin-{self.method}.png'), dpi=55, bbox_inches='tight')
         if not self.show_figure:
@@ -987,7 +999,7 @@ class ScarletFitter(object):
                 self.data.images.shape) * self.pixel_scale > 200 else 0.006
             if self.method == 'wavelet':
                 first_dblend_cont = 0.07 if max(
-                    self.data.images.shape) * self.pixel_scale > 200 else 0.006
+                    self.data.images.shape) * self.pixel_scale > 200 else 0.002
             self._first_detection(first_dblend_cont)
 
             self._estimate_box(self.cen_obj)
@@ -996,7 +1008,7 @@ class ScarletFitter(object):
             self._big_obj_detection()
             self._merge_catalogs()
             self._construct_obs_frames()
-            self._add_sources()
+            self._add_sources(min_grad=0.02)
 
             if self.show_figure:
                 fig = kz.display.display_scarlet_sources(
@@ -1062,7 +1074,6 @@ def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
 
     from kuaizi.utils import padding_PSF
     from kuaizi.mock import Data
-    import unagi  # for HSC saturation mask
 
     index = lsbg[name]
     # whether this galaxy is a very bright one
