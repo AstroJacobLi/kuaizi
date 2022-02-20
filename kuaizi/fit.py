@@ -17,6 +17,7 @@ import numpy as np
 import scarlet
 import unagi  # for HSC saturation mask
 from scarlet.source import StarletSource
+from scarlet.operator import prox_monotonic_mask
 
 
 from astropy import wcs
@@ -43,11 +44,11 @@ def _optimization(blend, bright=False, logger=None):
     print('  - Optimizing scarlet model...')
     if bright:
         # , 1e-4  # otherwise it will take forever....
-        e_rel_list = [1e-3, 1e-4]
-        n_iter = [100, 100]
+        e_rel_list = [1e-3, 1e-4, ]  #
+        n_iter = [100, 100, 100]
     else:
-        e_rel_list = [1e-4, 5e-4, 2e-4]  # , 5e-5, 1e-5
-        n_iter = [100, 100, 50]
+        e_rel_list = [1e-4, 5e-4]  # , 2e-4 # , 5e-5, 1e-5
+        n_iter = [100, 100]  # , 50
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
@@ -107,7 +108,7 @@ class ScarletFittingError(Exception):
 
 
 class ScarletFitter(object):
-    def __init__(self, method='vanilla', tigress=True, bright=False, **kwargs) -> None:
+    def __init__(self, method='vanilla', tigress=True, bright=False, min_grad=-0.03, **kwargs) -> None:
         """Initialize a ScarletFitter object.
 
         Args:
@@ -126,6 +127,7 @@ class ScarletFitter(object):
         self.method = method
         self.tigress = tigress
         self.bright = bright
+        self.min_grad = min_grad
 
         self.log_dir = kwargs.get('log_dir', './log')
         self.figure_dir = kwargs.get('figure_dir', './Figure')
@@ -145,8 +147,14 @@ class ScarletFitter(object):
         self.show_figure = kwargs.get('show_figure', False)
         self.starlet_thresh = kwargs.get('starlet_thresh', 0.5)
         self.monotonic = kwargs.get('monotonic', True)
-        self.variance = kwargs.get('variance', 0.07**2)
-        self.scales = kwargs.get('scales', [0, 1, 2, 3, 4, 5])
+        self.variance = kwargs.get('variance', 0.03**2)
+        self.scales = kwargs.get('scales', [0, 1, 2, 3, 4, 5, 6])
+
+        if self.bright:
+            self.variance = 0.05**2
+            self.scales = [0, 1, 2, 3, 4, 5, 6]
+            self.starlet_thresh = 1
+            self.thresh = 0.01
 
         self._set_logger()
 
@@ -154,7 +162,6 @@ class ScarletFitter(object):
         self.logger.info('    Load data')
         self.data = data
         self.coord = coord
-        self.bright = False
 
     def _set_logger(self):
         from .utils import set_logger
@@ -245,7 +252,7 @@ class ScarletFitter(object):
         if self.method == 'vanilla':
             min_grad = -0.01
         elif self.method == 'wavelet':
-            min_grad = -0.05
+            min_grad = -0.03
 
         starlet_source = StarletSource(model_frame,
                                        (cen_obj['ra'], cen_obj['dec']),
@@ -401,7 +408,7 @@ class ScarletFitter(object):
         self.seg_mask_cpct = (mask_conv >= gaussian_threshold)
         self.obj_cat_cpct = obj_cat_cpct
 
-    def _big_obj_detection(self, lvl=4.0, b=32, f=3, deblend_cont=0.01):
+    def _big_obj_detection(self, lvl=4.0, b=48, f=3, deblend_cont=0.01):
         # This step masks out bright and large contamination, which is not well-masked in previous step
         obj_cat, segmap_big, bg_rms = kz.detection.makeCatalog(
             [self.data],
@@ -539,8 +546,8 @@ class ScarletFitter(object):
         self.starlet_mask = ((np.sum(self.observation.weights == 0, axis=0)
                               != 0) + self.msk_star_ori + (~((self.segmap_ori == 0) | (self.segmap_ori == self.cen_obj['idx'] + 1)))).astype(bool)
 
-    def _add_central_source(self, K=2, min_grad=-0.1, thresh=0.01,
-                            shifting=True, monotonic=True, variance=0.01, scales=[0, 1, 2, 3, 4, 5]):
+    def _add_central_source(self, K=2, min_grad=0.02, thresh=0.1,
+                            shifting=True, monotonic=True, variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6]):
         '''
         Add central source. The central source type depends on `self.method`.
 
@@ -576,13 +583,15 @@ class ScarletFitter(object):
             sources.append(new_source)
         else:  # wavelet
             # Find a better box, not too large, not too small
+            if self.method == 'wavelet' and self.monotonic:
+                upper = 0.1
+            else:
+                upper = 0.3
             if self.smaller_box or self.bright:
-                min_grad_range = np.arange(0.02, 0.3, 0.05)
-            elif self.starlet_thresh > 0.5:
-                min_grad_range = np.arange(min_grad, 0.3, 0.05)
+                min_grad_range = np.arange(0.02, upper, 0.02)
             else:
                 # I changed -0.3 to -0.2
-                min_grad_range = np.arange(min_grad, 0.3, 0.05)
+                min_grad_range = np.arange(min_grad, upper, 0.02)
 
             # We calculate the ratio of contaminants' area over the box area
             # Then the box size is decided based on this ratio.
@@ -611,8 +620,8 @@ class ScarletFitter(object):
                 contam_ratio = 1 - \
                     np.sum((segbox == 0) | (segbox == self.cen_obj['idx'] + 1)) / \
                     np.sum(np.ones_like(segbox))
-                if (contam_ratio <= 0.15 and (~self.smaller_box)) or (
-                        contam_ratio <= 0.15 and (self.smaller_box or self.bright)):
+                if (contam_ratio <= 0.2 and (~self.smaller_box)) or (
+                        contam_ratio <= 0.2 and (self.smaller_box or self.bright)):
                     break
                 else:
                     contam_ratio_list.append(contam_ratio)
@@ -632,8 +641,8 @@ class ScarletFitter(object):
 
         return sources
 
-    def _add_sources(self, K=2, min_grad=-0.1,
-                     thresh=0.01, shifting=True):
+    def _add_sources(self, K=2, min_grad=0.02,
+                     thresh=0.1, shifting=True):
         '''
         Add all sources. Central source type depends on `self.method`.
 
@@ -935,6 +944,31 @@ class ScarletFitter(object):
             # This is the mask for everything except target galaxy
             footprint = footprint + footprint2
 
+        # Deal with non-monotonic flux
+        if self.method == 'wavelet':  # and self.monotonic is True:
+            src = self.blend.sources[0]
+            img = self.observation.render(src.get_model())
+            center = tuple(s // 2 for s in src.bbox.shape[1:])
+            prox = prox_monotonic_mask(
+                img[0], 1e-3,
+                center=center,
+                zero=0,
+                center_radius=2,
+                variance=1e-4,
+                max_iter=10)
+            smooth_radius = 3
+            gaussian_threshold = 0.02
+            mask_conv = np.copy(~prox[0])
+            mask_conv = convolve(mask_conv.astype(
+                float), Gaussian2DKernel(smooth_radius))
+            mask_conv = (mask_conv > gaussian_threshold)
+            monomask = np.zeros_like(footprint)
+            monomask[src.bbox.origin[1]:src.bbox.origin[1] + src.bbox.shape[1],
+                     src.bbox.origin[2]:src.bbox.origin[2] + src.bbox.shape[2]] = mask_conv
+            monomask = monomask.astype(bool)
+
+            footprint = footprint + monomask
+
         self.final_mask = footprint
 
         outdir = os.path.join(
@@ -951,7 +985,7 @@ class ScarletFitter(object):
                               'sed_ind': self.sed_ind}, footprint], fp)
             fp.close()
 
-    def _display_results(self):
+    def _display_results(self, stretch=0.9):
         # Save fitting figure
         # zoomin_size: in arcsec, rounded to integer multiple of 30 arcsec
         zoomin_size = np.ceil(
@@ -966,7 +1000,7 @@ class ScarletFitter(object):
             show_ind=self.sed_ind,
             zoomin_size=zoomin_size,
             minimum=-0.2,
-            stretch=1,
+            stretch=stretch,
             Q=1,
             channels=self.data.channels,
             show_loss=True,
@@ -1008,7 +1042,13 @@ class ScarletFitter(object):
             self._big_obj_detection()
             self._merge_catalogs()
             self._construct_obs_frames()
-            self._add_sources(min_grad=0.02)
+            if self.bright:
+                self.variance = 0.05**2
+                self.scales = [0, 1, 2, 3, 4, 5, 6]
+                self.starlet_thresh = 0.5
+                self.min_grad = 0.02
+
+            self._add_sources(min_grad=self.min_grad, thresh=0.1)
 
             if self.show_figure:
                 fig = kz.display.display_scarlet_sources(
@@ -1039,8 +1079,9 @@ class ScarletFitter(object):
 
 def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
                         method='vanilla',
+                        min_grad=-0.02,
                         starlet_thresh=0.5, monotonic=True, scales=[0, 1, 2, 3, 4, 5], variance=0.07**2,
-                        pixel_scale=HSC_pixel_scale, bright_thresh=17.0,
+                        pixel_scale=HSC_pixel_scale, bright_thresh=17.5,
                         prefix='candy', model_dir='./Model', figure_dir='./Figure', log_dir='./log',
                         show_figure=False, logger=None, global_logger=None, fail_logger=None):
     '''
@@ -1082,6 +1123,7 @@ def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
     fitter = ScarletFitter(method=method,
                            tigress=True,
                            bright=bright,
+                           min_grad=min_grad,
                            starlet_thresh=starlet_thresh,
                            monotonic=monotonic,
                            scales=scales,
