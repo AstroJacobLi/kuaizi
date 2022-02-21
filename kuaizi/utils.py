@@ -127,6 +127,9 @@ def set_logger(logger_name='fitting_wavelet_obs_tigress', file_name='candy', lev
         logger.setLevel(logging.ERROR)
 
     # create file handler which logs even debug messages
+    if os.path.isfile(file_name):
+        os.remove(file_name)
+
     fh = logging.FileHandler(file_name)
     fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
