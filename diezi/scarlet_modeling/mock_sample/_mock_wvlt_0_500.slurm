@@ -2,6 +2,7 @@
 #SBATCH -J mock_wvlt_0_500
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
+#SBATCH --mem-per-cpu=10G
 #SBATCH --time=48:00:00
 #SBATCH --export=ALL
 #SBATCH -o mock_wvlt_0_500.o
@@ -22,8 +23,8 @@ python3 ../script/sclt_multiprocess.py --njobs 16 \
    --PREFIX 'MOCK' \
    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \
    --low 0 --high 500 \
-   --suffix '' --starlet_thresh 1 --method wavelet
-   --monotonic True --variance 0.05**2 --scales '[0, 1, 2, 3, 4, 5, 6]'
+   --suffix '' --starlet_thresh 0.3 --method wavelet
+   --monotonic True --bkg True --variance 0.000225 --scales '[0, 1, 2, 3, 4]' --min_grad 0.01
 
 python3 ../script/sclt_meas_mp.py \
     --DATADIR '/scratch/gpfs/jiaxuanl/Data/' \
