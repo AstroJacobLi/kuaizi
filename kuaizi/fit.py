@@ -1,5 +1,5 @@
-""" 
-This file contains classes and functions for Scarlet fitting. I'm trying to make it more mordular. 
+"""
+This file contains classes and functions for Scarlet fitting. I'm trying to make it more mordular.
 Based on `fitting.py`.
 """
 # Import packages
@@ -39,16 +39,16 @@ plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
-def _optimization(blend, bright=False, logger=None):
+def _optimization(blend, bright=False, logger=None, bkg=False):
     logger.info('  - Optimizing scarlet model...')
     print('  - Optimizing scarlet model...')
     if bright:
         # , 1e-4  # otherwise it will take forever....
         e_rel_list = [1e-3, 1e-4, ]  #
-        n_iter = [100, 100, 100]
+        n_iter = [200, 200, ] if bkg else [100, 100, ]
     else:
-        e_rel_list = [1e-4, 5e-4]  # , 2e-4 # , 5e-5, 1e-5
-        n_iter = [100, 100]  # , 50
+        e_rel_list = [1e-4, 5e-4, 2e-4]  # , 2e-4 # , 5e-5, 1e-5
+        n_iter = [200, 200, 200] if bkg else [100, 100, 50]  # , 50
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
@@ -108,16 +108,17 @@ class ScarletFittingError(Exception):
 
 
 class ScarletFitter(object):
-    def __init__(self, method='vanilla', tigress=True, bright=False, min_grad=-0.03, **kwargs) -> None:
+    def __init__(self, method='vanilla', tigress=True, bright=False, min_grad=-0.03, bkg=True, **kwargs) -> None:
         """Initialize a ScarletFitter object.
 
         Args:
-            method (str, optional): method used in scarlet fitting, either 'vanilla' or 'wavelet'. 
+            method (str, optional): method used in scarlet fitting, either 'vanilla' or 'wavelet'.
                 Defaults to 'vanilla'.
             tigress (bool, optional): whether to use Tigress data. Defaults to True.
             bright (bool, optional): whether treat this object as bright object. Defaults to False.
-            **kwargs: keyword arguments for ScarletFitter, including 
-                ['log_dir', 'figure_dir', 'model_dir', 'prefix', 'index', 
+            bkg (bool, optional): whether to add a constant sky component. 
+            **kwargs: keyword arguments for ScarletFitter, including
+                ['log_dir', 'figure_dir', 'model_dir', 'prefix', 'index',
                  'pixel_scale', 'zeropoint', show_figure', starlet_thresh', 'monotonic', 'variance].
         """
         if method not in ['vanilla', 'wavelet']:
@@ -128,6 +129,7 @@ class ScarletFitter(object):
         self.tigress = tigress
         self.bright = bright
         self.min_grad = min_grad
+        self.bkg = bkg
 
         self.log_dir = kwargs.get('log_dir', './log')
         self.figure_dir = kwargs.get('figure_dir', './Figure')
@@ -227,7 +229,7 @@ class ScarletFitter(object):
         cen_obj['dec'] = dec
         cen_obj['idx'] = cen_indx_ori
         cen_obj['coord'] = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
-        #cen_obj_coord = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
+        # cen_obj_coord = SkyCoord(cen_obj['ra'], cen_obj['dec'], unit='deg')
 
         self.cen_obj = cen_obj
         self.obj_cat_ori = obj_cat_ori
@@ -480,7 +482,7 @@ class ScarletFitter(object):
         catalog_c = SkyCoord(
             self.obj_cat_big['ra'], self.obj_cat_big['dec'], unit='deg')
         dist = self.cen_obj['coord'].separation(catalog_c)
-        #obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
+        # obj_cat_big.remove_rows(np.where(dist < 3 * u.arcsec)[0])
         self.obj_cat_big.remove_rows(np.where(
             dist < 1. * np.sqrt(self.cen_obj['a'] * self.cen_obj['b']) * self.pixel_scale * u.arcsec)[0])  # 2 times circularized effective radius
 
@@ -558,9 +560,9 @@ class ScarletFitter(object):
         thresh (float): Threshold (# of std over background noise) in initializing the source.
         shifting (bool): Whether to allow the center of object to shift or not.
         monotonic (bool): Whether to enforce monotonicity of the profile. Only works for wavelet source.
-        variance (float): Variance (actually std) below which non-monotnoicity is allowed. 
+        variance (float): Variance (actually std) below which non-monotnoicity is allowed.
             Only works for wavelet source.
-        scales (list): For these wavelet scales, enforce monotonicity constraint, positive constraint, 
+        scales (list): For these wavelet scales, enforce monotonicity constraint, positive constraint,
             and L0 penalty (controlled by starlet_thresh).
             For other scales, we only enforce monotonicity, but remove the positive constraint.
             Only works for wavelet source and if `monotonic` is True.
@@ -654,10 +656,11 @@ class ScarletFitter(object):
         variance (float): For central source, variance (actually std) below which non-monotnoicity is allowed.
         shifting (bool): Whether to allow the center of central object to shift or not.
         monotonic (bool): Whether to enforce monotonicity of the profile. Only works for wavelet source.
-        scales (list): For these wavelet scales, enforce monotonicity constraint, positive constraint, 
+        scales (list): For these wavelet scales, enforce monotonicity constraint, positive constraint,
             and L0 penalty (controlled by starlet_thresh).
             For other scales, we only enforce monotonicity, but remove the positive constraint.
             Only works for wavelet source and if `monotonic` is True.
+        bkg (bool): Whether to add a sky background source.
         '''
         sources = self._add_central_source(K=K, min_grad=min_grad,
                                            thresh=thresh, shifting=shifting,
@@ -758,6 +761,14 @@ class ScarletFitter(object):
                 # only use SingleExtendedSource
                 sources.append(new_source)
 
+        # Add constant sky bkg
+        if self.bkg == True:
+            new_source = scarlet.ConstSkySource(
+                self.model_frame,
+                self.observation)
+            sources.append(new_source)
+            print('    Added constant sky background')
+            self.logger.info('    Added constant sky background')
         self._sources = sources
         self.blend = scarlet.Blend(self._sources, self.observation)
 
@@ -782,7 +793,7 @@ class ScarletFitter(object):
             plt.close()
 
         [self.blend, self.best_logL, self.best_erel, self.best_epoch, self._blend] = _optimization(
-            self.blend, bright=self.bright, logger=self.logger)
+            self.blend, bright=self.bright, logger=self.logger, bkg=self.bkg)
         with open(os.path.join(self.model_dir, f'{self.prefix}-{self.index}-trained-model-{self.method}.df'), 'wb') as fp:
             dill.dump(
                 [self.blend, {'starlet_thresh': self.starlet_thresh,
@@ -830,7 +841,11 @@ class ScarletFitter(object):
                 for src in np.array(self.blend.sources)[sed_ind]
             ]
 
-            sed_ind = sed_ind[(~point_flag) & near_cen_flag & dist_flag]
+            bkg_flag = np.array([isinstance(src, scarlet.source.ConstSkySource)
+                                 for src in np.array(self.blend.sources)[sed_ind]])
+
+            sed_ind = sed_ind[(~point_flag) & near_cen_flag &
+                              dist_flag & (~bkg_flag)]
 
             if not 0 in sed_ind:
                 # the central source must be included.
@@ -953,8 +968,8 @@ class ScarletFitter(object):
                 img[0], 1e-3,
                 center=center,
                 zero=0,
-                center_radius=2,
-                variance=1e-4,
+                center_radius=5,
+                variance=1e-4,  # 1e-4,
                 max_iter=10)
             smooth_radius = 3
             gaussian_threshold = 0.02
@@ -1080,17 +1095,17 @@ class ScarletFitter(object):
 def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
                         method='vanilla',
                         min_grad=-0.02,
-                        starlet_thresh=0.5, monotonic=True, scales=[0, 1, 2, 3, 4, 5], variance=0.07**2,
+                        starlet_thresh=0.5, monotonic=True, bkg=True, scales=[0, 1, 2, 3, 4, 5], variance=0.07**2,
                         pixel_scale=HSC_pixel_scale, bright_thresh=17.5,
                         prefix='candy', model_dir='./Model', figure_dir='./Figure', log_dir='./log',
-                        show_figure=False, logger=None, global_logger=None, fail_logger=None):
+                        show_figure=False, global_logger=None, fail_logger=None):
     '''
-    Run scarlet wavelet modeling on Tiger, modified on 01/04/2021. 
+    Run scarlet wavelet modeling on Tiger, modified on 01/04/2021.
 
     Parameters:
-        env_dict (dict): dictionary indicating the file directories, such as 
+        env_dict (dict): dictionary indicating the file directories, such as
             `env_dict = {'project': 'HSC', 'name': 'LSBG', 'data_dir': '/tigress/jiaxuanl/Data'}`
-        lsbg (one row in `astropy.Table`): the galaxy to be modeled. 
+        lsbg (one row in `astropy.Table`): the galaxy to be modeled.
         name (str): the column name for the index of `lsbg`.
         channels (str): bandpasses to be used, such as 'grizy'.
         method (str): the method to be used for fitting. Either "vanilla" or "wavelet".
@@ -1100,9 +1115,9 @@ def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
         bright_thresh (float): magnitude threshold for bright galaxies, default is 17.0.
         prefix (str): the prefix for output files.
         model_dir (str): directory for output modeling files.
-        figure_dir (str): directory for output figures. 
+        figure_dir (str): directory for output figures.
         show_figure (bool): if True, show the figure displaying fitting results.
-        logger (`logging.Logger`): a dedicated robot who writes down the log. 
+        logger (`logging.Logger`): a dedicated robot who writes down the log.
             If not provided, a Logger will be generated automatically.
         global_logger (`logging.Logger`): the logger used to pass the log within this function to outside.
         fail_logger (`logging.Logger`): the logger used to take notes for failed cases.
@@ -1126,6 +1141,7 @@ def fitting_obs_tigress(env_dict, lsbg, name='Seq', channels='griz',
                            min_grad=min_grad,
                            starlet_thresh=starlet_thresh,
                            monotonic=monotonic,
+                           bkg=bkg,
                            scales=scales,
                            variance=variance,
                            log_dir=log_dir,
