@@ -48,7 +48,8 @@ def _optimization(blend, bright=False, logger=None, bkg=False):
         n_iter = [200, 200, ] if bkg else [100, 100, ]
     else:
         e_rel_list = [1e-4, 5e-4, 2e-4]  # , 2e-4 # , 5e-5, 1e-5
-        n_iter = [200, 200, 200] if bkg else [100, 100, 50]  # , 50
+        n_iter = [150, 100, 100] if bkg else [
+            100, 100, 50]  # , 50 [200, 200, 200]
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
@@ -121,7 +122,7 @@ class ScarletFitter(object):
                 ['log_dir', 'figure_dir', 'model_dir', 'prefix', 'index',
                  'pixel_scale', 'zeropoint', show_figure', starlet_thresh', 'monotonic', 'variance].
         """
-        if method not in ['vanilla', 'wavelet']:
+        if method not in ['vanilla', 'wavelet', 'spergel']:
             raise ValueError(
                 f'Method {method} is not supported! Only "vaniila" and "wavelet" are supported.')
 
@@ -152,12 +153,6 @@ class ScarletFitter(object):
         self.variance = kwargs.get('variance', 0.03**2)
         self.scales = kwargs.get('scales', [0, 1, 2, 3, 4, 5, 6])
 
-        if self.bright:
-            self.variance = 0.05**2
-            self.scales = [0, 1, 2, 3, 4, 5, 6]
-            self.starlet_thresh = 1
-            self.thresh = 0.01
-
         self._set_logger()
 
     def load_data(self, data, coord):
@@ -171,7 +166,7 @@ class ScarletFitter(object):
             self.log_dir, f'{self.prefix}-{self.index}.log'))
         self.logger = logger
 
-    def _first_gaia_search(self):
+    def _first_gaia_search(self, scale_factor=1.0):
         print('    Query GAIA stars...')
         self.logger.info('    Query GAIA stars...')
         # Generate a mask for GAIA bright stars
@@ -180,7 +175,7 @@ class ScarletFitter(object):
             self.data.wcs,
             pixel_scale=self.pixel_scale,
             gaia_bright=19.5,
-            mask_a=694.7,
+            mask_a=694.7 * scale_factor,
             mask_b=3.8,
             factor_b=1.0,  # 0.7,
             factor_f=1.4,  # 1.0,
@@ -191,19 +186,19 @@ class ScarletFitter(object):
         else:
             self.n_stars = len(self.gaia_cat)
 
-    def _first_detection(self, first_dblend_cont):
+    def _first_detection(self, first_dblend_cont, conv_radius=2, b=80, f=3):
         obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
             [self.data],
             lvl=4,  # a.k.a., "sigma"
             mask=self.msk_star_ori,
             method='vanilla',
             convolve=True,
-            conv_radius=2,
+            conv_radius=conv_radius,
             match_gaia=False,
             show_fig=self.show_figure,
             visual_gaia=False,
-            b=80,
-            f=3,
+            b=b,
+            f=f,
             pixel_scale=self.pixel_scale,
             minarea=20,
             deblend_nthresh=48,
@@ -254,7 +249,9 @@ class ScarletFitter(object):
         if self.method == 'vanilla':
             min_grad = -0.01
         elif self.method == 'wavelet':
-            min_grad = -0.03
+            min_grad = -0.1
+        else:
+            min_grad = -0.1
 
         starlet_source = StarletSource(model_frame,
                                        (cen_obj['ra'], cen_obj['dec']),
@@ -319,7 +316,7 @@ class ScarletFitter(object):
             ax = plt.gca()
             ax.add_patch(rect)
 
-    def _mask_stars_outside_box(self):
+    def _mask_stars_outside_box(self, scale_factor=1.0):
         if self.n_stars > 0:
             # Find stars within the wavelet box, and mask them.
             star_flag = [(item[0] > self.starlet_extent[0]) & (item[0] < self.starlet_extent[1]) &
@@ -337,7 +334,7 @@ class ScarletFitter(object):
                 gaia_stars=self.gaia_cat[~np.array(star_flag)],
                 pixel_scale=self.pixel_scale,
                 gaia_bright=19.5,
-                mask_a=694.7,
+                mask_a=694.7 * scale_factor,
                 mask_b=3.8,
                 factor_b=0.8,
                 factor_f=0.6,
@@ -528,7 +525,7 @@ class ScarletFitter(object):
                 bkg = sep.Background(input_data, bw=50, bh=50, fw=3.5, fh=3.5)
             else:
                 input_data = convolve(
-                    self.data.images[i].astype(float), Gaussian2DKernel(2.5))
+                    self.data.images[i].astype(float), Gaussian2DKernel(4))
                 bkg = sep.Background(input_data, bw=80,
                                      bh=80, fw=2.5, fh=2.5)
             input_data -= bkg.back()
@@ -549,7 +546,8 @@ class ScarletFitter(object):
                               != 0) + self.msk_star_ori + (~((self.segmap_ori == 0) | (self.segmap_ori == self.cen_obj['idx'] + 1)))).astype(bool)
 
     def _add_central_source(self, K=2, min_grad=0.02, thresh=0.1,
-                            shifting=True, monotonic=True, variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6]):
+                            shifting=True, monotonic=True, variance=0.03**2,
+                            scales=[0, 1, 2, 3, 4, 5, 6]):
         '''
         Add central source. The central source type depends on `self.method`.
 
@@ -583,17 +581,12 @@ class ScarletFitter(object):
                 satu_mask=self.data.masks,
                 K=K, thresh=thresh, shifting=shifting, min_grad=min_grad)
             sources.append(new_source)
-        else:  # wavelet
+        elif self.method == 'wavelet':  # wavelet
+            assert self.monotonic == monotonic, 'monotonic must be consistent with fitter.monotonic'
             # Find a better box, not too large, not too small
-            if self.method == 'wavelet' and self.monotonic:
-                upper = 0.1
-            else:
-                upper = 0.3
-            if self.smaller_box or self.bright:
-                min_grad_range = np.arange(0.02, upper, 0.02)
-            else:
-                # I changed -0.3 to -0.2
-                min_grad_range = np.arange(min_grad, upper, 0.02)
+            upper = 0.1 if self.monotonic else 0.3
+            min_grad_range = np.arange(
+                0.02, upper, 0.02) if self.bright else np.arange(min_grad, upper, 0.02)
 
             # We calculate the ratio of contaminants' area over the box area
             # Then the box size is decided based on this ratio.
@@ -610,7 +603,7 @@ class ScarletFitter(object):
                     self._conv_observation,  # self._conv_observation,
                     star_mask=self.starlet_mask,  # bright stars are masked when estimating morphology
                     satu_mask=self.data.masks,  # saturated pixels are masked when estimating SED
-                    thresh=thresh,  # 0.01
+                    thresh=thresh,
                     min_grad=min_grad,
                     monotonic=monotonic,
                     starlet_thresh=self.starlet_thresh,
@@ -639,7 +632,34 @@ class ScarletFitter(object):
             starlet_source.center = (
                 np.array(starlet_source.bbox.shape) // 2 + starlet_source.bbox.origin)[1:]
             sources.append(starlet_source)
-            # Finish adding the starlet source
+
+        elif self.method == 'spergel':
+            from .measure import g1g2, flux_radius_array
+            # We first initialize an ExtendedSource to guess the initial parameters
+            new_source = scarlet.SingleExtendedSource(
+                self.model_frame,
+                (src['ra'], src['dec']),
+                self.observation,
+                satu_mask=self.data.masks,
+                thresh=thresh,
+                shifting=True,
+                min_grad=min_grad)
+            morph = new_source.morphology
+            SED = np.array(new_source.spectrum * new_source.morphology.sum())
+            g1, g2 = g1g2(np.array(morph))
+            rhalf = flux_radius_array(np.array(morph), 0.45) * 1.5
+            nu = np.array([0.5])
+
+            david = scarlet.SpergelSource(
+                self.model_frame,
+                (src['ra'], src['dec']),
+                nu, rhalf, np.array((g1[0], g2[0])),
+                self.observation,
+                SED=SED)
+            sources.append(david)
+            self.logger.info(
+                f'  - Added Spergel profile with bbox = {david.bbox.shape}')
+            print(f'  - Added Spergel profile with bbox = {david.bbox.shape}')
 
         return sources
 
@@ -694,7 +714,7 @@ class ScarletFitter(object):
             cpct = cpct[np.setdiff1d(np.arange(len(cpct)),
                                      tempid[np.where(sep2d < 1 * u.arcsec)])]
 
-        if not self.bright:
+        if not (self.bright | self.smaller_box):
             # for bright galaxy, we don't include these compact sources into modeling,
             # due to the limited computation resources
             for k, src in enumerate(cpct):
@@ -727,17 +747,17 @@ class ScarletFitter(object):
             self._big_cat = big_cat
 
             for k, src in enumerate(big_cat):
-                if src['fwhm_custom'] > 22:
+                if src['fwhm_custom'] > 24:
                     new_source = scarlet.source.ExtendedSource(
                         self.model_frame, (src['ra'], src['dec']),
                         self.observation,
-                        K=2, thresh=2, shifting=True, min_grad=0.2)
+                        K=2, thresh=3, shifting=True, min_grad=0.2)
                 else:
                     try:
                         new_source = scarlet.source.SingleExtendedSource(
                             self.model_frame, (src['ra'], src['dec']),
                             self.observation, satu_mask=self.data.masks,  # helps to get SED correct
-                            thresh=2, shifting=False, min_grad=0.2)
+                            thresh=3, shifting=False, min_grad=0.2)
                     except Exception as e:
                         self.logger.info(f'   ! Error: {e}')
                 sources.append(new_source)
@@ -765,7 +785,11 @@ class ScarletFitter(object):
         if self.bkg == True:
             new_source = scarlet.ConstSkySource(
                 self.model_frame,
-                self.observation)
+                bbox=sources[0].bbox,
+                observations=self.observation)
+            new_source = scarlet.ConstWholeSkySource(
+                self.model_frame,
+                observations=self.observation)
             sources.append(new_source)
             print('    Added constant sky background')
             self.logger.info('    Added constant sky background')
@@ -968,8 +992,8 @@ class ScarletFitter(object):
                 img[0], 1e-3,
                 center=center,
                 zero=0,
-                center_radius=5,
-                variance=1e-4,  # 1e-4,
+                center_radius=4,
+                variance=1e-5,  # 1e-4,
                 max_iter=10)
             smooth_radius = 3
             gaussian_threshold = 0.02
@@ -1061,7 +1085,7 @@ class ScarletFitter(object):
                 self.variance = 0.05**2
                 self.scales = [0, 1, 2, 3, 4, 5, 6]
                 self.starlet_thresh = 0.5
-                self.min_grad = 0.02
+                self.min_grad = 0.01
 
             self._add_sources(min_grad=self.min_grad, thresh=0.1)
 

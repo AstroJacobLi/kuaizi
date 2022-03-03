@@ -1414,7 +1414,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
                      vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
     else:
-        ax[2].imshow(residual_rgb * (~np.tile((aggr_mask | mask).T, (3, 1, 1))).T,
+        ax[2].imshow(residual_rgb * (~np.tile((aggr_mask.astype(bool) | mask).T, (3, 1, 1))).T,
                      vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
 

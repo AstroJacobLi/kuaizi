@@ -246,6 +246,117 @@ def raw_moment(data, i_order, j_order, weight):
     return np.sum(data, axis=(1, 2))
 
 
+def g1g2(model):
+    '''
+    model is a 2D array
+    '''
+    weight = None
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    # zeroth-order moment: total flux
+    w00 = raw_moment(model, 0, 0, weight)
+
+    # first-order moment: centroid
+    w10 = raw_moment(model, 1, 0, weight)
+    w01 = raw_moment(model, 0, 1, weight)
+    x_c = w10 / w00
+    y_c = w01 / w00
+
+    # second-order moment: b/a ratio and position angle
+    m11 = raw_moment(model, 1, 1, weight) / w00 - x_c * y_c
+    m20 = raw_moment(model, 2, 0, weight) / w00 - x_c**2
+    m02 = raw_moment(model, 0, 2, weight) / w00 - y_c**2
+
+    g1 = (m20 - m02) / (m20 + m02 + 2 * np.sqrt(m20 * m02 - m11**2))
+    g2 = (2 * m11) / (m20 + m02 + 2 * np.sqrt(m20 * m02 - m11**2))
+
+    return (g1, g2)
+
+
+def q_pa(model):
+    '''
+    model is a 2D array
+    '''
+    weight = None
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    # zeroth-order moment: total flux
+    w00 = raw_moment(model, 0, 0, weight)
+
+    # first-order moment: centroid
+    w10 = raw_moment(model, 1, 0, weight)
+    w01 = raw_moment(model, 0, 1, weight)
+    x_c = w10 / w00
+    y_c = w01 / w00
+
+    # second-order moment: b/a ratio and position angle
+    m11 = raw_moment(model, 1, 1, weight) / w00 - x_c * y_c
+    m20 = raw_moment(model, 2, 0, weight) / w00 - x_c**2
+    m02 = raw_moment(model, 0, 2, weight) / w00 - y_c**2
+    cov = np.array([m20, m11, m11, m02]).T.reshape(-1, 2, 2)
+    eigvals, eigvecs = np.linalg.eigh(cov)
+
+    # q = b/a
+    q = np.min(eigvals, axis=1) / np.max(eigvals, axis=1)  # don't take sqrt
+
+    # position angle PA: between the major axis and the east (positive x-axis)
+    major_axis = eigvecs[np.arange(
+        len(eigvecs)), np.argmax(eigvals, axis=1), :]
+    sign = np.sign(major_axis[:, 1])  # sign of y-component
+    pa = np.rad2deg(np.arccos(np.dot(major_axis, [1, 0])))
+    pa = np.array([x - 180 if abs(x) > 90 else x for x in pa])
+    pa *= sign
+    pa = np.deg2rad(pa)
+
+    return (q, pa)
+
+
+def flux_radius_array(model, frac=0.5):
+    """
+    model is a 2D array
+    """
+    from scipy.interpolate import interp1d, UnivariateSpline
+    import sep
+
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    w00 = raw_moment(model, 0, 0, None)
+    w10 = raw_moment(model, 1, 0, None)
+    w01 = raw_moment(model, 0, 1, None)
+    x_cen = (w10 / w00)[0]
+    y_cen = (w01 / w00)[0]
+
+    q, pa = q_pa(model)
+
+    total_flux = model.sum(axis=(1, 2))
+    depth = model.shape[0]
+    r_frac = []
+
+    # sep.sum_ellipse is very slow! Try to improve!
+    if depth > 1:
+        for i in range(depth):
+            r_max = max(model.shape)
+            r_ = np.linspace(0, r_max, 500)
+            flux_ = sep.sum_ellipse(
+                model[i], [x_cen], [y_cen], 1, 1 * q[i], pa[i], r=r_)[0]
+            flux_ /= total_flux[i]
+            func = UnivariateSpline(r_, flux_ - frac, s=0)
+            r_frac.append(func.roots()[0])
+    else:  # might be buggy
+        r_max = max(model.shape)
+        r_ = np.linspace(0, r_max, 500)
+        flux_ = sep.sum_ellipse(
+            model[0], [x_cen], [y_cen], 1, 1 * q[0], pa[0], r=r_)[0]
+        flux_ /= total_flux[0]
+        func = UnivariateSpline(r_, flux_ - frac, s=0)
+        r_frac.append(func.roots()[0])
+
+    return np.array(r_frac) * np.sqrt(q)
+
+
 def shape(components, observation=None, show_fig=False, weight_order=0):
     """Determine b/a ratio `q` and position angle `pa` of model by calculating its second moments.
 
@@ -410,6 +521,7 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     else:
         bbox = observation.bbox
 
+    bbox = observation.bbox
     models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
     models = models[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
@@ -564,12 +676,21 @@ def makeMeasurementMockGal(gal, makesegmap=True, sigma=2,
     Returns:
         measure_dict (dict): a dictionary containing all measurements
     """
+    import sep
 
     models = gal.model.images  # PSF-free model
     data = gal.mock.images
     weights = np.ones_like(models)  # gal.mock.weights
     mask = None  # np.zeros_like(models)  # None  # gal.mock.masks
     psfs = gal.mock.psfs
+
+    sky = np.zeros_like(gal.bkg.images)
+    for i in range(len(sky)):
+        bkg = sep.Background(gal.bkg.images[i])
+        sky[i] = np.random.normal(
+            0, scale=bkg.globalrms, size=(gal.bkg.images[i].shape))
+
+    models += sky
 
     # Flux and magnitude in each band
     filt = 0  # g-band for measurement
@@ -943,6 +1064,15 @@ def cal_mue(n, Re, mag):
     mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1)
                                                  * np.pi) + 2.5 * bn(n) / np.log(10) - 5 * n * np.log10(bn(n))
     return mu
+
+# Spergel constants
+
+
+def cal_cnu(nu):
+    z = np.array(
+        [-0.00788962, 0.0735303, -0.27770785, 0.99483285, 1.25227402]
+    )
+    return z[0] * nu ** 4 + z[1] * nu ** 3 + z[2] * nu ** 2 + z[3] * nu + z[4]
 
 
 def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright=False,
