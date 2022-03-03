@@ -38,7 +38,7 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
     try:
         measurement, _ = makeMeasurement(list(np.array(blend.sources)[info['sed_ind']]),
                                          blend.observations[0],
-                                         aggr_mask=None,  # mask.astype(bool),
+                                         aggr_mask=mask.astype(bool),
                                          makesegmap=makesegmap, sigma=sigma,
                                          zeropoint=27.0, out_prefix=None,
                                          show_fig=False, asinh_a=0.02, framealpha=0.7)
@@ -55,7 +55,7 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
 
 def run_all(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, cat_dir,
             low=0, high=None, ncpu=16, sigma=.02,
-            method='vanilla',
+            method='wavelet',
             # makesegmap=True,
             filename='_lsbg_measure.fits', suffix=''):
     print('SET ENVIRONMENT')

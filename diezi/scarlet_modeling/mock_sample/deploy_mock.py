@@ -11,7 +11,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=
                         variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.02):
     ''' create slurm script and then submit 
     '''
-    time = "48:00:00"
+    time = "5:59:00"
 
     cntnt = '\n'.join([
         "#!/bin/bash",
@@ -39,7 +39,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=
         "   --PREFIX 'MOCK' \\",
         "   --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \\",
         f"   --low {low} --high {high} \\" if ind_list is None else f"   --ind_list {ind_list} \\",
-        f"   --suffix '' --starlet_thresh {starlet_thresh} --method {method}",
+        f"   --suffix '' --starlet_thresh {starlet_thresh} --method {method} \\",
         f"   --monotonic {monotonic} --bkg {bkg} --variance {variance} --scales '{scales}' --min_grad {min_grad}",
         "",
         f"python3 ../script/sclt_meas_mp.py \\",
