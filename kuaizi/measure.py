@@ -246,11 +246,10 @@ def raw_moment(data, i_order, j_order, weight):
     return np.sum(data, axis=(1, 2))
 
 
-def g1g2(model):
+def g1g2(model, weight=None):
     '''
     model is a 2D array
     '''
-    weight = None
     if len(model.shape) == 2:
         model = model[None, :, :]
 
@@ -483,7 +482,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, sigma=2,
+def makeMeasurement(components, observation, aggr_mask=None,
+                    makesegmap=True, sigma=2, method='spergel',
                     zeropoint=27.0, pixel_scale=0.168,
                     out_prefix=None, show_fig=True, **kwargs):
     """
@@ -502,10 +502,11 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     Returns:
         measure_dict (dict): a dictionary containing all measurements
     """
+    if method == 'spergel':
+        _blend = scarlet.Blend(components[0:1], observation)
+    else:
+        _blend = scarlet.Blend(components, observation)
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
-
-    _blend = scarlet.Blend(components, observation)
-
     if min_cutout_size < 0.9 * observation.bbox.shape[1]:
         # Multi-components enabled
         lower_left = np.min([np.array(comp.bbox.origin)
@@ -530,7 +531,9 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     data = observation.data
     weights = observation.weights
     psfs = observation.psf.get_model()
-    if aggr_mask is None:
+    if method == 'spergel':
+        mask = np.zeros_like(weights[0]).astype(bool)
+    elif aggr_mask is None:
         mask = (weights.sum(axis=0) == 0)
     else:
         mask = aggr_mask | (weights.sum(axis=0) == 0)
@@ -546,11 +549,18 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     weights = np.ascontiguousarray(weights)
 
     # Flux and magnitude in each band
-    filt = 0  # i-band for measurement
+    filt = 0  # g-band for measurement
 
     measure_dict = {}
-    measure_dict['flux'] = flux(components, observation)
-    # normalized against i-band
+    if method == 'spergel':
+        sed, morph = components[0].get_models_of_children()
+        true_flux = (2 * np.pi * components[0].parameters[3]
+                     ** 2) / cal_cnu(components[0].parameters[2])**2
+        measure_dict['flux'] = np.array(true_flux * sed)
+    else:
+        measure_dict['flux'] = flux(components, observation)
+
+    # normalized against g-band
     SED = (measure_dict['flux'] / measure_dict['flux'][filt])
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
 
@@ -606,6 +616,11 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     measure_dict['rhalf_circularized'] = morph.rhalf_ellip / \
         np.sqrt(
             morph.elongation_asymmetry)  # circularized effective radius, consistent with Greco+18.
+    if method == 'spergel':
+        measure_dict['rhalf_spergel'] = float(
+            components[0].get_parameter(3)[0])
+    else:
+        measure_dict['rhalf_spergel'] = np.nan
     measure_dict['r20'] = morph.r20  # circular
     measure_dict['r50'] = morph.r50  # circular
     measure_dict['r80'] = morph.r80  # circular
@@ -839,6 +854,7 @@ def _write_to_row(row, measurement):
     row['rhalf_circ'] = measurement['rhalf_circ']
     row['rhalf_ellip'] = measurement['rhalf_ellip']
     row['rhalf_circularized'] = measurement['rhalf_circularized']
+    row['rhalf_spergel'] = measurement['rhalf_spergel']
     row['r20'] = measurement['r20']
     row['r50'] = measurement['r50']
     row['r80'] = measurement['r80']
@@ -890,6 +906,7 @@ def initialize_meas_cat(lsbg_cat):
         Column(name='rhalf_circ', length=length),
         Column(name='rhalf_ellip', length=length),
         Column(name='rhalf_circularized', length=length),
+        Column(name='rhalf_spergel', length=length),
         Column(name='r20', length=length),
         Column(name='r50', length=length),
         Column(name='r80', length=length),

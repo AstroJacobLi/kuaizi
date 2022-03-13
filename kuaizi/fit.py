@@ -39,7 +39,7 @@ plt.rcParams['font.size'] = 15
 plt.rc('image', cmap='inferno', interpolation='none', origin='lower')
 
 
-def _optimization(blend, bright=False, logger=None, bkg=False):
+def _optimization(blend, bright=False, spergel=False, logger=None, bkg=False):
     logger.info('  - Optimizing scarlet model...')
     print('  - Optimizing scarlet model...')
     if bright:
@@ -50,6 +50,9 @@ def _optimization(blend, bright=False, logger=None, bkg=False):
         e_rel_list = [1e-4, 5e-4, 2e-4]  # , 2e-4 # , 5e-5, 1e-5
         n_iter = [150, 100, 100] if bkg else [
             100, 100, 50]  # , 50 [200, 200, 200]
+    if spergel:
+        e_rel_list = [1e-4, 5e-4, 2e-4]  # , 2e-4 # , 5e-5, 1e-5
+        n_iter = [200, 200, 200]
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
@@ -186,10 +189,10 @@ class ScarletFitter(object):
         else:
             self.n_stars = len(self.gaia_cat)
 
-    def _first_detection(self, first_dblend_cont, conv_radius=2, b=80, f=3):
+    def _first_detection(self, first_dblend_cont, lvl=4, conv_radius=2, b=80, f=3):
         obj_cat_ori, segmap_ori, bg_rms = kz.detection.makeCatalog(
             [self.data],
-            lvl=4,  # a.k.a., "sigma"
+            lvl=lvl,  # a.k.a., "sigma"
             mask=self.msk_star_ori,
             method='vanilla',
             convolve=True,
@@ -251,7 +254,7 @@ class ScarletFitter(object):
         elif self.method == 'wavelet':
             min_grad = -0.1
         else:
-            min_grad = -0.1
+            min_grad = -0.2
 
         starlet_source = StarletSource(model_frame,
                                        (cen_obj['ra'], cen_obj['dec']),
@@ -635,19 +638,32 @@ class ScarletFitter(object):
 
         elif self.method == 'spergel':
             from .measure import g1g2, flux_radius_array
-            # We first initialize an ExtendedSource to guess the initial parameters
+            # We first initialize an ExtendedSource to guess the color
             new_source = scarlet.SingleExtendedSource(
                 self.model_frame,
                 (src['ra'], src['dec']),
-                self.observation,
+                self._conv_observation,
                 satu_mask=self.data.masks,
-                thresh=thresh,
+                thresh=0.05,
                 shifting=True,
-                min_grad=min_grad)
-            morph = new_source.morphology
-            SED = np.array(new_source.spectrum * new_source.morphology.sum())
+                min_grad=0.1)
+            sed, morph = new_source.get_models_of_children()
+            SED = np.array(new_source.spectrum * morph.sum())
+
+            new_source = scarlet.StarletSource(
+                self.model_frame,
+                (src['ra'], src['dec']),
+                self.observation,
+                thresh=thresh,
+                starlet_thresh=1e-3,
+                monotonic=False,
+                variance=0.05**2,
+                min_grad=0.005)
+
+            _, morph = new_source.get_models_of_children()
             g1, g2 = g1g2(np.array(morph))
-            rhalf = flux_radius_array(np.array(morph), 0.45) * 1.5
+            rhalf = flux_radius_array(np.array(morph), 0.4)
+            rhalf = np.maximum(rhalf, 15)
             nu = np.array([0.5])
 
             david = scarlet.SpergelSource(
@@ -661,10 +677,11 @@ class ScarletFitter(object):
                 f'  - Added Spergel profile with bbox = {david.bbox.shape}')
             print(f'  - Added Spergel profile with bbox = {david.bbox.shape}')
 
-        return sources
+        self._sources = sources
+        return
 
-    def _add_sources(self, K=2, min_grad=0.02,
-                     thresh=0.1, shifting=True):
+    def _add_other_sources(self, K=2, min_grad=0.01,
+                           thresh=0.1, shifting=True):
         '''
         Add all sources. Central source type depends on `self.method`.
 
@@ -682,11 +699,7 @@ class ScarletFitter(object):
             Only works for wavelet source and if `monotonic` is True.
         bkg (bool): Whether to add a sky background source.
         '''
-        sources = self._add_central_source(K=K, min_grad=min_grad,
-                                           thresh=thresh, shifting=shifting,
-                                           monotonic=self.monotonic,
-                                           variance=self.variance, scales=self.scales)
-
+        sources = self._sources
         # Only model "real compact" sources
         if len(self.obj_cat_big) > 0 and len(self.obj_cat_cpct) > 0:
             # remove intersection between cpct and big objects
@@ -757,7 +770,7 @@ class ScarletFitter(object):
                         new_source = scarlet.source.SingleExtendedSource(
                             self.model_frame, (src['ra'], src['dec']),
                             self.observation, satu_mask=self.data.masks,  # helps to get SED correct
-                            thresh=3, shifting=False, min_grad=0.2)
+                            thresh=1, shifting=False, min_grad=0.1)
                     except Exception as e:
                         self.logger.info(f'   ! Error: {e}')
                 sources.append(new_source)
@@ -817,7 +830,7 @@ class ScarletFitter(object):
             plt.close()
 
         [self.blend, self.best_logL, self.best_erel, self.best_epoch, self._blend] = _optimization(
-            self.blend, bright=self.bright, logger=self.logger, bkg=self.bkg)
+            self.blend, bright=self.bright, spergel=(self.method == 'spergel'), logger=self.logger, bkg=self.bkg)
         with open(os.path.join(self.model_dir, f'{self.prefix}-{self.index}-trained-model-{self.method}.df'), 'wb') as fp:
             dill.dump(
                 [self.blend, {'starlet_thresh': self.starlet_thresh,
@@ -1070,7 +1083,7 @@ class ScarletFitter(object):
             # Replace the vanilla detection with a convolved vanilla detection
             first_dblend_cont = 0.07 if max(
                 self.data.images.shape) * self.pixel_scale > 200 else 0.006
-            if self.method == 'wavelet':
+            if self.method == 'wavelet' or self.method == 'spergel':
                 first_dblend_cont = 0.07 if max(
                     self.data.images.shape) * self.pixel_scale > 200 else 0.002
             self._first_detection(first_dblend_cont)
@@ -1086,8 +1099,12 @@ class ScarletFitter(object):
                 self.scales = [0, 1, 2, 3, 4, 5, 6]
                 self.starlet_thresh = 0.5
                 self.min_grad = 0.01
-
-            self._add_sources(min_grad=self.min_grad, thresh=0.1)
+            self._add_central_source(K=2, min_grad=self.min_grad,
+                                     thresh=0.1, shifting=True,
+                                     monotonic=self.monotonic,
+                                     variance=self.variance,
+                                     scales=self.scales)
+            self._add_other_sources(min_grad=self.min_grad, thresh=0.1)
 
             if self.show_figure:
                 fig = kz.display.display_scarlet_sources(
