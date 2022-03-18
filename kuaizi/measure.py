@@ -510,7 +510,7 @@ def makeMeasurement(components, observation, aggr_mask=None,
     if min_cutout_size < 0.9 * observation.bbox.shape[1]:
         # Multi-components enabled
         lower_left = np.min([np.array(comp.bbox.origin)
-                            for comp in components], axis=0)
+                             for comp in components], axis=0)
         upper_right = np.max([np.array(comp.bbox.origin) +
                               np.array(comp.bbox.shape) for comp in components], axis=0)
         bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
@@ -556,7 +556,7 @@ def makeMeasurement(components, observation, aggr_mask=None,
         sed, morph = components[0].get_models_of_children()
         true_flux = (2 * np.pi * components[0].parameters[3]
                      ** 2) / cal_cnu(components[0].parameters[2])**2
-        measure_dict['flux'] = np.array(true_flux * sed)
+        measure_dict['flux'] = np.array(true_flux * sed).ravel()
     else:
         measure_dict['flux'] = flux(components, observation)
 
@@ -634,6 +634,9 @@ def makeMeasurement(components, observation, aggr_mask=None,
         morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
     measure_dict['SB_eff_avg'] = -2.5 * np.log10(
         morph.SB_eff_avg * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    if method == 'spergel':
+        measure_dict['SB_eff_avg'] = measure_dict['mag'] + 2.5 * \
+            np.log10(2 * np.pi * (measure_dict['rhalf_spergel'] * 0.168)**2)
     measure_dict['flux_circ'] = morph.flux_circ * SED
     measure_dict['flux_ellip'] = morph.flux_ellip * SED
     measure_dict['Gini'] = morph.gini
@@ -1381,9 +1384,9 @@ def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
 
     lower_left = np.min([np.array(comp.bbox.origin)
-                        for comp in components], axis=0)
+                         for comp in components], axis=0)
     upper_right = np.max([np.array(comp.bbox.origin) +
-                         np.array(comp.bbox.shape) for comp in components], axis=0)
+                          np.array(comp.bbox.shape) for comp in components], axis=0)
     bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
     bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
     bbox.shape = tuple(int(i * 1.5) for i in bbox.shape)
@@ -1500,7 +1503,7 @@ def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright
     from statmorph.utils.image_diagnostics import make_figure
     fig = make_figure(morph, **kwargs)
     plt.savefig(os.path.join(figure_dir, 'statmorph_' +
-                str(index) + '.png'), dpi=100, bbox_inches='tight')
+                             str(index) + '.png'), dpi=100, bbox_inches='tight')
     if show_figure_statmorph:
         plt.show()
     else:
