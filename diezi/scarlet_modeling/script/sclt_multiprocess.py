@@ -68,6 +68,9 @@ def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_
         high = len(lsbg_cat)
 
     if ind_list is not None:
+        if isinstance(ind_list, str):
+            ind_list = np.array(np.load(ind_list))
+        print(ind_list)
         iterable = ind_list
     else:
         iterable = np.arange(low, high, 1)

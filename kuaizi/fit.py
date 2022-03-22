@@ -856,6 +856,8 @@ class ScarletFitter(object):
             color_dist = np.linalg.norm(
                 color_mat - color_mat[0], axis=1) / np.linalg.norm(color_mat[0])
             sed_ind = np.where(color_dist < 0.1)[0]
+            if len(sed_ind) < 1:
+                sed_ind = np.array([0])
             dist = np.array([
                 np.linalg.norm(
                     src.center - self.blend.sources[0].center) * self.pixel_scale

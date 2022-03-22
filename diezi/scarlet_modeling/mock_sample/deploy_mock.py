@@ -99,3 +99,9 @@ if __name__ == '__main__':
 
 # python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
 # --low=1250 --high=1500 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
+# --low=1500 --high=1750 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
+# --low=1750 --high=2000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
