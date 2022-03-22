@@ -112,7 +112,7 @@ class ScarletFittingError(Exception):
 
 
 class ScarletFitter(object):
-    def __init__(self, method='vanilla', tigress=True, bright=False, min_grad=-0.03, bkg=True, **kwargs) -> None:
+    def __init__(self, method='vanilla', tigress=True, bright=False, min_grad=-0.03, bkg=True, **kwargs):
         """Initialize a ScarletFitter object.
 
         Args:
@@ -127,7 +127,7 @@ class ScarletFitter(object):
         """
         if method not in ['vanilla', 'wavelet', 'spergel']:
             raise ValueError(
-                f'Method {method} is not supported! Only "vaniila" and "wavelet" are supported.')
+                f'Method {method} is not supported! Only "vaniila", "wavelet", and "spergel" are supported.')
 
         self.method = method
         self.tigress = tigress
@@ -648,7 +648,7 @@ class ScarletFitter(object):
                 shifting=True,
                 min_grad=0.1)
             sed, morph = new_source.get_models_of_children()
-            SED = np.array(new_source.spectrum * morph.sum())
+            SED = np.array(new_source.spectrum.get_model() * morph.sum())
 
             new_source = scarlet.StarletSource(
                 self.model_frame,
