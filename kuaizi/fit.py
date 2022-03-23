@@ -701,14 +701,16 @@ class ScarletFitter(object):
         '''
         sources = self._sources
         # Only model "real compact" sources
+        if len(self.obj_cat_big) > 0:
+            big = SkyCoord(ra=self.obj_cat_big['ra'] * u.degree,
+                           dec=self.obj_cat_big['dec'] * u.degree)
         if len(self.obj_cat_big) > 0 and len(self.obj_cat_cpct) > 0:
             # remove intersection between cpct and big objects
             # if an object is both cpct and big, we think it is big
             cpct_coor = SkyCoord(
                 ra=np.array(self.obj_cat_cpct['ra']) * u.degree,
                 dec=np.array(self.obj_cat_cpct['dec']) * u.degree)
-            big = SkyCoord(ra=self.obj_cat_big['ra'] * u.degree,
-                           dec=self.obj_cat_big['dec'] * u.degree)
+
             tempid, sep2d, _ = match_coordinates_sky(big, cpct_coor)
             cpct = self.obj_cat_cpct[np.setdiff1d(
                 np.arange(len(self.obj_cat_cpct)), tempid[np.where(sep2d < 1 * u.arcsec)])]
@@ -796,10 +798,10 @@ class ScarletFitter(object):
 
         # Add constant sky bkg
         if self.bkg == True:
-            new_source = scarlet.ConstSkySource(
-                self.model_frame,
-                bbox=sources[0].bbox,
-                observations=self.observation)
+            # new_source = scarlet.ConstSkySource(
+            #     self.model_frame,
+            #     bbox=sources[0].bbox,
+            #     observations=self.observation)
             new_source = scarlet.ConstWholeSkySource(
                 self.model_frame,
                 observations=self.observation)
