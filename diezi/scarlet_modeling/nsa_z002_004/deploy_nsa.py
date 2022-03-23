@@ -8,7 +8,7 @@ import fire
 
 def deploy_modeling_job(low=0, high=1000, ind_list=None, name='nsa_z002_004', ncpu=32,
                         method='wavelet', starlet_thresh=0.5, monotonic=True, bkg=True, min_grad=-0.001,
-                        variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.02):
+                        variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.05):
     ''' create slurm script and then submit 
     '''
     time = "11:59:00"
@@ -76,38 +76,38 @@ if __name__ == '__main__':
 
 # python deploy_mock.py --name mock_wvlt --ncpu=16 --starlet_thresh=0.5 \
 #  --method=wavelet --low=0 --high=500 --monotonic=True --variance=0 --min_grad 0.01 \
-#  --scales="[0, 1, 2, 3]" --sigma=0.02
+#  --scales="[0, 1, 2, 3]" --sigma=0.05
 
 # python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
+# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 # python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
+# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 # python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=2000 --high=3000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
+# --low=2000 --high=3000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 # python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=3000 --high=4000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
+# --low=3000 --high=4000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 # python deploy_nsa.py --name nsa --ncpu=12 --method=vanilla \
-# --low=4000 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
+# --low=4000 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 ############ SPERGEL #############
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=2000 --high=3000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=2000 --high=3000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=3000 --high=4000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=3000 --high=4000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=4000 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=4000 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02 --ind_list='./ind_list.npy'
+# --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05 --ind_list='./ind_list.npy'
