@@ -246,6 +246,116 @@ def raw_moment(data, i_order, j_order, weight):
     return np.sum(data, axis=(1, 2))
 
 
+def g1g2(model, weight=None):
+    '''
+    model is a 2D array
+    '''
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    # zeroth-order moment: total flux
+    w00 = raw_moment(model, 0, 0, weight)
+
+    # first-order moment: centroid
+    w10 = raw_moment(model, 1, 0, weight)
+    w01 = raw_moment(model, 0, 1, weight)
+    x_c = w10 / w00
+    y_c = w01 / w00
+
+    # second-order moment: b/a ratio and position angle
+    m11 = raw_moment(model, 1, 1, weight) / w00 - x_c * y_c
+    m20 = raw_moment(model, 2, 0, weight) / w00 - x_c**2
+    m02 = raw_moment(model, 0, 2, weight) / w00 - y_c**2
+
+    g1 = (m20 - m02) / (m20 + m02 + 2 * np.sqrt(m20 * m02 - m11**2))
+    g2 = (2 * m11) / (m20 + m02 + 2 * np.sqrt(m20 * m02 - m11**2))
+
+    return (g1, g2)
+
+
+def q_pa(model):
+    '''
+    model is a 2D array
+    '''
+    weight = None
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    # zeroth-order moment: total flux
+    w00 = raw_moment(model, 0, 0, weight)
+
+    # first-order moment: centroid
+    w10 = raw_moment(model, 1, 0, weight)
+    w01 = raw_moment(model, 0, 1, weight)
+    x_c = w10 / w00
+    y_c = w01 / w00
+
+    # second-order moment: b/a ratio and position angle
+    m11 = raw_moment(model, 1, 1, weight) / w00 - x_c * y_c
+    m20 = raw_moment(model, 2, 0, weight) / w00 - x_c**2
+    m02 = raw_moment(model, 0, 2, weight) / w00 - y_c**2
+    cov = np.array([m20, m11, m11, m02]).T.reshape(-1, 2, 2)
+    eigvals, eigvecs = np.linalg.eigh(cov)
+
+    # q = b/a
+    q = np.min(eigvals, axis=1) / np.max(eigvals, axis=1)  # don't take sqrt
+
+    # position angle PA: between the major axis and the east (positive x-axis)
+    major_axis = eigvecs[np.arange(
+        len(eigvecs)), np.argmax(eigvals, axis=1), :]
+    sign = np.sign(major_axis[:, 1])  # sign of y-component
+    pa = np.rad2deg(np.arccos(np.dot(major_axis, [1, 0])))
+    pa = np.array([x - 180 if abs(x) > 90 else x for x in pa])
+    pa *= sign
+    pa = np.deg2rad(pa)
+
+    return (q, pa)
+
+
+def flux_radius_array(model, frac=0.5):
+    """
+    model is a 2D array
+    """
+    from scipy.interpolate import interp1d, UnivariateSpline
+    import sep
+
+    if len(model.shape) == 2:
+        model = model[None, :, :]
+
+    w00 = raw_moment(model, 0, 0, None)
+    w10 = raw_moment(model, 1, 0, None)
+    w01 = raw_moment(model, 0, 1, None)
+    x_cen = (w10 / w00)[0]
+    y_cen = (w01 / w00)[0]
+
+    q, pa = q_pa(model)
+
+    total_flux = model.sum(axis=(1, 2))
+    depth = model.shape[0]
+    r_frac = []
+
+    # sep.sum_ellipse is very slow! Try to improve!
+    if depth > 1:
+        for i in range(depth):
+            r_max = max(model.shape)
+            r_ = np.linspace(0, r_max, 500)
+            flux_ = sep.sum_ellipse(
+                model[i], [x_cen], [y_cen], 1, 1 * q[i], pa[i], r=r_)[0]
+            flux_ /= total_flux[i]
+            func = UnivariateSpline(r_, flux_ - frac, s=0)
+            r_frac.append(func.roots()[0])
+    else:  # might be buggy
+        r_max = max(model.shape)
+        r_ = np.linspace(0, r_max, 500)
+        flux_ = sep.sum_ellipse(
+            model[0], [x_cen], [y_cen], 1, 1 * q[0], pa[0], r=r_)[0]
+        flux_ /= total_flux[0]
+        func = UnivariateSpline(r_, flux_ - frac, s=0)
+        r_frac.append(func.roots()[0])
+
+    return np.array(r_frac) * np.sqrt(q)
+
+
 def shape(components, observation=None, show_fig=False, weight_order=0):
     """Determine b/a ratio `q` and position angle `pa` of model by calculating its second moments.
 
@@ -372,7 +482,8 @@ def mu_central(components, observation=None, method='centroid', zeropoint=27.0, 
     return mu_cen
 
 
-def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, sigma=2,
+def makeMeasurement(components, observation, aggr_mask=None,
+                    makesegmap=True, sigma=2, method='spergel',
                     zeropoint=27.0, pixel_scale=0.168,
                     out_prefix=None, show_fig=True, **kwargs):
     """
@@ -391,14 +502,15 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     Returns:
         measure_dict (dict): a dictionary containing all measurements
     """
+    if method == 'spergel':
+        _blend = scarlet.Blend(components[0:1], observation)
+    else:
+        _blend = scarlet.Blend(components, observation)
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
-
-    _blend = scarlet.Blend(components, observation)
-
     if min_cutout_size < 0.9 * observation.bbox.shape[1]:
         # Multi-components enabled
         lower_left = np.min([np.array(comp.bbox.origin)
-                            for comp in components], axis=0)
+                             for comp in components], axis=0)
         upper_right = np.max([np.array(comp.bbox.origin) +
                               np.array(comp.bbox.shape) for comp in components], axis=0)
         bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
@@ -410,6 +522,7 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     else:
         bbox = observation.bbox
 
+    bbox = observation.bbox
     models = _blend.get_model()  # PSF-free model
     models = observation.render(models)  # PSF-convoled model
     models = models[:, bbox.origin[1]:bbox.origin[1] + bbox.shape[1],
@@ -418,7 +531,9 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     data = observation.data
     weights = observation.weights
     psfs = observation.psf.get_model()
-    if aggr_mask is None:
+    if method == 'spergel':
+        mask = np.zeros_like(weights[0]).astype(bool)
+    elif aggr_mask is None:
         mask = (weights.sum(axis=0) == 0)
     else:
         mask = aggr_mask | (weights.sum(axis=0) == 0)
@@ -434,11 +549,18 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     weights = np.ascontiguousarray(weights)
 
     # Flux and magnitude in each band
-    filt = 0  # i-band for measurement
+    filt = 0  # g-band for measurement
 
     measure_dict = {}
-    measure_dict['flux'] = flux(components, observation)
-    # normalized against i-band
+    if method == 'spergel':
+        sed, morph = components[0].get_models_of_children()
+        true_flux = (2 * np.pi * components[0].parameters[3]
+                     ** 2) / cal_cnu(components[0].parameters[2])**2
+        measure_dict['flux'] = np.array(true_flux * sed).ravel()
+    else:
+        measure_dict['flux'] = flux(components, observation)
+
+    # normalized against g-band
     SED = (measure_dict['flux'] / measure_dict['flux'][filt])
     measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
 
@@ -452,12 +574,11 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     data_avg = np.average(data, weights=np.sqrt(
         weights.sum(axis=(1, 2))), axis=0)
 
+    bkg = sep.Background(data_avg, bh=12, bw=12, mask=mask)
     if makesegmap:
-        bkg = sep.Background(data_avg, bh=12, bw=12, mask=mask)
         _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms, minarea=1,
                                 deblend_cont=.1,
                                 mask=mask, segmentation_map=True)
-
         # Only select relevant detections.
         cen_ind = [segmap[int(comp.center[0] - bbox.origin[1]),
                           int(comp.center[1] - bbox.origin[2])] for comp in components]
@@ -473,6 +594,164 @@ def makeMeasurement(components, observation, aggr_mask=None, makesegmap=True, si
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
         n_sigma_outlier=15, min_cutout_size=min_cutout_size, cutout_extent=2,
+        mask=mask, psf=psfs[filt])
+    morph = source_morphs[0]
+
+    measure_dict['xc_centroid'] = morph.xc_centroid
+    measure_dict['yc_centroid'] = morph.yc_centroid
+    measure_dict['xc_peak'] = morph.xc_peak
+    measure_dict['yc_peak'] = morph.yc_peak
+    measure_dict['ellipticity_centroid'] = morph.ellipticity_centroid
+    measure_dict['elongation_centroid'] = morph.elongation_centroid
+    measure_dict['orientation_centroid'] = morph.orientation_centroid
+    measure_dict['xc_asymmetry'] = morph.xc_asymmetry
+    measure_dict['yc_asymmetry'] = morph.yc_asymmetry
+    measure_dict['ellipticity_asymmetry'] = morph.ellipticity_asymmetry
+    measure_dict['elongation_asymmetry'] = morph.elongation_asymmetry
+    measure_dict['orientation_asymmetry'] = morph.orientation_asymmetry
+    measure_dict['rpetro_circ'] = morph.rpetro_circ
+    measure_dict['rpetro_ellip'] = morph.rpetro_ellip
+    measure_dict['rhalf_circ'] = morph.rhalf_circ
+    measure_dict['rhalf_ellip'] = morph.rhalf_ellip
+    measure_dict['rhalf_circularized'] = morph.rhalf_ellip / \
+        np.sqrt(
+            morph.elongation_asymmetry)  # circularized effective radius, consistent with Greco+18.
+    if method == 'spergel':
+        measure_dict['rhalf_spergel'] = float(
+            components[0].get_parameter(3)[0])
+    else:
+        measure_dict['rhalf_spergel'] = np.nan
+    measure_dict['r20'] = morph.r20  # circular
+    measure_dict['r50'] = morph.r50  # circular
+    measure_dict['r80'] = morph.r80  # circular
+    measure_dict['SB_0_circ'] = -2.5 * np.log10(morph.SB_0_circ * SED / (
+        pixel_scale**2)) + zeropoint   # in mag per arcsec2
+    measure_dict['SB_0_ellip'] = -2.5 * np.log10(
+        morph.SB_0_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_circ'] = -2.5 * np.log10(
+        morph.SB_eff_circ * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_ellip'] = -2.5 * np.log10(
+        morph.SB_eff_ellip * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    measure_dict['SB_eff_avg'] = -2.5 * np.log10(
+        morph.SB_eff_avg * SED / (pixel_scale**2)) + zeropoint  # in mag per arcsec2
+    if method == 'spergel':
+        measure_dict['SB_eff_avg'] = measure_dict['mag'] + 2.5 * \
+            np.log10(2 * np.pi * (measure_dict['rhalf_spergel'] * 0.168)**2)
+    measure_dict['flux_circ'] = morph.flux_circ * SED
+    measure_dict['flux_ellip'] = morph.flux_ellip * SED
+    measure_dict['Gini'] = morph.gini
+    measure_dict['M20'] = morph.m20
+    measure_dict['F(G, M20)'] = morph.gini_m20_bulge
+    measure_dict['S(G, M20)'] = morph.gini_m20_merger
+    measure_dict['sn_per_pixel'] = morph.sn_per_pixel
+    measure_dict['C'] = morph.concentration
+    measure_dict['A'] = morph.asymmetry
+    measure_dict['A_outer'] = morph.outer_asymmetry
+    measure_dict['A_shape'] = morph.shape_asymmetry
+    measure_dict['S'] = morph.smoothness
+    measure_dict['sersic_amplitude'] = morph.sersic_amplitude
+    measure_dict['sersic_rhalf'] = morph.sersic_rhalf
+    measure_dict['sersic_n'] = morph.sersic_n
+    measure_dict['sersic_xc'] = morph.sersic_xc
+    measure_dict['sersic_yc'] = morph.sersic_yc
+    measure_dict['sersic_ellip'] = morph.sersic_ellip
+    measure_dict['sersic_theta'] = morph.sersic_theta
+    measure_dict['sky_mean'] = morph.sky_mean
+    measure_dict['sky_median'] = morph.sky_median
+    measure_dict['sky_sigma'] = morph.sky_sigma
+    measure_dict['flag'] = morph.flag
+    measure_dict['flag_sersic'] = morph.flag_sersic
+
+    if show_fig:
+        from statmorph.utils.image_diagnostics import make_figure
+        fig = make_figure(morph, **kwargs)
+
+    measure_dict_new = {}
+    if out_prefix is not None:
+        for key in measure_dict.keys():
+            measure_dict_new['_'.join([out_prefix, key])] = measure_dict[key]
+        measure_dict = measure_dict_new
+
+    return measure_dict, morph
+
+
+def makeMeasurementMockGal(gal, makesegmap=True, sigma=2,
+                           zeropoint=27.0, pixel_scale=0.168,
+                           out_prefix=None, show_fig=True, **kwargs):
+    """
+    Measure the structural parameters of the galaxy, after modeling with scarlet.
+
+    Parameters:
+        components (list of Scarlet sources): a list of sources that will be blended with observation
+        observation (scarlet.observation): observation data
+        aggr_mask (2-D binary array): the aggressive mask, which is generated during modeling
+        sigma (float): the threshold when generating a segmentation map for `statmorph`
+        zeropoint (float): photometric zeropoint of the input data
+        pixel_scale (float): the angular size of pixel, default is 0.168 (for HSC)
+        out_prefix (str): the prefix for each key in output dictionary
+        show_fig (bool): if True, a default `statmorph` figure will be shown
+
+    Returns:
+        measure_dict (dict): a dictionary containing all measurements
+    """
+    import sep
+
+    models = gal.model.images  # PSF-free model
+    data = gal.mock.images
+    weights = np.ones_like(models)  # gal.mock.weights
+    mask = None  # np.zeros_like(models)  # None  # gal.mock.masks
+    psfs = gal.mock.psfs
+
+    sky = np.zeros_like(gal.bkg.images)
+    for i in range(len(sky)):
+        bkg = sep.Background(gal.bkg.images[i])
+        sky[i] = np.random.normal(
+            0, scale=bkg.globalrms, size=(gal.bkg.images[i].shape))
+
+    models += sky
+
+    # Flux and magnitude in each band
+    filt = 0  # g-band for measurement
+
+    measure_dict = {}
+    measure_dict['flux'] = np.sum(models, axis=(1, 2))
+    # normalized against g-band
+    SED = (measure_dict['flux'] / measure_dict['flux'][filt])
+
+    measure_dict['mag'] = -2.5 * np.log10(measure_dict['flux']) + zeropoint
+
+    # We take the model and weight map in g-band. Such that we can use the SED to get
+    # surface brightness in other bands.
+    # A sky background is estimated on the original image,
+    # and we run `sep` to generate a 1-sigma segmentation map.
+    # Then we run `statmorph` using that segmap
+
+    img = models[filt]
+
+    data_avg = np.average(data, weights=np.sqrt(
+        weights.sum(axis=(1, 2))), axis=0)
+
+    if makesegmap:
+        bkg = sep.Background(data_avg, bh=12, bw=12, mask=mask)
+        _, segmap = sep.extract(img - bkg.globalback, sigma, err=bkg.globalrms, minarea=1,
+                                deblend_cont=.1,
+                                mask=mask, segmentation_map=True)
+
+        # Only select relevant detections.
+        cen_ind = [segmap[int(img.shape[1] // 2),
+                          int(img.shape[0] // 2)]]
+        segmap[~np.add.reduce(
+            [segmap == ind for ind in cen_ind]).astype(bool)] = 0
+        segmap = (segmap > 0)
+        segmap = convolve(segmap, Gaussian2DKernel(4)) > 0.01
+
+        img[~segmap] = np.nan
+    else:
+        segmap = np.ones_like(img)
+
+    source_morphs = statmorph.source_morphology(
+        img, segmap, weightmap=np.sqrt(weights[filt]),
+        n_sigma_outlier=15, min_cutout_size=img.shape[0], cutout_extent=2,
         mask=mask, psf=psfs[filt])
     morph = source_morphs[0]
 
@@ -578,6 +857,7 @@ def _write_to_row(row, measurement):
     row['rhalf_circ'] = measurement['rhalf_circ']
     row['rhalf_ellip'] = measurement['rhalf_ellip']
     row['rhalf_circularized'] = measurement['rhalf_circularized']
+    row['rhalf_spergel'] = measurement['rhalf_spergel']
     row['r20'] = measurement['r20']
     row['r50'] = measurement['r50']
     row['r80'] = measurement['r80']
@@ -629,6 +909,7 @@ def initialize_meas_cat(lsbg_cat):
         Column(name='rhalf_circ', length=length),
         Column(name='rhalf_ellip', length=length),
         Column(name='rhalf_circularized', length=length),
+        Column(name='rhalf_spergel', length=length),
         Column(name='r20', length=length),
         Column(name='r50', length=length),
         Column(name='r80', length=length),
@@ -803,6 +1084,15 @@ def cal_mue(n, Re, mag):
     mu = mag + 5 * np.log10(Re) + 2.5 * np.log10(gamma(2 * n + 1)
                                                  * np.pi) + 2.5 * bn(n) / np.log(10) - 5 * n * np.log10(bn(n))
     return mu
+
+# Spergel constants
+
+
+def cal_cnu(nu):
+    z = np.array(
+        [-0.00788962, 0.0735303, -0.27770785, 0.99483285, 1.25227402]
+    )
+    return z[0] * nu ** 4 + z[1] * nu ** 3 + z[2] * nu ** 2 + z[3] * nu + z[4]
 
 
 def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright=False,
@@ -1094,9 +1384,9 @@ def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright
     min_cutout_size = max([comp.bbox.shape[1] for comp in components])
 
     lower_left = np.min([np.array(comp.bbox.origin)
-                        for comp in components], axis=0)
+                         for comp in components], axis=0)
     upper_right = np.max([np.array(comp.bbox.origin) +
-                         np.array(comp.bbox.shape) for comp in components], axis=0)
+                          np.array(comp.bbox.shape) for comp in components], axis=0)
     bbox = scarlet.Box(upper_right - lower_left, origin=lower_left)
     bbox.center = np.array(bbox.origin) + np.array(bbox.shape) // 2
     bbox.shape = tuple(int(i * 1.5) for i in bbox.shape)
@@ -1213,7 +1503,7 @@ def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright
     from statmorph.utils.image_diagnostics import make_figure
     fig = make_figure(morph, **kwargs)
     plt.savefig(os.path.join(figure_dir, 'statmorph_' +
-                str(index) + '.png'), dpi=100, bbox_inches='tight')
+                             str(index) + '.png'), dpi=100, bbox_inches='tight')
     if show_figure_statmorph:
         plt.show()
     else:

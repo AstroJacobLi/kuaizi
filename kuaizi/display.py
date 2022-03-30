@@ -211,10 +211,10 @@ def _display_single(img,
             horizontalalignment='center',
             color=scale_bar_color)
     if add_text is not None:
-        text_x_0 = int(img_size_x*0.08)
-        text_y_0 = int(img_size_y*text_y_offset)
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
         ax1.text(text_x_0, text_y_0,
-                 r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                 r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
 
     # Put a color bar on the image
     if color_bar:
@@ -406,11 +406,11 @@ def display_single(img,
             horizontalalignment='center',
             color=scale_bar_color)
     if add_text is not None:
-        text_x_0 = int(img_size_x*0.08)
-        text_y_0 = int(img_size_y*text_y_offset)
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
             ax.text(text_x_0, text_y_0,
-                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                    r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
         else:
             ax.text(text_x_0, text_y_0, add_text,
                     fontsize=text_fontsize, color=text_color)
@@ -667,11 +667,11 @@ def display_rgb(images,
             horizontalalignment='center',
             color=scale_bar_color)
     if add_text is not None:
-        text_x_0 = int(img_size_x*0.08)
-        text_y_0 = int(img_size_y*text_y_offset)
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
             ax.text(text_x_0, text_y_0,
-                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                    r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
         else:
             ax.text(text_x_0, text_y_0, add_text,
                     fontsize=text_fontsize, color=text_color)
@@ -936,7 +936,7 @@ def display_scarlet_sources(data, sources, ax=None, show_mask=True, show_ind=Non
         text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
             ax.text(text_x_0, text_y_0,
-                    r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                    r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
         else:
             ax.text(text_x_0, text_y_0, add_text,
                     fontsize=text_fontsize, color=text_color)
@@ -1036,7 +1036,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         images, norm=norm, channel_map=channel_map)
     model_rgb = scarlet.display.img_to_rgb(
         model_, norm=norm, channel_map=channel_map)
-    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q / 2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
@@ -1140,7 +1140,7 @@ def display_scarlet_model(blend, zoomin_size=None, ax=None, show_loss=False, sho
         text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
             ax[0].text(
-                text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                text_x_0, text_y_0, r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
         else:
             ax[0].text(text_x_0, text_y_0, add_text,
                        fontsize=text_fontsize, color=text_color)
@@ -1296,7 +1296,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     model_rgb = scarlet.display.img_to_rgb(
         model_, norm=norm, channel_map=channel_map)
 
-    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q / 2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
@@ -1385,7 +1385,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
         images, norm=norm, channel_map=channel_map)
     model_rgb = scarlet.display.img_to_rgb(
         model_, norm=norm, channel_map=channel_map)
-    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q/2)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q / 2)
     residual_rgb = scarlet.display.img_to_rgb(
         residual, norm=norm, channel_map=channel_map)
     vmax = np.max(np.abs(residual_rgb))
@@ -1397,11 +1397,11 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     elif show_gray_mask and aggr_mask is None:
         ax[1].imshow(model_rgb)
         ax[1].imshow(mask.astype(float), origin='lower',
-                     alpha=0.15, cmap='Greys_r')
+                     alpha=0.10, cmap='Greys_r')
     elif show_gray_mask and aggr_mask is not None:
         ax[1].imshow(model_rgb)
         ax[1].imshow((aggr_mask | mask).astype(float), origin='lower',
-                     alpha=0.15, cmap='Greys_r')
+                     alpha=0.10, cmap='Greys_r')
     else:
         ax[1].imshow(model_rgb)
 
@@ -1414,7 +1414,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
                      vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
     else:
-        ax[2].imshow(residual_rgb * (~np.tile((aggr_mask | mask).T, (3, 1, 1))).T,
+        ax[2].imshow(residual_rgb * (~np.tile((aggr_mask.astype(bool) | mask).T, (3, 1, 1))).T,
                      vmin=-vmax, vmax=vmax, cmap='seismic')
         ax[2].set_title("Residual")
 
@@ -1462,7 +1462,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
         text_y_0 = int(img_size_y * text_y_offset)
         if usetex:
             ax[0].text(
-                text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                text_x_0, text_y_0, r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
         else:
             ax[0].text(text_x_0, text_y_0, add_text,
                        fontsize=text_fontsize, color=text_color)
@@ -1556,7 +1556,7 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
         titles = ['HSC image', 'Scarlet', 'Sersic',
                   'HSC - Scarlet', 'Scarlet - Sersic']
     else:
-        titles = ['']*5
+        titles = [''] * 5
 
     for i, data in enumerate([hsc_img, scarlet_model, sersic_model, res1, res2]):
         show = axes[i].imshow(data, vmin=vmin, vmax=vmax, origin='lower',
@@ -1576,33 +1576,34 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
     dx = 0.61
     fs = fontsize
     if band is not None:
-        m_tot = r'$m_'+band+' = '+str(round(s.m_tot, 1))+'$'
+        m_tot = r'$m_' + band + ' = ' + str(round(s.m_tot, 1)) + '$'
     else:
-        m_tot = r'$m = '+str(round(s.m_tot, 1))+'$'
-    r_e = r'$r_\mathrm{eff}='+str(round(s.r_e*pixscale, 1))+'^{\prime\prime}$'
-    mu_0 = r'$\mu_0='+str(round(s.mu_0, 1))+'$'
-    mu_e = r'$\mu_e='+str(round(s.mu_e, 1))+'$'
-    n = r'$n = '+str(round(s.n, 2))+'$'
+        m_tot = r'$m = ' + str(round(s.m_tot, 1)) + '$'
+    r_e = r'$r_\mathrm{eff}=' + \
+        str(round(s.r_e * pixscale, 1)) + '^{\prime\prime}$'
+    mu_0 = r'$\mu_0=' + str(round(s.mu_0, 1)) + '$'
+    mu_e = r'$\mu_e=' + str(round(s.mu_e, 1)) + '$'
+    n = r'$n = ' + str(round(s.n, 2)) + '$'
 
     c = 'b'
 
     axes[2].text(x, y, m_tot, transform=axes[2].transAxes,
                  fontsize=fs, color=c)
-    axes[2].text(x, y-dy, mu_0, transform=axes[2].transAxes,
+    axes[2].text(x, y - dy, mu_0, transform=axes[2].transAxes,
                  fontsize=fs, color=c)
-    axes[2].text(x, y-2*dy, mu_e, transform=axes[2].transAxes,
+    axes[2].text(x, y - 2 * dy, mu_e, transform=axes[2].transAxes,
                  fontsize=fs, color=c)
-    axes[2].text(x+dx, y, n, transform=axes[2].transAxes,
+    axes[2].text(x + dx, y, n, transform=axes[2].transAxes,
                  fontsize=fs, color=c)
-    axes[2].text(x+dx, y-dy, r_e, transform=axes[2].transAxes,
+    axes[2].text(x + dx, y - dy, r_e, transform=axes[2].transAxes,
                  fontsize=fs, color=c)
     if band is not None:
         axes[2].text(0.9, 0.05, band, color='r', transform=axes[2].transAxes,
                      fontsize=25)
     if 'reduced_chisq' in list(mod_params.keys()):
         chisq = r'$\chi^2_\mathrm{dof} = ' +\
-                str(round(mod_params['reduced_chisq'], 2))+'$'
-        axes[2].text(x+dx, y-2*dy, chisq, transform=axes[2].transAxes,
+                str(round(mod_params['reduced_chisq'], 2)) + '$'
+        axes[2].text(x + dx, y - 2 * dy, chisq, transform=axes[2].transAxes,
                      fontsize=fs, color=c)
 
     # Put a color bar on the image
@@ -1649,7 +1650,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter((g_mag - i_mag)[candy], (g_mag - r_mag)
                 [candy], color='g', zorder=10, label='Candy')
     plt.scatter((g_mag - i_mag)[junk], (g_mag - r_mag)
-                [junk], color='r', label='junk', zorder=10)
+                [junk], color='r', label='junk')
     plt.scatter((g_mag - i_mag)[gal], (g_mag - r_mag)
                 [gal], color='b', label='gal')
     color_bound = [0.1, 1.2]
@@ -1685,7 +1686,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_eff_avg']
                 [:, 0][candy], color='g', zorder=10)
     plt.scatter((g_mag - i_mag)[junk],
-                meas_cat['SB_eff_avg'][:, 0][junk], color='r', zorder=11)
+                meas_cat['SB_eff_avg'][:, 0][junk], color='r')
     plt.scatter((g_mag - i_mag)[gal],
                 meas_cat['SB_eff_avg'][:, 0][gal], color='b')
     plt.xlabel('g-i')
@@ -1701,7 +1702,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
                 [candy], color='g', zorder=10)
     plt.scatter(meas_cat['M20'][junk], meas_cat['Gini']
-                [junk], color='r', zorder=11)
+                [junk], color='r')
     plt.scatter(meas_cat['M20'][gal], meas_cat['Gini'][gal], color='b')
     plt.xlabel('M20')
     plt.ylabel('Gini')
@@ -1715,7 +1716,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.sca(axes[1, 0])
     plt.scatter(meas_cat['C'][candy], meas_cat['A']
                 [candy], color='g', zorder=10)
-    plt.scatter(meas_cat['C'][junk], meas_cat['A'][junk], color='r', zorder=11)
+    plt.scatter(meas_cat['C'][junk], meas_cat['A'][junk], color='r')
     plt.scatter(meas_cat['C'][gal], meas_cat['A'][gal], color='b')
     plt.xlim(0.7, 4.8)
     plt.ylim(-.2, 1.2)
@@ -1728,7 +1729,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter(meas_cat['SB_0'][:, 0][candy],
                 meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
     plt.scatter(meas_cat['SB_0'][:, 0][junk],
-                meas_cat['rhalf_circularized'][junk], color='r', zorder=11)
+                meas_cat['rhalf_circularized'][junk], color='r')
     plt.scatter(meas_cat['SB_0'][:, 0][~junk],
                 meas_cat['rhalf_circularized'][~junk], color='b')
     plt.axvline(22., color='k', ls='--')
@@ -1743,7 +1744,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][candy],
                 meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][junk],
-                meas_cat['rhalf_circularized'][junk], color='r', zorder=11)
+                meas_cat['rhalf_circularized'][junk], color='r')
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][~junk],
                 meas_cat['rhalf_circularized'][~junk], color='b')
     plt.axvline(23., color='k', ls='--')
@@ -1758,7 +1759,7 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.scatter(meas_cat['rhalf_circularized'][candy],
                 meas_cat['sersic_rhalf'][candy], color='g', zorder=10)
     plt.scatter(meas_cat['rhalf_circularized'][junk],
-                meas_cat['sersic_rhalf'][junk], color='r', zorder=11)
+                meas_cat['sersic_rhalf'][junk], color='r')
     plt.scatter(meas_cat['rhalf_circularized'][gal],
                 meas_cat['sersic_rhalf'][gal], color='b')
     plt.xscale('log')

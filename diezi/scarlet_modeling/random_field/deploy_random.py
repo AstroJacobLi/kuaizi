@@ -1,30 +1,32 @@
 '''
 python script to deploy slurm jobs for constructing training spectra
 '''
-import os, sys 
+import os
+import sys
 import fire
 
-def deploy_training_job(low=0, high=1000, name='random_field', ncpu=32, starlet_thresh=1, method='wavelet'): 
+
+def deploy_training_job(low=0, high=1000, name='random_field', ncpu=32, starlet_thresh=1, method='wavelet'):
     ''' create slurm script and then submit 
     '''
-    time="48:00:00"
+    time = "48:00:00"
 
     cntnt = '\n'.join([
-        "#!/bin/bash", 
+        "#!/bin/bash",
         f"#SBATCH -J {name}_{low}_{high}",
         "#SBATCH --nodes=1",
-        "#SBATCH --ntasks-per-node=%i" % ncpu, 
-        "#SBATCH --time=%s" % time, 
+        "#SBATCH --ntasks-per-node=%i" % ncpu,
+        "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
         f"#SBATCH -o {name}_{low}_{high}.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
-        "", 
-        'now=$(date +"%T")', 
-        'echo "start time ... $now"', 
-        "", 
-        "module purge", 
-        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh", 
+        "",
+        'now=$(date +"%T")',
+        'echo "start time ... $now"',
+        "",
+        "module purge",
+        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
         "export OMP_NUM_THREADS=1",
         "",
         f"python3 ../script/sclt_multiprocess.py --njobs {ncpu} \\",
@@ -48,19 +50,20 @@ def deploy_training_job(low=0, high=1000, name='random_field', ncpu=32, starlet_
         f"    --ncpu={ncpu} --suffix '' --sigma=0.5",
         "",
         "",
-        'now=$(date +"%T")', 
-        'echo "end time ... $now"', 
-        ""]) 
+        'now=$(date +"%T")',
+        'echo "end time ... $now"',
+        ""])
 
     # create the slurm script execute it and remove it
-    f = open(f'_{name}_{low}_{high}.slurm','w')
+    f = open(f'_{name}_{low}_{high}.slurm', 'w')
     f.write(cntnt)
     f.close()
     os.system(f'sbatch _{name}_{low}_{high}.slurm')
     #os.system('rm _train.slurm')
-    return None 
+    return None
+
 
 if __name__ == '__main__':
     fire.Fire(deploy_training_job)
 
-# python deploy_random.py --name random_field --ncpu=1 --starlet_thresh=1 --method=wavelet --low=0 --high=None
+# python deploy_random.py --name random_field --ncpu=8 --starlet_thresh=1 --method=wavelet --low=0 --high=None

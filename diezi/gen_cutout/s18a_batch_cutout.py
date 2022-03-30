@@ -72,11 +72,12 @@ def batch_cutout(data_dir, obj_cat_dir, low=0, high=None,
     skymap = butler.get('deepCoadd_skyMap', immediate=True)
     print('\n Number of jobs:', njobs)
 
+    obj_cat = Table.read(obj_cat_dir)
     if high is None:
-        high = len(obj_cat_dir)
+        high = len(obj_cat)
     if low is None:
         low = 0
-    obj_cat = Table.read(obj_cat_dir)[low:high]
+    obj_cat = obj_cat[low:high]
     print('\n Number of galaxies:', len(obj_cat))
 
     # Adaptive cutout size# Normal objects, use 0.7 arcmin cutout.
