@@ -47,7 +47,7 @@ def set_env(project='HSC', name='HSC_LSBG', data_dir='Research/Data/'):
     return data_dir
 
 
-def set_matplotlib(style='JL', usetex=True, fontsize=13, figsize=(6, 5), dpi=60):
+def set_matplotlib(style='default', usetex=False, fontsize=13, figsize=(6, 5), dpi=60):
     '''
     Default matplotlib settings, borrowed from Song Huang. I really like his plotting style.
 

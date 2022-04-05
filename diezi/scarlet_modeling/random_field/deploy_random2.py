@@ -1,16 +1,17 @@
 '''
-python script to deploy slurm jobs
+python script to deploy slurm jobs for constructing training spectra
 '''
 import os
 import sys
 import fire
 
-PREFIX = 'NSA'
-OUTPUT_SUBDIR = 'NSA_Z001_002'
-CAT_DIR = '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/NSA/z001_002/nsa_cutout_cat_z001_002.fits'
+
+PREFIX = 'RANDOM_FIELD'
+OUTPUT_SUBDIR = 'RANDOM_FIELD2'
+CAT_DIR = '/tigress/jiaxuanl/Data/HSC/LSBG/Catalog/random_field2/random_field2_cutout_cat_random_field2.fits'
 
 
-def deploy_modeling_job(low=0, high=1000, ind_list=None, name='nsa_z001_002', ncpu=32,
+def deploy_modeling_job(low=0, high=1000, ind_list=None, name='random2', ncpu=32,
                         method='wavelet', starlet_thresh=0.5, monotonic=True, bkg=True, min_grad=-0.001,
                         variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.05, only_measure=False):
     ''' create slurm script and then submit 
@@ -80,30 +81,12 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='nsa_z001_002', nc
 if __name__ == '__main__':
     fire.Fire(deploy_modeling_job)
 
-# python deploy_mock.py --name mock_wvlt --ncpu=16 --starlet_thresh=0.5 \
-#  --method=wavelet --low=0 --high=500 --monotonic=True --variance=0 --min_grad 0.01 \
-#  --scales="[0, 1, 2, 3]" --sigma=0.05
 
 ############ VANILLA #############
-# python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05 --only_measure=True
-
-# python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05 --only_measure=True
-
-# python deploy_nsa.py --name nsa --ncpu=10 --method=vanilla \
-# --low=2000 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05 --only_measure=True
+# python deploy_random2.py --name random2 --ncpu=16 --method=vanilla \
+# --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
 
 
 ############ SPERGEL #############
-# python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=0 --high=1000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
-
-# python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
-
-# python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --low=2000 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
-
-# python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
-# --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05 --ind_list='/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/z001_002_failed.npy'
+# python deploy_random2.py --name rdm2_spgl --ncpu=16 --method=spergel \
+# --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
