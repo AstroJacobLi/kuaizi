@@ -25,11 +25,12 @@ import sys
 class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
+        # sys.stdout = open(os.devnull, 'w')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self._original_stdout
+        # sys.stdout.close()
+        # sys.stdout = self._original_stdout
+        pass
 
 
 def makeCatalog(datas, layer_ind=None, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5,
@@ -657,8 +658,11 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 # src[0].freezeParam('pos')
                 # Free parameter for our target galaxy
                 if obj['target'] == 1 and ref_source is not None:
-                    src = [copy.deepcopy(ref_source)]
-                    src[0].brightness = Flux(obj_temp['flux'])
+                    src = [ref_source.copy()]
+                    print(src[0])
+                    # src[0].brightness = Flux(obj_temp['flux'])
+                    src[0].thawAllParams()
+                    src[0].thawAllRecursive()
                 if obj['target'] == 1:
                     for item in freeze_dict:
                         if item == 'shape.ab' and freeze_dict[item]:
@@ -686,8 +690,11 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                                 'shape')].freezeParam('re')
                         if item == 'shape' and freeze_dict[item] and item in src[0].namedparams:
                             src[0].freezeParam(item)
-                        if item in ['pos', 'sersicindex'] and freeze_dict[item] and item in src[0].namedparams:
-                            src[0].freezeParam(item)
+                        if item in ['pos', 'sersicindex'] and item in src[0].namedparams:
+                            if freeze_dict[item] is True:
+                                src[0].freezeParam(item)
+                            # src[0].freezeParam(
+                            #     item) if freeze_dict[item] else src[0].thawParam(item)
                     #[src[0].freezeParam(key) for key in freeze_dict if key in src[0].namedparams and freeze_dict[key] is True]
                 trac_obj = Tractor([tim], src)
                 trac_obj.freezeParam('images')
@@ -712,25 +719,25 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             print(f'# Progress: {i+1} / {len(obj_cat)}')
 
     # ########################################
-    # # Another round of global optimization #
-    tim = Image(data=img_data,
-                invvar=invvar,
-                psf=psf_obj,
-                wcs=NullWCS(pixscale=pixel_scale),
-                sky=ConstantSky(0.0),
-                photocal=NullPhotoCal()
-                )
-    trac_obj = Tractor([tim], blob_sources)
-    trac_obj.freezeParam('images')
-    with HiddenPrints():
-        chi2_0 = (trac_obj.getChiImage()**2).mean()
-        try:
-            trac_obj.optimize_loop()
-        except:
-            pass
-        chi2_1 = (trac_obj.getChiImage()**2).mean()
-    if verbose:
-        print('# Global optimization: Chi2 improvement = ', chi2_0 - chi2_1)
+    # # # Another round of global optimization #
+    # tim = Image(data=img_data,
+    #             invvar=invvar,
+    #             psf=psf_obj,
+    #             wcs=NullWCS(pixscale=pixel_scale),
+    #             sky=ConstantSky(0.0),
+    #             photocal=NullPhotoCal()
+    #             )
+    # trac_obj = Tractor([tim], blob_sources)
+    # trac_obj.freezeParam('images')
+    # with HiddenPrints():
+    #     chi2_0 = (trac_obj.getChiImage()**2).mean()
+    #     try:
+    #         trac_obj.optimize_loop()
+    #     except:
+    #         pass
+    #     chi2_1 = (trac_obj.getChiImage()**2).mean()
+    # if verbose:
+    #     print('# Global optimization: Chi2 improvement = ', chi2_0 - chi2_1)
 
     ########################
     # Plot the residual #
@@ -921,6 +928,9 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
             Flux is in nanomaggy, effective radius (`re`) is in arcsec.
 
     '''
+    if trac_obj is None:
+        return None
+
     trac_obj.thawAllRecursive()
 
     attri = trac_obj.catalog.getParamNames()
@@ -936,7 +946,8 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
     src = trac_obj.catalog[i]
 
     keys_to_extract = [item for item in attri if f'source{i}.' in item]
-    source_values = {key.replace(f'source{i}.', ''): values[key] for key in keys_to_extract}
+    source_values = {key.replace(f'source{i}.', '')
+                                 : values[key] for key in keys_to_extract}
     source_values['flux'] *= 10**((22.5 - zeropoint) / 2.5)  # in nanomaggy
 
     source_invvar = {key.replace(
@@ -1008,21 +1019,24 @@ def _write_to_row(row, model_dict, channels=list('grizy')):
     Returns:
         row (astropy.table.Row)
     '''
-    meas_dict = getTargetProperty(model_dict['i'])
-    for key in ['x', 'x_ivar', 'y', 'y_ivar', 'ab', 'ab_ivar', 'phi', 'phi_ivar', 'sersic', 'sersic_ivar']:
-        row[key] = meas_dict[key]
-
-    # flux
-    flux = np.zeros(len(channels))
-    flux_ivar = np.zeros(len(channels))
-    for i, filt in enumerate(channels):
-        meas_dict = getTargetProperty(model_dict[filt])
-        flux[i] = meas_dict['flux']
-        flux_ivar[i] = meas_dict['flux_ivar']
-
-    row['flux'] = flux
-    row['flux_ivar'] = flux_ivar
-    return row
+    if 'i' in model_dict.keys() and model_dict['i'] is not None:
+        # Positions from i-band
+        meas_dict = getTargetProperty(model_dict['i'])
+        for key in ['x', 'x_ivar', 'y', 'y_ivar', 'ab', 'ab_ivar', 'phi', 'phi_ivar', 'sersic', 'sersic_ivar']:
+            row[key] = meas_dict[key]
+        # flux
+        flux = np.zeros(len(channels))
+        flux_ivar = np.zeros(len(channels))
+        for i, filt in enumerate(channels):
+            meas_dict = getTargetProperty(model_dict[filt])
+            if meas_dict is not None:
+                flux[i] = meas_dict['flux']
+                flux_ivar[i] = meas_dict['flux_ivar']
+        row['flux'] = flux
+        row['flux_ivar'] = flux_ivar
+        return row
+    else:
+        return row
 
 
 def initialize_meas_cat(obj_cat, channels=list('grizy')):
