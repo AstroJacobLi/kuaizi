@@ -1,4 +1,5 @@
 from __future__ import division, print_function
+from turtle import ScrolledCanvas
 
 import numpy as np
 
@@ -20,6 +21,7 @@ import kuaizi
 
 import os
 import sys
+import copy
 
 
 class HiddenPrints:
@@ -273,42 +275,51 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
 
             elif obj_type[i] == 'DEV':
                 pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-                sources.append(
-                    DevGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
+                src = DevGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi)))
+                # src.brightness.lower = 0
+                # src.shape.lowers = [0, 0, None]
+                # src.shape.uppers = [None, None, None]
+                sources.append(src)
 
             elif obj_type[i] == 'EXP':
                 pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-                sources.append(
-                    ExpGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi))))
+                src = ExpGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi)))
+                # src.brightness.lower = 0
+                # src.shape.lowers = [0, 0, None]
+                sources.append(src)
             elif obj_type[i] == 'SER':
                 pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-                sources.append(
-                    SersicGalaxy(
-                        PixPos(pos_x, pos_y), Flux(obj['flux']),
-                        GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
-                                    (90.0 + obj['theta'] * 180.0 / np.pi)),
-                        SersicIndex(1.0)
-                    )
+                src = SersicGalaxy(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']),
+                    GalaxyShape(obj['a_arcsec'], (obj['b_arcsec'] / obj['a_arcsec']),
+                                (90.0 + obj['theta'] * 180.0 / np.pi)),
+                    SersicIndex(2.0)
                 )
+                src.brightness.lower = 0
+                src.shape.lowers = [0, 0, None]
+                sources.append(src)
             elif obj_type[i] == 'REX':
                 pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
                 src = ExpGalaxy(
                     PixPos(pos_x, pos_y), Flux(obj['flux']),
                     EllipseE(obj['a_arcsec'], 0, 0)
                 )
-                src.shape.freezeParam('e1')
-                src.shape.freezeParam('e2')
+                # src.brightness.lower = 0
+                # src.shape.freezeParam('e1')
+                # src.shape.freezeParam('e2')
                 sources.append(src)
             else:
                 pos_x, pos_y = w.wcs_world2pix([[obj['ra'], obj['dec']]], 0)[0]
-                sources.append(PointSource(
-                    PixPos(pos_x, pos_y), Flux(obj['flux'])))
+                src = PointSource(
+                    PixPos(pos_x, pos_y), Flux(obj['flux']))
+                # src.brightness.lower = 0
+                sources.append(src)
 
         print(" - Now you have %d sources" % len(sources))
 
@@ -619,6 +630,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     from tractor.galaxy import GalaxyShape, DevGalaxy, ExpGalaxy, CompositeGalaxy
     from tractor.psf import Flux, PixPos, PointSource, PixelizedPSF, Image, Tractor
     from tractor.ellipses import EllipseE
+    from tractor.constrained_optimizer import ConstrainedOptimizer
     import copy
 
     if len(obj_cat) < 1:
@@ -631,7 +643,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     blob_sources = []
 
     dchisq = []
-    type_list = ['PSF', 'DEV', 'EXP', 'SER']  # 'REX',
+    type_list = ['DEV', 'EXP', 'SER']  # 'REX', # 'PSF',
 
     image = copy.deepcopy(img_data)
 
@@ -653,11 +665,12 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             if obj['target'] == 1 and ref_source is not None:
                 # don't iterate over types if ref_source is None
                 src = [ref_source.copy()]
-                src[0].brightness = Flux(obj_temp['flux'])
+                src[0].brightness = Flux(obj['flux'])
                 print(src[0])
-                src[0].thawAllParams()
-                src[0].thawAllRecursive()
-                src = _freeze_params(src, freeze_dict)
+                src = _freeze_params(
+                    src, freeze_dict, cen_ind=0, fix_all=False)
+                src = _set_bounds(src)
+                # , optimizer=ConstrainedOptimizer)
                 trac_obj = Tractor([tim], src)
                 trac_obj.freezeParam('images')
                 trac_obj.optimize_loop()
@@ -668,13 +681,18 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                     obj_temp['type'] = Type
                     src = add_tractor_sources(
                         Table(obj_temp), None, w, shape_method=shape_method)
+                    src = _set_bounds(src)
                     # Free parameter for our target galaxy
                     if obj['target'] == 1:
                         src = _freeze_params(src, freeze_dict)
-                    trac_obj = Tractor([tim], src)
+                    trac_obj = Tractor(
+                        [tim], src)  # , optimizer=ConstrainedOptimizer)
                     trac_obj.freezeParam('images')
                     try:
-                        trac_obj.optimize_loop()
+                        # trac_obj.optimize_loop()
+                        # trac_obj.optimize_loop(dchisq=0.1, shared_params=False)
+                        v = trac_obj.optimize(
+                            variance=True, just_variance=True, shared_params=False)
                         # object on the edge doesn't work
                         chi_1 = (trac_obj.getChiImage()**2).mean()
                     except:
@@ -682,7 +700,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                     chi_diff.append(chi_0 - chi_1)
                     if obj['target'] == 1:
                         print(src[0])
-                        print(chi_0 - chi_1)
+                        # print(chi_0 - chi_1)
                     blobs.append(src[0])
                 dchisq.append(chi_diff)
                 # use the type with smallest chi2
@@ -695,43 +713,6 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
         if verbose:
             print(f'# Progress: {i+1} / {len(obj_cat)}')
 
-    # ########################################
-    # # Another round for the central #
-    # cen_ind = np.where(obj_cat['target'] == 1)[0][0]
-    # print('cen_id', cen_ind)
-    # obj = obj_cat[cen_ind]
-    # tim = Image(data=img_data,
-    #             invvar=invvar,
-    #             psf=psf_obj,
-    #             wcs=NullWCS(pixscale=pixel_scale),
-    #             sky=ConstantSky(0.0),
-    #             photocal=NullPhotoCal()
-    #             )
-    # for Type in type_list:  # iterate over morph types
-    #     obj_temp = copy.deepcopy(obj)
-    #     obj_temp['type'] = Type
-    #     src = add_tractor_sources(
-    #         Table(obj_temp), None, w, shape_method=shape_method)
-    #     # Free parameter for our target galaxy
-    #     if obj['target'] == 1:
-    #         src = _freeze_params(src, freeze_dict)
-    #     trac_obj = Tractor([tim], src)
-    #     trac_obj.freezeParam('images')
-    #     try:
-    #         trac_obj.optimize_loop()
-    #         # object on the edge doesn't work
-    #         chi_1 = (trac_obj.getChiImage()**2).mean()
-    #     except:
-    #         chi_1 = 99
-    #     chi_diff.append(chi_0 - chi_1)
-    #     if obj['target'] == 1:
-    #         print('Another time', src[0])
-    #         print(chi_0 - chi_1)
-    #     blobs.append(src[0])
-    # dchisq.append(chi_diff)
-    # # use the type with smallest chi2
-    # blob_sources[cen_ind + 1] = blobs[np.nanargmax(chi_diff)]
-
     #######################################
     # Another round of global optimization #
     tim = Image(data=img_data,
@@ -741,7 +722,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                 sky=ConstantSky(0.0),
                 photocal=NullPhotoCal()
                 )
-    trac_obj = Tractor([tim], blob_sources)
+    trac_obj = Tractor([tim], _set_bounds(blob_sources))
     trac_obj.freezeParam('images')
     with HiddenPrints():
         chi2_0 = (trac_obj.getChiImage()**2).mean()
@@ -753,7 +734,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     if verbose:
         print('# Global optimization: Chi2 improvement = ', chi2_0 - chi2_1)
 
-    ########################
+    #####################
     # Plot the residual #
     tim = Image(data=img_data,
                 invvar=invvar,
@@ -790,8 +771,6 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             plt.savefig(fig_name, dpi=200, bbox_inches='tight')
             plt.show()
             print('   The chi-square is', chi2)
-            # print('   The chi-square is', np.sqrt(
-            #     np.mean(np.square((img_data - trac_mod_opt).flatten()))) / np.sum(img_data))
         elif verbose:
             plt.show()
             print('   The chi-square is', chi2)
@@ -807,40 +786,191 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
         return blob_sources, trac_obj
 
 
-def _freeze_params(src, freeze_dict):
+import types
+
+
+def _isLegal_shape(src):
+    return (src.shape.getAllParams() <= src.shape.uppers) & (
+        src.shape.getAllParams() >= src.shape.lowers)
+
+
+def _isLegal_flux(src):
+    return (src.brightness.getAllParams()[0] <= src.brightness.upper) & (
+        src.brightness.getAllParams()[0] >= src.brightness.lower)
+
+
+def _getLogPrior(src):
+    if src.getSourceType() == 'PointSource':
+        if not src.brightness.isLegal():
+            return -np.inf
+        else:
+            return 0
+    else:
+        if not (src.brightness.isLegal() & src.shape.isLegal()):
+            return -np.inf
+        else:
+            return 0
+
+
+def _set_bounds(sources):
+    """
+    Set lower bounds to sources
+    """
+    for src in sources:
+        try:
+            src.brightness.lower = 0
+            src.brightness.upper = 1e9
+            src.shape.lowers = [0, 0, -1e9]
+            src.shape.uppers = [1e9, 1e9, 1e9]
+            src.shape.isLegal = types.MethodType(_isLegal_shape, src)
+            src.brightness.isLegal = types.MethodType(_isLegal_flux, src)
+            src.brightness.getLogPrior = types.MethodType(_getLogPrior, src)
+        except:
+            pass
+    return sources
+
+
+def _freeze_source(src, freeze_dict):
+    """
+    Freeze one source.
+    """
     for item in freeze_dict:
         if item == 'shape.ab' and freeze_dict[item]:
             try:
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('ab')
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('e1')
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('e2')
+                if src.getNamedParamIndex('shape') is not None and src.shape.re >= 0:
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('ab')
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('e1')
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('e2')
             except:
                 pass
         if item == 'shape.phi' and freeze_dict[item]:
             try:
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('phi')
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('e1')
-                src[0][src[0].getNamedParamIndex(
-                    'shape')].freezeParam('e2')
+                if src.getNamedParamIndex('shape') is not None and src.shape.re >= 0:
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('phi')
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('e1')
+                    src[src.getNamedParamIndex(
+                        'shape')].freezeParam('e2')
             except:
                 pass
         if item == 'shape.re' and freeze_dict[item]:
-            src[0][src[0].getNamedParamIndex(
-                'shape')].freezeParam('re')
-        if item == 'shape' and freeze_dict[item] and item in src[0].namedparams:
-            src[0].freezeParam(item)
-        if item in ['pos', 'sersicindex'] and item in src[0].namedparams:
+            if src.getNamedParamIndex('shape') is not None and src.shape.re >= 0:
+                src[src.getNamedParamIndex(
+                    'shape')].freezeParam('re')
+        if item == 'shape' and freeze_dict[item] and item in src.namedparams:
+            src.freezeParam(item)
+
+        if item == 'pos' and freeze_dict[item] and item in src.namedparams:
+            # src.freezeParam(item)
+            src.pos.addGaussianPrior('x', src.pos.x, 1)
+            src.pos.addGaussianPrior('y', src.pos.y, 1)
+
+        if item in ['sersicindex'] and item in src.namedparams:
             if freeze_dict[item] is True:
-                src[0].freezeParam(item)
+                src.freezeParam(item)
     return src
 
 
+def _freeze_params(sources, freeze_dict, cen_ind=None, fix_all=False):
+    """
+    Freeze central source, or freeze all sources.
+
+    Also see: _freeze_source
+    """
+    if cen_ind is not None:
+        sources[cen_ind] = _freeze_source(sources[cen_ind], freeze_dict)
+
+    if fix_all:
+        for i in range(len(sources)):
+            sources[i] = _freeze_source(sources[i], freeze_dict)
+    return sources
+
+
+def tractor_fix_all(catalog, w, img_data, invvar, psf_obj, pixel_scale,
+                    freeze_dict=None,
+                    band_name=None, show_fig=False, fig_name=None, verbose=False):
+    '''
+    Take the sources from the give Tractor catalog, fix all params in `freeze_dict` and fit.
+    '''
+    from tractor import NullWCS, NullPhotoCal, ConstantSky
+    from tractor.psf import Image, Tractor
+
+    if len(catalog) < 1:
+        raise ValueError(
+            "The length of `obj_cat` is less than 1. Please check your catalog!")
+
+    if freeze_dict is None:
+        freeze_dict = {}
+
+    catalog = _set_bounds(catalog)
+
+    with HiddenPrints():
+        tim = Image(data=img_data,
+                    invvar=invvar,
+                    psf=psf_obj,
+                    wcs=NullWCS(pixscale=pixel_scale),
+                    sky=ConstantSky(0.0),
+                    photocal=NullPhotoCal()
+                    )
+        catalog = _freeze_params(catalog, freeze_dict, fix_all=True)
+    # print('Thawed(self)   Thawed(parent)   Param', '\n', '-' * 50)
+    # for param, tself, tparent in catalog.getParamStateRecursive():
+    #     print('   %5s      %5s           ' % (tself, tparent), param)
+    trac_obj = Tractor([tim], catalog)
+    chi2_0 = (trac_obj.getChiImage()**2).mean()
+    trac_obj.freezeParam('images')
+    trac_obj.optimize_loop()
+    chi2 = (trac_obj.getChiImage()**2).mean()
+    print('# Global optimization: Chi2 improvement = ', chi2_0 - chi2)
+
+    blob_sources = trac_obj.catalog
+    ########################
+    # Plot the residual #
+    if show_fig:
+        plt.rc('font', size=20)
+        fig, [ax1, ax2, ax3] = plt.subplots(1, 3, figsize=(18, 8))
+
+        with HiddenPrints():
+            trac_mod_opt = trac_obj.getModelImage(
+                0, minsb=0.)
+
+        if band_name is None:
+            _ = kuaizi.display.display_multiple(
+                [img_data, trac_mod_opt, img_data - trac_mod_opt],
+                text=['raw\ image', 'tractor\ model', 'residual'],
+                ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
+        else:
+            _ = kuaizi.display.display_multiple(
+                [img_data, trac_mod_opt, img_data - trac_mod_opt],
+                text=[f'{band_name}-band\ raw\ image',
+                      'tractor\ model', 'residual'],
+                ax=[ax1, ax2, ax3], scale_bar_y_offset=0.4, text_fontsize=20)
+
+        if fig_name is not None:
+            plt.savefig(fig_name, dpi=200, bbox_inches='tight')
+            plt.show()
+            print('   The chi-square is', chi2)
+        elif verbose:
+            plt.show()
+            print('   The chi-square is', chi2)
+        else:
+            plt.close()
+            print('   The chi-square is', chi2)
+    else:
+        print('   The chi-square is', chi2)
+
+    if show_fig:
+        return blob_sources, trac_obj, fig
+    else:
+        return blob_sources, trac_obj
+
+
 def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
+                                 obj_cat=None, fix_all=False, tractor_cat=None,
                                  freeze_dict=None, ref_source=None,
                                  show_fig=False, verbose=False):
     '''
@@ -872,60 +1002,84 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
         print("### `" + obj_name + f"` {filt}-band")
     layer_ind = channels.index(filt)
 
-    obj_cat_sep, segmap_sep = makeCatalog(
-        [data],
-        layer_ind=layer_ind,
-        lvl=2.0,
-        mask=None,
-        method='vanilla',
-        convolve=False,
-        match_gaia=False,
-        show_fig=False,
-        visual_gaia=False,
-        b=32,
-        f=3,
-        pixel_scale=0.168,
-        minarea=5,
-        deblend_nthresh=48,
-        deblend_cont=0.001,
-        sky_subtract=True,
-        verbose=verbose)
+    if fix_all and tractor_cat is None:
+        raise ValueError(
+            'Tractor catalog must be provided in `fix_all` mode. ')
 
-    obj_cat_sep['a_arcsec'] = obj_cat_sep['a'] * HSC_pixel_scale
-    obj_cat_sep['b_arcsec'] = obj_cat_sep['b'] * HSC_pixel_scale
-    obj_cat_sep['type'] = np.repeat(b'NAN', len(obj_cat_sep))
+    if obj_cat is None:
+        obj_cat_sep, segmap_sep = makeCatalog(
+            [data],
+            layer_ind=layer_ind,
+            lvl=2.0,
+            mask=None,
+            method='vanilla',
+            convolve=False,
+            match_gaia=False,
+            show_fig=False,
+            visual_gaia=False,
+            b=32,
+            f=3,
+            pixel_scale=0.168,
+            minarea=5,
+            deblend_nthresh=48,
+            deblend_cont=0.001,
+            sky_subtract=True,
+            verbose=verbose)
 
-    obj_cat_sep.sort('flux', reverse=True)
-    # obj_cat_sep.sort('flux', reverse=False)
+        obj_cat_sep['a_arcsec'] = obj_cat_sep['a'] * HSC_pixel_scale
+        obj_cat_sep['b_arcsec'] = obj_cat_sep['b'] * HSC_pixel_scale
+        obj_cat_sep['type'] = np.repeat(b'NAN', len(obj_cat_sep))
 
-    catalog_c = SkyCoord(obj_cat_sep['ra'], obj_cat_sep['dec'], unit='deg')
-    dist = coord.separation(catalog_c)
-    cen_obj_ind = np.argsort(dist)[0]
-    cen_obj = obj_cat_sep[cen_obj_ind]
-    ### Add a "target" column to indicate which object is the target galaxy ###
-    obj_cat_sep['target'] = np.zeros(len(obj_cat_sep), dtype=int)
-    obj_cat_sep['target'][cen_obj_ind] = 1
+        obj_cat_sep.sort('flux', reverse=True)
+        # obj_cat_sep.sort('flux', reverse=False)
+
+        catalog_c = SkyCoord(obj_cat_sep['ra'], obj_cat_sep['dec'], unit='deg')
+        dist = coord.separation(catalog_c)
+        cen_obj_ind = np.argsort(dist)[0]
+        cen_obj = obj_cat_sep[cen_obj_ind]
+        ### Add a "target" column to indicate which object is the target galaxy ###
+        obj_cat_sep['target'] = np.zeros(len(obj_cat_sep), dtype=int)
+        obj_cat_sep['target'][cen_obj_ind] = 1
+
+        obj_cat = obj_cat_sep
+
+    else:
+        cen_obj_ind = np.where(obj_cat['target'] == 1)[0][0]
 
     # print(f'# Type of the central object is {cen_obj["type"]}')
     if verbose:
-        print(f'# Total number of objects: {len(obj_cat_sep)}')
+        print(f'# Total number of objects: {len(obj_cat)}')
         print(f'# Central object index in {filt}-band: {cen_obj_ind}')
 
     psf_obj = PixelizedPSF(data.psfs[layer_ind])  # Construct PSF
 
-    result = tractor_blob_by_blob(
-        obj_cat_sep,
-        data.wcs,
-        data.images[layer_ind],
-        data.weights[layer_ind],
-        psf_obj,
-        HSC_pixel_scale,
-        shape_method='manual',
-        freeze_dict=freeze_dict,
-        ref_source=ref_source,
-        show_fig=show_fig,
-        fig_name=obj_name + '_sep_tractor_' + filt,
-        verbose=verbose)
+    if not fix_all:
+        result = tractor_blob_by_blob(
+            obj_cat,
+            data.wcs,
+            data.images[layer_ind],
+            data.weights[layer_ind],
+            psf_obj,
+            HSC_pixel_scale,
+            shape_method='manual',
+            freeze_dict=freeze_dict,
+            ref_source=ref_source,
+            show_fig=show_fig,
+            fig_name=obj_name + '_sep_tractor_' + filt,
+            verbose=verbose)
+    else:
+        result = tractor_fix_all(
+            tractor_cat,
+            data.wcs,
+            data.images[layer_ind],
+            data.weights[layer_ind],
+            psf_obj,
+            HSC_pixel_scale,
+            freeze_dict=freeze_dict,
+            show_fig=show_fig,
+            fig_name=obj_name + '_sep_tractor_' + filt,
+            verbose=verbose
+        )
 
     if not show_fig:
         sources, trac_obj = result
@@ -934,7 +1088,7 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
     trac_obj.target_ind = cen_obj_ind  # record the index of target galaxy
     if verbose:
         print(trac_obj.catalog[cen_obj_ind])
-    return trac_obj
+    return trac_obj, obj_cat
 
 
 def _compute_invvars(allderivs):
@@ -1056,7 +1210,7 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
     return source_output
 
 
-def _write_to_row(row, model_dict, channels=list('grizy')):
+def _write_to_row(row, model_dict, channels=list('grizy') + ['N708', 'N540']):
     '''
     Write the output of `makeMeasurement` to a Row of astropy.table.Table.
 
