@@ -52,7 +52,7 @@ def vanilla_detection(detect_image, mask=None, sigma=3, b=64, f=3, minarea=5,
                       convolve=False, conv_radius=None, deblend_nthresh=30,
                       deblend_cont=0.001, sky_subtract=True, show_fig=True, **kwargs):
     '''
-    Source detection using Source Extractor (actually SEP). 
+    Source detection using Source Extractor (actually SEP).
 
     Parameters
     ----------
@@ -127,7 +127,7 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
         the number of wavelet decompositions
     high_freq_lvl: int
         this parameter controls how much low-frequency features are wiped away. It should be smaller than `wavelet_lvl - 1`.
-        `high_freq_lvl=0` means no low-freq features are wiped (equivalent to vanilla), higher number yields a image with less low-freq features.  
+        `high_freq_lvl=0` means no low-freq features are wiped (equivalent to vanilla), higher number yields a image with less low-freq features.
     sigma: float
         detection threshold
     b: float
@@ -191,7 +191,7 @@ def wavelet_detection(detect_image, mask=None, wavelet_lvl=4, low_freq_lvl=0, hi
 
 
 def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_radius=5,
-                match_gaia=True, show_fig=True, visual_gaia=True, tigress=False, **kwargs):
+                match_gaia=True, show_fig=True, visual_gaia=True, tigress=False, layer_ind=None, **kwargs):
     ''' Creates a detection catalog by combining low and high resolution data.
 
     This function is used for detection before running scarlet.
@@ -206,7 +206,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     lvl: int
         detection lvl, i.e., sigma in SEP
     method: str
-        Options: 
+        Options:
             "wavelet" uses wavelet decomposition of images before combination, emphasizes high-frequency features
             "vanilla" directly detect objects using SEP
     match_gaia: bool
@@ -215,7 +215,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         whether show the detection catalog as a figure
     visual_gaia: bool
         whether mark Gaia stars in the figure
-    kwargs: 
+    kwargs:
         See the arguments of 'utils.extract_obj'.
 
     Returns
@@ -237,6 +237,8 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
             np.abs(np.sum(datas[0].images, axis=(1, 2)))[:, None, None]
         # Detection image as the sum over all images
         detect_image = np.sum(hr_images, axis=0)
+        # _weights = datas[0].weights.sum(axis=(1, 2)) / datas[0].weights.sum()
+        # detect_image = (_weights[:, None, None] * datas[0].images).sum(axis=0)
     else:
         data_lr, data_hr = datas
         # Create observations for each image
@@ -256,6 +258,9 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     else:
         detect = detect_image
 
+    if layer_ind is not None:
+        detect = datas[0].images[layer_ind]
+
     # we better subtract background first, before convolve
     if method == 'wavelet':
         result = wavelet_detection(
@@ -267,7 +272,7 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     obj_cat = result[0]
     segmap = result[1]
 
-    ## RA and Dec
+    # RA and Dec
     if len(datas) == 1:
         ra, dec = datas[0].wcs.wcs_pix2world(obj_cat['x'], obj_cat['y'], 0)
         obj_cat.add_columns([Column(data=ra, name='ra'),
@@ -345,8 +350,8 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         psf_ind2 = temp_cat[temp2[flag2]]['index'].data
         # we also use the coordinates from Gaia for bright stars
         obj_cat.remove_rows(psf_ind2)
-        #obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
-        #obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
+        # obj_cat['gaia_coord'][psf_ind2] = np.array(gaia_stars[['ra', 'dec']])[flag2]
+        # obj_cat['obj_type'][psf_ind2] = scarlet.source.PointSource
         if logger:
             logger.info(f'    Matched {len(psf_ind)} stars from GAIA')
         print(f'    Matched {len(psf_ind)} stars from GAIA')
