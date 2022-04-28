@@ -660,7 +660,17 @@ class ScarletFitter(object):
                 variance=0.05**2,
                 min_grad=0.005)
 
+            if new_source.bbox.shape[1] > 0.9 * self.data.images[0].shape[0]:
+                new_source.bbox.shape = (
+                    new_source.bbox.shape[0], 0.7 * self.data.images[0].shape[0], 0.7 * self.data.images[0].shape[0])
+
+                cen = self.data.images[0].shape[0] // 2
+                new_source.bbox.origin = (0, cen -
+                                          np.array(new_source.bbox.shape[1]) // 2, cen -
+                                          np.array(new_source.bbox.shape[2]) // 2)
+
             _, morph = new_source.get_models_of_children()
+
             g1, g2 = g1g2(np.array(morph))
             rhalf = flux_radius_array(np.array(morph), 0.4)
             rhalf = np.maximum(rhalf, 15)

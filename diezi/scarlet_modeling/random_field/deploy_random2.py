@@ -18,7 +18,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='random2', ncpu=32
     '''
     time = "11:59:00"
 
-    run_scarlet_content = '\n'.join([f"python3 ../script/sclt_multiprocess.py --njobs {ncpu} \\",
+    run_scarlet_content = '\n'.join([f"python ../script/sclt_multiprocess.py --njobs {ncpu} \\",
                                      "   --DATADIR '/scratch/gpfs/jiaxuanl/Data/' \\",
                                      "   --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \\",
                                      f"   --OUTPUT_SUBDIR '{OUTPUT_SUBDIR}/{method}' \\",
@@ -27,7 +27,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='random2', ncpu=32
                                      f"   --low {low} --high {high} \\" if ind_list is None else f"   --ind_list {ind_list} \\",
                                      f"   --suffix '' --starlet_thresh {starlet_thresh} --method {method} \\",
                                      f"   --monotonic {monotonic} --bkg {bkg} --variance {variance} --scales '{scales}' --min_grad {min_grad}"])
-    measure_content = '\n'.join([f"python3 ../script/sclt_meas_mp.py \\",
+    measure_content = '\n'.join([f"python ../script/sclt_meas_mp.py \\",
                                  "    --DATADIR '/scratch/gpfs/jiaxuanl/Data/' \\",
                                  "    --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \\",
                                  f"    --OUTPUT_SUBDIR '{OUTPUT_SUBDIR}/{method}' \\",

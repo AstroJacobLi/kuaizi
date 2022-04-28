@@ -2,7 +2,7 @@
 
 # Setup hscPipe enviroment
 module purge
-module load rh/devtoolset/6
+module load rh/devtoolset/8
 . /tigress/HSC/LSST/stack3_tiger/loadLSST.bash
 
 setup lsst_apps

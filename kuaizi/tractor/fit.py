@@ -223,6 +223,7 @@ def add_tractor_sources(obj_cat, sources, w, shape_method='manual', band='r'):
 
 def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                          shape_method='manual', freeze_dict=None, ref_source=None,
+                         point_source=False,
                          band_name=None, show_fig=False, fig_name=None, verbose=False):
     '''
     Run tractor in a blob-by-blob way. 
@@ -254,6 +255,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
         Example `freeze_dict` is like: `{'pos': True, 'shape': False, 'sersicindex': False}`.
     ref_source (tractor source): If this is provided, the central source will be fixed to have the same shape
         as the reference source, while other sources in the field are free to move.
+    point_source (bool): If True, then the galaxy is fixed to be a point source (PSF).
     band_name (str): name of the filter
     fig_name (str): if not None, it will save the tractor subtracted image to the given path.
     verbose (bool): if true, it will print out everything...
@@ -280,6 +282,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
 
     blob_sources = []
     dchisq = []
+
     type_list = ['PSF', 'DEV', 'EXP', 'SER']
 
     image = copy.deepcopy(img_data)
@@ -314,7 +317,7 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
             else:
                 # enable to iterate over types
                 for Type in type_list:  # iterate over morph types
-                    if obj['target'] == 1 and Type == 'PSF':
+                    if ~point_source & (obj['target'] == 1) & (Type == 'PSF'):
                         continue  # target object cannot be a PSF!!
                     obj_temp = copy.deepcopy(obj)
                     obj_temp['type'] = Type
@@ -339,7 +342,10 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                     blobs.append(src[0])
                 dchisq.append(chi_diff)
                 # use the type with smallest chi2
-                blob_sources.append(blobs[np.nanargmax(chi_diff)])
+                if point_source and (obj['target'] == 1):
+                    blob_sources.append(blobs[0])  # PSF
+                else:
+                    blob_sources.append(blobs[np.nanargmax(chi_diff)])
 
             # subtract optimized object model from image
             trac_mod_opt = trac_obj.getModelImage(0, minsb=0.)
@@ -529,7 +535,7 @@ def tractor_fix_all(catalog, img_data, invvar, psf_obj, pixel_scale,
 
 def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
                                  obj_cat=None, fix_all=False, tractor_cat=None,
-                                 freeze_dict=None, ref_source=None,
+                                 freeze_dict=None, ref_source=None, point_source=False,
                                  show_fig=False, verbose=False):
     '''
     This function wraps both `tractor_blob_by_blob` and `tractor_fix_all` to fit
@@ -548,6 +554,7 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
     ref_source (tractor source): If this is provided, the central source will be fixed 
         to have the same shape as the reference source, while other sources in 
         the field are free to move. Only works if `fix_all = False`.
+    point_source (bool): If this is True, the central source will be a point source.
     show_fig (bool): whether to show the figure.
     verbose (bool): whether to print the progress.
 
@@ -559,11 +566,11 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
     from kuaizi import HSC_pixel_scale
     from tractor.psf import PixelizedPSF
 
-    obj_name = obj['name'].rstrip('_y')
+    obj_name = obj['name']  # .replace('_y', '')
     coord = SkyCoord(obj['ra'], obj['dec'], frame='icrs', unit='deg')
 
     if verbose:
-        print("### `" + obj_name + f"` {filt}-band")
+        print(f"### `{obj_name}` {filt}-band")
     layer_ind = channels.index(filt)
 
     if fix_all and tractor_cat is None:
@@ -584,7 +591,7 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
             tigress=True,
             b=32,
             f=3,
-            pixel_scale=0.168,
+            pixel_scale=HSC_pixel_scale,
             minarea=5,
             deblend_nthresh=48,
             deblend_cont=0.001,
@@ -628,8 +635,9 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
             shape_method='manual',
             freeze_dict=freeze_dict,
             ref_source=ref_source,
+            point_source=point_source,
             show_fig=show_fig,
-            fig_name=obj_name + '_sep_tractor_' + filt,
+            fig_name=f'{obj_name}_sep_tractor_{filt}',
             verbose=verbose)
     else:
         result = tractor_fix_all(
@@ -640,7 +648,7 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
             HSC_pixel_scale,
             freeze_dict=freeze_dict,
             show_fig=show_fig,
-            fig_name=obj_name + '_sep_tractor_' + filt,
+            fig_name=f'{obj_name}_sep_tractor_{filt}',
             verbose=verbose
         )
 
@@ -649,6 +657,7 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
     else:
         sources, trac_obj, fig = result
     trac_obj.target_ind = cen_obj_ind  # record the index of target galaxy
+    trac_obj.wcs = data.wcs
     if verbose:
         print(trac_obj.catalog[cen_obj_ind])
     return trac_obj, obj_cat

@@ -32,7 +32,7 @@ class HiddenPrints:
 
 def _isLegal_shape(src):
     """
-    Check if the given source is within physical limits. 
+    Check if the given source is within physical limits.
     See `_set_bounds` on how to use it.
     """
     return (src.shape.getAllParams() <= src.shape.uppers) & (
@@ -41,7 +41,7 @@ def _isLegal_shape(src):
 
 def _isLegal_flux(src):
     """
-    Check if the given source is within physical limits. 
+    Check if the given source is within physical limits.
     See `_set_bounds` on how to use it.
     """
     return (src.brightness.getAllParams()[0] <= src.brightness.upper) & (
@@ -50,7 +50,7 @@ def _isLegal_flux(src):
 
 def _getLogPrior(src):
     """
-    LogPrior for sources. 
+    LogPrior for sources.
     See `_set_bounds` on how to use it.
     """
     if src.getSourceType() == 'PointSource':
@@ -67,12 +67,12 @@ def _getLogPrior(src):
 
 def _set_bounds(sources):
     """
-    The big problem with default `tractor` is that sources can have 
-    legit negative fluxes, negative radius, etc. This function manually 
+    The big problem with default `tractor` is that sources can have
+    legit negative fluxes, negative radius, etc. This function manually
     writes the upper and lower limit for parameters (flux, R_e, axis ratio).
-    The prior is assumed to be a tophat within upper and lower limit. 
-    We implement this by overwriting the `isLegal` function in `tractor.utils` 
-    and the `getLogPrior` function in `tractor.utils.BaseParams`. 
+    The prior is assumed to be a tophat within upper and lower limit.
+    We implement this by overwriting the `isLegal` function in `tractor.utils`
+    and the `getLogPrior` function in `tractor.utils.BaseParams`.
     """
     for src in sources:
         src.brightness.lower = 0  # no negative flux
@@ -94,9 +94,9 @@ def _freeze_source(src, freeze_dict):
     Parameters
     ----------
     src : tractor source.
-    freeze_dict : dict, e.g., 
+    freeze_dict : dict, e.g.,
         ```
-        freeze_dict = {'pos': True, 'shape': True, 'shape.re': True, 
+        freeze_dict = {'pos': True, 'shape': True, 'shape.re': True,
         'shape.ab': True, 'shape.phi': True, 'sersicindex': True}
         ```
     """
@@ -147,12 +147,12 @@ def _freeze_params(sources, freeze_dict, cen_ind=None, fix_all=False):
     Parameters
     ----------
     sources : list of tractor sources.
-    freeze_dict : dict, e.g., 
+    freeze_dict : dict, e.g.,
         ```
-        freeze_dict = {'pos': True, 'shape': True, 'shape.re': True, 
+        freeze_dict = {'pos': True, 'shape': True, 'shape.re': True,
         'shape.ab': True, 'shape.phi': True, 'sersicindex': True}
         ```
-    cen_ind : int, optional. The index of target object in `sources`. 
+    cen_ind : int, optional. The index of target object in `sources`.
         If provided, only the central object will be frozen.
     fix_all : bool, optional. If True, all sources are frozen according to `freeze_dict`.
     """
@@ -200,21 +200,21 @@ def _regularize_attr(item):
 
 def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, zeropoint=kuaizi.HSC_zeropoint):
     '''
-    Write the properties of our target galaxy in a certain band into a dictionary. 
+    Write the properties of our target galaxy in a certain band into a dictionary.
 
     Paarameters
     ----------
     trac_obj: `Tractor` object, including the target galaxy
-    wcs: wcs object of the input image. 
+    wcs: wcs object of the input image.
     pixel_scale: pixel scale of the input image.
     zeropoint: zeropoint of the input image.
 
     Returns
     -------
-    source_output (dict): contains many attributes of the target galaxy in `trac_obj`. 
-        source_output (dict): contains many attributes of the target galaxy in `trac_obj`. 
-    source_output (dict): contains many attributes of the target galaxy in `trac_obj`. 
-        Flux is in nanomaggies. (ZP=22.5), 
+    source_output (dict): contains many attributes of the target galaxy in `trac_obj`.
+        source_output (dict): contains many attributes of the target galaxy in `trac_obj`.
+    source_output (dict): contains many attributes of the target galaxy in `trac_obj`.
+        Flux is in nanomaggies. (ZP=22.5),
         effective radius (`re`) is in arcsec.
     '''
     if trac_obj is None:
@@ -235,7 +235,7 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
     src = trac_obj.catalog[i]
 
     keys_to_extract = [item for item in attri if f'source{i}.' in item]
-    source_values = {key.replace(f'source{i}.', ''): values[key] for key in keys_to_extract}
+    source_values = {key.replace(f'source{i}.', '')                     : values[key] for key in keys_to_extract}
     source_values['flux'] *= 10**((22.5 - zeropoint) / 2.5)  # in nanomaggy
 
     source_invvar = {key.replace(
@@ -273,6 +273,12 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
             source_output['sersic'] = 0.0
             source_output['sersic_ivar'] = 0.0
             source_output['type'] = 'PSF'
+            source_output['ab'] = 1.0
+            source_output['phi'] = 0.0
+            source_output['ab_ivar'] = 0.0
+            source_output['phi_ivar'] = 0.0
+            source_output['re'] = 0.0
+            source_output['re_ivar'] = 0.0
     else:
         source_output['type'] = 'SER'
 
@@ -288,10 +294,10 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
         source_output['ra_ivar'] = float(ra_ivar)
         source_output['dec_ivar'] = float(dec_ivar)
 
-    # Pixel to arcsec
-    if 're' in source_output.keys():
-        source_output['re'] *= pixel_scale
-        source_output['re_ivar'] /= pixel_scale**2
+    # R_e is already in arcsec
+    if 're' not in source_output.keys():
+        source_output['re'] = 0
+        source_output['re_ivar'] = 0
 
     return source_output
 
@@ -311,8 +317,8 @@ def _write_to_row(row, model_dict, channels=list('grizy') + ['N708', 'N540']):
     '''
     if 'i' in model_dict.keys() and model_dict['i'] is not None:
         # Positions from i-band
-        meas_dict = getTargetProperty(model_dict['i'])
-        for key in ['x', 'x_ivar', 'y', 'y_ivar', 'ab', 'ab_ivar', 'phi', 'phi_ivar', 'sersic', 'sersic_ivar']:
+        meas_dict = getTargetProperty(model_dict['i'], wcs=model_dict['i'].wcs)
+        for key in ['ra', 'ra_ivar', 'dec', 'dec_ivar', 're', 're_ivar', 'ab', 'ab_ivar', 'phi', 'phi_ivar', 'sersic', 'sersic_ivar']:
             row[key] = meas_dict[key]
         # flux
         flux = np.zeros(len(channels))
@@ -338,12 +344,14 @@ def initialize_meas_cat(obj_cat, channels=list('grizy') + ['N708', 'N540']):
 
     meas_cat = Table([
         Column(name='ID', length=length, dtype=int),
-        Column(name='x', length=length, dtype=float),
-        Column(name='x_ivar', length=length, dtype=float),
-        Column(name='y', length=length, dtype=float),
-        Column(name='y_ivar', length=length, dtype=float),
+        Column(name='ra', length=length, dtype=float),
+        Column(name='ra_ivar', length=length, dtype=float),
+        Column(name='dec', length=length, dtype=float),
+        Column(name='dec_ivar', length=length, dtype=float),
         Column(name='flux', length=length, shape=(bands,)),
         Column(name='flux_ivar', length=length, shape=(bands,)),
+        Column(name='re', length=length, dtype=float),
+        Column(name='re_ivar', length=length, dtype=float),
         Column(name='ab', length=length, dtype=float),
         Column(name='ab_ivar', length=length, dtype=float),
         Column(name='phi', length=length, dtype=float),

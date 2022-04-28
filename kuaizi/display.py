@@ -251,6 +251,7 @@ def display_single(img,
                    stretch='arcsinh',
                    scale='zscale',
                    contrast=0.25,
+                   alpha=1.0,
                    no_negative=False,
                    lower_percentile=1.0,
                    upper_percentile=99.0,
@@ -351,7 +352,7 @@ def display_single(img,
         zmin, zmax = np.nanmin(img_scale), np.nanmax(img_scale)
 
     show = ax1.imshow(img_scale, origin='lower', cmap=cmap, norm=norm,
-                      vmin=zmin, vmax=zmax)
+                      vmin=zmin, vmax=zmax, alpha=alpha)
 
     # Hide ticks and tick labels
     ax1.tick_params(
@@ -578,13 +579,13 @@ def display_rgb(images,
     Display multi-band image in RGB using ``arcsinh`` stretching.
 
     Parameters:
-        images (numpy 3-D array): the images array, dimension follows (Number of filters, Height, Width). 
+        images (numpy 3-D array): the images array, dimension follows (Number of filters, Height, Width).
         pixel_scale (float): The pixel size, in unit of "arcsec/pixel".
         xsize (int): Width of the image, default = 8.
         ysize (int): Height of the image, default = 8.
         ax (``matplotlib.pyplot.axes`` object): The user could provide axes on which the figure will be drawn.
-        stretch (float): 
-        Q (float): 
+        stretch (float):
+        Q (float):
         scale_bar (bool): Whether show scale bar or not.
         physical_scale (bool): comoving physical scale, in "kpc/arcsec".
         scale_bar_length (float): The length of scale bar.
@@ -1631,7 +1632,7 @@ def display_pymfit_model(blend, mod_params, mask_fn=None, cmap=plt.cm.gray_r, co
         plt.close()
 
 
-def plot_measurement(lsbg_cat, meas_cat):
+def plot_measurement(lsbg_cat, meas_cat, gal_zorder=2, candy_zorder=3, junk_zorder=0):
     junk = (lsbg_cat['bad_votes'] > lsbg_cat['good_votes'])
     candy = (lsbg_cat['good_votes'] > lsbg_cat['bad_votes']) & (
         lsbg_cat['is_candy'] > lsbg_cat['is_galaxy'])
@@ -1648,11 +1649,12 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[0, 0])  # color-color figure
     plt.scatter((g_mag - i_mag)[candy], (g_mag - r_mag)
-                [candy], color='g', zorder=10, label='Candy')
+                [candy], color='g', label='Candy',
+                zorder=candy_zorder)
     plt.scatter((g_mag - i_mag)[junk], (g_mag - r_mag)
-                [junk], color='r', label='junk')
+                [junk], color='r', label='junk', zorder=junk_zorder)
     plt.scatter((g_mag - i_mag)[gal], (g_mag - r_mag)
-                [gal], color='b', label='gal')
+                [gal], color='b', label='gal', zorder=gal_zorder)
     color_bound = [0.1, 1.2]
     half_width = 0.25
     plt.vlines(color_bound[0], 0.7 * color_bound[0] - half_width,
@@ -1670,9 +1672,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[0, 1])  # SB-color figure
     plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_0']
-                [:, 0][candy], color='g', zorder=10)
-    plt.scatter((g_mag - i_mag)[junk], meas_cat['SB_0'][:, 0][junk], color='r')
-    plt.scatter((g_mag - i_mag)[gal], meas_cat['SB_0'][:, 0][gal], color='b')
+                [:, 0][candy], color='g', zorder=candy_zorder)
+    plt.scatter((g_mag - i_mag)[junk], meas_cat['SB_0']
+                [:, 0][junk], color='r', zorder=junk_zorder)
+    plt.scatter((g_mag - i_mag)[gal], meas_cat['SB_0']
+                [:, 0][gal], color='b', zorder=gal_zorder)
     plt.xlabel('g-i')
     plt.ylabel('SB_0_g')
     plt.axhline(22., color='k', ls='--')
@@ -1684,11 +1688,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[0, 2])  # SB-color figure
     plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_eff_avg']
-                [:, 0][candy], color='g', zorder=10)
+                [:, 0][candy], color='g', zorder=candy_zorder)
     plt.scatter((g_mag - i_mag)[junk],
-                meas_cat['SB_eff_avg'][:, 0][junk], color='r')
+                meas_cat['SB_eff_avg'][:, 0][junk], color='r', zorder=junk_zorder)
     plt.scatter((g_mag - i_mag)[gal],
-                meas_cat['SB_eff_avg'][:, 0][gal], color='b')
+                meas_cat['SB_eff_avg'][:, 0][gal], color='b', zorder=gal_zorder)
     plt.xlabel('g-i')
     plt.ylabel('SB_eff_g')
     plt.axhline(23.0, color='k', ls='--')
@@ -1700,10 +1704,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[0, 3])
     plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
-                [candy], color='g', zorder=10)
+                [candy], color='g', zorder=candy_zorder)
     plt.scatter(meas_cat['M20'][junk], meas_cat['Gini']
-                [junk], color='r')
-    plt.scatter(meas_cat['M20'][gal], meas_cat['Gini'][gal], color='b')
+                [junk], color='r', zorder=junk_zorder)
+    plt.scatter(meas_cat['M20'][gal], meas_cat['Gini']
+                [gal], color='b', zorder=gal_zorder)
     plt.xlabel('M20')
     plt.ylabel('Gini')
     plt.xlim(-3, 0)
@@ -1714,10 +1719,12 @@ def plot_measurement(lsbg_cat, meas_cat):
     plt.plot(x, 0.136 * x + 0.788, color='orange')
 
     plt.sca(axes[1, 0])
-    plt.scatter(meas_cat['C'][candy], meas_cat['A']
-                [candy], color='g', zorder=10)
-    plt.scatter(meas_cat['C'][junk], meas_cat['A'][junk], color='r')
-    plt.scatter(meas_cat['C'][gal], meas_cat['A'][gal], color='b')
+    plt.scatter(meas_cat['C'][candy], meas_cat['A_outer']
+                [candy], color='g', zorder=candy_zorder)
+    plt.scatter(meas_cat['C'][junk], meas_cat['A_outer']
+                [junk], color='r', zorder=junk_zorder, alpha=0.6)
+    plt.scatter(meas_cat['C'][gal], meas_cat['A_outer']
+                [gal], color='b', zorder=gal_zorder)
     plt.xlim(0.7, 4.8)
     plt.ylim(-.2, 1.2)
     plt.axvline(3.3)
@@ -1727,11 +1734,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[1, 1])  # SB-R_e figure
     plt.scatter(meas_cat['SB_0'][:, 0][candy],
-                meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
+                meas_cat['rhalf_circularized'][candy], color='g', zorder=candy_zorder)
     plt.scatter(meas_cat['SB_0'][:, 0][junk],
-                meas_cat['rhalf_circularized'][junk], color='r')
+                meas_cat['rhalf_circularized'][junk], color='r', zorder=junk_zorder)
     plt.scatter(meas_cat['SB_0'][:, 0][~junk],
-                meas_cat['rhalf_circularized'][~junk], color='b')
+                meas_cat['rhalf_circularized'][~junk], color='b', zorder=gal_zorder)
     plt.axvline(22., color='k', ls='--')
     plt.axhline(1.8 / 0.168, color='k', ls='--')
     plt.axhline(10 / 0.168, color='k', ls='--')
@@ -1742,11 +1749,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[1, 2])  # SB-R_e figure
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][candy],
-                meas_cat['rhalf_circularized'][candy], color='g', zorder=10)
+                meas_cat['rhalf_circularized'][candy], color='g', zorder=candy_zorder)
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][junk],
-                meas_cat['rhalf_circularized'][junk], color='r')
+                meas_cat['rhalf_circularized'][junk], color='r', zorder=junk_zorder)
     plt.scatter(meas_cat['SB_eff_avg'][:, 0][~junk],
-                meas_cat['rhalf_circularized'][~junk], color='b')
+                meas_cat['rhalf_circularized'][~junk], color='b', zorder=gal_zorder)
     plt.axvline(23., color='k', ls='--')
     plt.axhline(1.8 / 0.168, color='k', ls='--')
     plt.axhline(10 / 0.168, color='k', ls='--')
@@ -1757,11 +1764,11 @@ def plot_measurement(lsbg_cat, meas_cat):
 
     plt.sca(axes[1, 3])
     plt.scatter(meas_cat['rhalf_circularized'][candy],
-                meas_cat['sersic_rhalf'][candy], color='g', zorder=10)
+                meas_cat['sersic_rhalf'][candy], color='g', zorder=candy_zorder)
     plt.scatter(meas_cat['rhalf_circularized'][junk],
-                meas_cat['sersic_rhalf'][junk], color='r')
+                meas_cat['sersic_rhalf'][junk], color='r', zorder=junk_zorder)
     plt.scatter(meas_cat['rhalf_circularized'][gal],
-                meas_cat['sersic_rhalf'][gal], color='b')
+                meas_cat['sersic_rhalf'][gal], color='b', zorder=gal_zorder)
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel('R_e')
