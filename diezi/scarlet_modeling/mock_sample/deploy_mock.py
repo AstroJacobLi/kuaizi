@@ -8,7 +8,7 @@ import fire
 
 def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=32,
                         method='wavelet', starlet_thresh=0.5, monotonic=True, bkg=True, min_grad=-0.001,
-                        variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.02):
+                        variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=None):
     ''' create slurm script and then submit 
     '''
     time = "11:59:00"
@@ -21,15 +21,14 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=
         "#SBATCH --mem-per-cpu=10G",
         "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
-        f"#SBATCH -o {name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o {name}_ind_list.o",
+        f"#SBATCH -o ./log/{name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o ./log/{name}_ind_list.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
         "",
         'now=$(date +"%T")',
         'echo "start time ... $now"',
         "",
-        "module purge",
-        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
+        "source /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
         "export OMP_NUM_THREADS=1",
         "",
         f"python ../script/sclt_multiprocess.py --njobs {ncpu} \\",
@@ -103,5 +102,17 @@ if __name__ == '__main__':
 # python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
 # --low=1500 --high=1750 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
 
+
+############ SPERGEL #############
+# Final run #
 # python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1750 --high=2000 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
+# --low=0 --high=500 --monotonic=True --bkg=True -min_grad=-0.05
+
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
+# --low=500 --high=1000 --monotonic=True --bkg=True -min_grad=-0.05
+
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
+# --low=1000 --high=1500 --monotonic=True --bkg=True -min_grad=-0.05
+
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
+# --low=1500 --high=2000 --monotonic=True --bkg=True -min_grad=-0.05

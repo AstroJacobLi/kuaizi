@@ -50,8 +50,9 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='candy_job', ncpu=
         'now=$(date +"%T")',
         'echo "start time ... $now"',
         "",
-        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
+        "source /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
         "export OMP_NUM_THREADS=1",
+        # "export QT_DEBUG_PLUGINS=1",
         "",
         run_scarlet_content if not only_measure else "",
         "",
@@ -95,8 +96,11 @@ if __name__ == '__main__':
 
 
 ############ SPERGEL #############
-# python deploy_candy.py --name candy_spgl --ncpu=15 --method=spergel \
-# --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
+# python deploy_candy.py --name candy_spgl --ncpu=8 --method=spergel \
+# --low=0 --high=400 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
+
+# python deploy_candy.py --name candy_spgl --ncpu=8 --method=spergel \
+# --low=400 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
 # --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05 --ind_list='/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/z001_002_failed.npy'

@@ -75,6 +75,13 @@ def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_
     else:
         iterable = np.arange(low, high, 1)
 
+    # for i in iterable:
+    #     run_scarlet(i, DATADIR=DATADIR, OUTPUT_DIR=OUTPUT_DIR,
+    #                 OUTPUT_SUBDIR=OUTPUT_SUBDIR, PREFIX=PREFIX,
+    #                 cat=lsbg_cat, method=method, starlet_thresh=starlet_thresh, min_grad=min_grad,
+    #                 monotonic=monotonic, bkg=bkg, variance=variance, scales=scales,
+    #                 global_logger=global_logger, fail_logger=fail_logger)
+
     pool.map(partial(run_scarlet, DATADIR=DATADIR, OUTPUT_DIR=OUTPUT_DIR,
                      OUTPUT_SUBDIR=OUTPUT_SUBDIR, PREFIX=PREFIX,
                      cat=lsbg_cat, method=method, starlet_thresh=starlet_thresh, min_grad=min_grad,

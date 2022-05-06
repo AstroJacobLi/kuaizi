@@ -619,8 +619,10 @@ def makeMeasurement(components, observation, aggr_mask=None,
     if method == 'spergel':
         measure_dict['rhalf_spergel'] = float(
             components[0].get_parameter(3)[0])
+        measure_dict['spergel_nu'] = components[0].parameters[2]
     else:
         measure_dict['rhalf_spergel'] = np.nan
+        measure_dict['spergel_nu'] = np.nan
     measure_dict['r20'] = morph.r20  # circular
     measure_dict['r50'] = morph.r50  # circular
     measure_dict['r80'] = morph.r80  # circular
@@ -858,6 +860,7 @@ def _write_to_row(row, measurement):
     row['rhalf_ellip'] = measurement['rhalf_ellip']
     row['rhalf_circularized'] = measurement['rhalf_circularized']
     row['rhalf_spergel'] = measurement['rhalf_spergel']
+    row['spergel_nu'] = measurement['spergel_nu']
     row['r20'] = measurement['r20']
     row['r50'] = measurement['r50']
     row['r80'] = measurement['r80']
@@ -910,6 +913,7 @@ def initialize_meas_cat(lsbg_cat):
         Column(name='rhalf_ellip', length=length),
         Column(name='rhalf_circularized', length=length),
         Column(name='rhalf_spergel', length=length),
+        Column(name='spergel_nu', length=length),
         Column(name='r20', length=length),
         Column(name='r50', length=length),
         Column(name='r80', length=length),
@@ -1093,6 +1097,19 @@ def cal_cnu(nu):
         [-0.00788962, 0.0735303, -0.27770785, 0.99483285, 1.25227402]
     )
     return z[0] * nu ** 4 + z[1] * nu ** 3 + z[2] * nu ** 2 + z[3] * nu + z[4]
+
+# translate spergel nu to sersic n for fixed R_e
+
+
+def nu_to_n(nu):
+    """
+    Translate spergel nu to sersic n for fixed R_e. 
+    See `/scarlet_modeling/mock_sample/calibrate_spergel_sersic.ipynb` for details.
+    """
+    poly = np.array([0.04913607, -0.71617268, 3.91080029, -9.75982742, 10.05678307,
+                     0.56215767, -7.91817952, 2.24241979, 4.0896339, -3.6047578,
+                     1.8876589])
+    return np.polyval(poly, nu)
 
 
 def _measure_image(data, coord, index, pixel_scale=0.168, zeropoint=27.0, bright=False,

@@ -3,7 +3,7 @@ Make cuts based on color, SB, size, etc.
 """
 import numpy as np
 
-default_cuts_dict = {'color_bound': [0.1, 1.2],
+default_cuts_dict = {'color_bound': [0., 1.2],
                      'color_width': 0.5,
                      'i_mag_limit': 22.5,
                      'min_re': 1.8,  # arcsec
@@ -185,3 +185,30 @@ def post_process_cat(input_cuts_cat):
     cuts_cat['completeness'] = comp
 
     return cuts_cat
+
+
+def predict_bias(y, X, degree=2, hidden_layer_sizes=(64, 64, 64), random_state=None):
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import PolynomialFeatures
+    from sklearn.neural_network import MLPRegressor
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+
+    if random_state is None:
+        random_state = 1
+    # Polynomial features
+    pipeline = make_pipeline(PolynomialFeatures(degree), StandardScaler())
+    X_poly = pipeline.fit_transform(X)
+
+    X_train_poly, X_test_poly, y_train, y_test = train_test_split(X_poly, y,
+                                                                  test_size=0.3,
+                                                                  random_state=random_state)
+
+    # NN regressor
+    regr = MLPRegressor(hidden_layer_sizes=hidden_layer_sizes,
+                        random_state=random_state,
+                        max_iter=500
+                        ).fit(X_train_poly, y_train)
+    print('Score:', regr.score(X_test_poly, y_test))
+    pipeline2 = make_pipeline(pipeline, regr)
+    return pipeline2

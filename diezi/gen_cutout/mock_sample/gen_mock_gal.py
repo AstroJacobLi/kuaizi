@@ -20,7 +20,8 @@ kz.utils.set_env(**env_dict)
 kz.utils.set_matplotlib(style='default', usetex=False)
 
 output_dir = './Cutout/mock_sample/'
-param_cat = Table.read('./Catalog/mock_sample/mock_gal_param_truth.fits')
+param_cat = Table.read(
+    './Catalog/mock_sample/mock_gal_param_truth_0_5000.fits')
 
 length = len(param_cat)
 bands = 4
@@ -36,6 +37,7 @@ lsbg_cat = Table([Column(name='viz-id', length=length, dtype=int),
                   Column(name='mags', length=length, shape=(bands,)),
                   Column(name='prefix', length=length, dtype='S65'),
                   ])
+print("Start to generate mock galaxies...")
 
 
 def gen_mock_gal(low, high):

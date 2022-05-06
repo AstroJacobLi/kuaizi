@@ -51,8 +51,10 @@ def _optimization(blend, bright=False, spergel=False, logger=None, bkg=False):
         n_iter = [150, 100, 100] if bkg else [
             100, 100, 50]  # , 50 [200, 200, 200]
     if spergel:
-        e_rel_list = [1e-4, 5e-4, 2e-4]  # , 2e-4 # , 5e-5, 1e-5
-        n_iter = [200, 200, 200]
+        e_rel_list = [1e-4, 5e-4, 2e-4]
+        n_iter = [200, 200, 100]
+        # e_rel_list = [1e-4, 5e-4, 2e-4]
+        # n_iter = [200, 200, 200]
 
     blend.fit(1, 1e-3)  # First iteration, just to get the inital loss
 
@@ -62,8 +64,8 @@ def _optimization(blend, bright=False, spergel=False, logger=None, bkg=False):
     best_epoch = 20
 
     for i, e_rel in enumerate(e_rel_list):
-        for k in range(n_iter[i] // 5):
-            blend.fit(5, e_rel)
+        for k in range(n_iter[i] // 10):
+            blend.fit(10, e_rel)
             if (-blend.loss[-1] > best_logL) and (len(blend.loss) > best_epoch):
                 best_model = copy.deepcopy(blend)
                 best_logL = -blend.loss[-1]
@@ -548,7 +550,7 @@ class ScarletFitter(object):
         self.starlet_mask = ((np.sum(self.observation.weights == 0, axis=0)
                               != 0) + self.msk_star_ori + (~((self.segmap_ori == 0) | (self.segmap_ori == self.cen_obj['idx'] + 1)))).astype(bool)
 
-    def _add_central_source(self, K=2, min_grad=0.02, thresh=0.1,
+    def _add_central_source(self, K=2, min_grad=0.02, thresh=0.05,
                             shifting=True, monotonic=True, variance=0.03**2,
                             scales=[0, 1, 2, 3, 4, 5, 6]):
         '''
@@ -646,7 +648,7 @@ class ScarletFitter(object):
                 satu_mask=self.data.masks,
                 thresh=0.05,
                 shifting=True,
-                min_grad=0.1)
+                min_grad=0.05)
             sed, morph = new_source.get_models_of_children()
             SED = np.array(new_source.spectrum.get_model() * morph.sum())
 
@@ -658,7 +660,7 @@ class ScarletFitter(object):
                 starlet_thresh=1e-3,
                 monotonic=False,
                 variance=0.05**2,
-                min_grad=0.005)
+                min_grad=min_grad)  # 0.002
 
             if new_source.bbox.shape[1] > 0.9 * self.data.images[0].shape[0]:
                 new_source.bbox.shape = (
@@ -672,8 +674,8 @@ class ScarletFitter(object):
             _, morph = new_source.get_models_of_children()
 
             g1, g2 = g1g2(np.array(morph))
-            rhalf = flux_radius_array(np.array(morph), 0.4)
-            rhalf = np.maximum(rhalf, 15)
+            rhalf = flux_radius_array(np.array(morph), 0.5)
+            rhalf = np.maximum(rhalf, 25) # 25
             nu = np.array([0.5])
 
             david = scarlet.SpergelSource(
@@ -808,13 +810,13 @@ class ScarletFitter(object):
 
         # Add constant sky bkg
         if self.bkg == True:
-            # new_source = scarlet.ConstSkySource(
-            #     self.model_frame,
-            #     bbox=sources[0].bbox,
-            #     observations=self.observation)
-            new_source = scarlet.ConstWholeSkySource(
+            new_source = scarlet.ConstSkySource(
                 self.model_frame,
+                bbox=sources[0].bbox,
                 observations=self.observation)
+            # new_source = scarlet.ConstWholeSkySource(
+            #     self.model_frame,
+            #     observations=self.observation)
             sources.append(new_source)
             print('    Added constant sky background')
             self.logger.info('    Added constant sky background')
@@ -892,7 +894,7 @@ class ScarletFitter(object):
                 for src in np.array(self.blend.sources)[sed_ind]
             ]
 
-            bkg_flag = np.array([isinstance(src, scarlet.source.ConstSkySource)
+            bkg_flag = np.array([(isinstance(src, scarlet.source.ConstSkySource)) | (isinstance(src, scarlet.source.ConstWholeSkySource))
                                  for src in np.array(self.blend.sources)[sed_ind]])
 
             sed_ind = sed_ind[(~point_flag) & near_cen_flag &
@@ -1099,8 +1101,9 @@ class ScarletFitter(object):
                 self.data.images.shape) * self.pixel_scale > 200 else 0.006
             if self.method == 'wavelet' or self.method == 'spergel':
                 first_dblend_cont = 0.07 if max(
-                    self.data.images.shape) * self.pixel_scale > 200 else 0.002
-            self._first_detection(first_dblend_cont)
+                    self.data.images.shape) * self.pixel_scale > 200 else 0.001
+                b = 40
+            self._first_detection(first_dblend_cont, b=b)
 
             self._estimate_box(self.cen_obj)
             self._mask_stars_outside_box()

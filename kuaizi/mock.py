@@ -293,7 +293,7 @@ class MockGal:
         y2 = y1 + blend.sources[0].bbox.shape[1:][1]
         mask = mask.astype(bool)[x1:x2, y1:y2]
         mask += np.sum((new_weights[:, x1:x2, y1:y2]
-                       == 0), axis=0).astype(bool)
+                        == 0), axis=0).astype(bool)
 
         mockgal_img = blend.sources[0].get_model(
         ) * np.repeat(~mask[np.newaxis, :, :], len(self.channels), axis=0)
@@ -420,7 +420,7 @@ class MockGal:
             text_y_0 = int(img_size_y * text_y_offset)
             if usetex:
                 ax[0].text(
-                    text_x_0, text_y_0, r'$\mathrm{'+add_text+'}$', fontsize=text_fontsize, color=text_color)
+                    text_x_0, text_y_0, r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
             else:
                 ax[0].text(text_x_0, text_y_0, add_text,
                            fontsize=text_fontsize, color=text_color)
@@ -471,6 +471,25 @@ class MockGal:
             hdu2 = fits.PrimaryHDU(data=self.mock.psfs[i])  # PSF
             hdu2.writeto(fits_file.replace(
                 '.fits', '_psf.fits'), overwrite=overwrite)
+
+    def write_fits_model(self, output_dir='./', prefix='mockgal', obj_id=0, overwrite=False):
+        # Write FITS file, but only save the model without background
+        for i, filt in enumerate(list(self.model.channels)):
+            hdu1 = fits.HDUList([
+                fits.PrimaryHDU(header=self.mock.wcs.to_header()),  # header
+                fits.ImageHDU(data=self.model.images[i],
+                              header=self.mock.wcs.to_header(),
+                              name='IMAGE'),  # image
+                fits.ImageHDU(data=self.mock.masks[i].astype(np.int32),
+                              header=self.mock.wcs.to_header(),
+                              name='MASK'),  # mask
+                fits.ImageHDU(data=self.mock.variances[i],
+                              header=self.mock.wcs.to_header(),
+                              name='VARIANCE'),  # variance
+            ])
+            fits_file = f'{prefix}_{obj_id}_{filt}' + '.fits'
+            fits_file = os.path.join(output_dir, fits_file)
+            hdu1.writeto(fits_file, overwrite=overwrite)
 
     @classmethod
     def read(cls, filename, format='pkl'):
