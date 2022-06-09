@@ -172,8 +172,9 @@ class MockGal:
         # Calculate RA, DEC of the mock galaxy
         y_cen = self.bkg.images.shape[2] / 2
         x_cen = self.bkg.images.shape[1] / 2
-        galaxy['ra'], galaxy['dec'] = self.bkg.wcs.wcs_pix2world(
-            x_cen, y_cen, 0)
+        if self.bkg.wcs is not None:
+            galaxy['ra'], galaxy['dec'] = self.bkg.wcs.wcs_pix2world(
+                x_cen, y_cen, 0)
 
         # Calculate flux based on i-band mag and SED
         i_band_loc = np.argwhere(np.array(list(self.channels)) == 'i')[
