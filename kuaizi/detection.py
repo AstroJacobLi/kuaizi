@@ -1,7 +1,7 @@
 import sep
 import numpy as np
 import scarlet
-from scarlet.wavelet import mad_wavelet, Starlet
+from scarlet.wavelet import Starlet
 
 from .utils import extract_obj, image_gaia_stars, _image_gaia_stars_tigress
 from astropy.table import Table, Column
@@ -297,12 +297,12 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
     obj_cat.add_column(
         Column(data=[None] * len(obj_cat), name='obj_type'), index=0)
 
-    if len(datas) == 1:
-        bg_rms = mad_wavelet(detect)
-    else:
-        bg_rms = []
-        for data in datas:
-            bg_rms.append(mad_wavelet(detect))
+    # if len(datas) == 1:
+    #     bg_rms = mad_wavelet(detect)
+    # else:
+    #     bg_rms = []
+    #     for data in datas:
+    #         bg_rms.append(mad_wavelet(detect))
 
     if match_gaia:
         obj_cat.add_column(
@@ -390,4 +390,4 @@ def makeCatalog(datas, mask=None, lvl=3, method='wavelet', convolve=False, conv_
         ax1.set_xlim(xlim)
         ax1.set_ylim(ylim)
 
-    return obj_cat, segmap, bg_rms
+    return obj_cat, segmap, 0  # bg_rms

@@ -7,11 +7,12 @@ import fire
 
 
 PREFIX = 'RANDOM_FIELD'
-OUTPUT_SUBDIR = 'RANDOM_FIELD2'
-CAT_DIR = '/tigress/jiaxuanl/Data/HSC/LSBG/Catalog/random_field2/random_field2_cutout_cat_random_field2.fits'
+num = 2
+OUTPUT_SUBDIR = f'RANDOM_FIELD{num}'
+CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/random_field{num}/random_field{num}_cutout_cat_random_field{num}.fits'
 
 
-def deploy_modeling_job(low=0, high=1000, ind_list=None, name='random2', ncpu=32,
+def deploy_modeling_job(low=0, high=1000, ind_list=None, name=f'random{num}', ncpu=32,
                         method='wavelet', starlet_thresh=0.5, monotonic=True, bkg=True, min_grad=-0.001,
                         variance=0.03**2, scales=[0, 1, 2, 3, 4, 5, 6], sigma=0.05, only_measure=False):
     ''' create slurm script and then submit 
@@ -44,15 +45,14 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='random2', ncpu=32
         "#SBATCH --mem-per-cpu=12G",
         "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
-        f"#SBATCH -o {name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o {name}_ind_list.o",
+        f"#SBATCH -o ./log/{name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o ./log/{name}_ind_list.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
         "",
         'now=$(date +"%T")',
         'echo "start time ... $now"',
         "",
-        "module purge",
-        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
+        "source /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
         "export OMP_NUM_THREADS=1",
         "",
         run_scarlet_content if not only_measure else "",
@@ -83,10 +83,11 @@ if __name__ == '__main__':
 
 
 ############ VANILLA #############
-# python deploy_random2.py --name random2 --ncpu=16 --method=vanilla \
-# --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05
-
+# python deploy_random2.py --name random1 --ncpu=12 --method=vanilla \
+# --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.05 --only_measure=True
 
 ############ SPERGEL #############
-# python deploy_random2.py --name rdm2_spgl --ncpu=16 --method=spergel \
+# python deploy_random2.py --name rdm1_spgl --ncpu=12 --method=spergel \
 # --low=0 --high=None --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05
+
+# python deploy_random2.py --name rdm2_spgl --ncpu=12 --method=spergel --low=0 --high=None --monotonic=True --bkg=True --min_grad=-0.05

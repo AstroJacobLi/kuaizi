@@ -36,7 +36,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=
         "   --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \\",
         f"   --OUTPUT_SUBDIR 'MOCK_SAMPLE/{method}' \\",
         "   --PREFIX 'MOCK' \\",
-        "   --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \\",
+        "   --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_5000.fits' \\",
         f"   --low {low} --high {high} \\" if ind_list is None else f"   --ind_list {ind_list} \\",
         f"   --suffix '' --starlet_thresh {starlet_thresh} --method {method} \\",
         f"   --monotonic {monotonic} --bkg {bkg} --variance {variance} --scales '{scales}' --min_grad {min_grad}",
@@ -46,7 +46,7 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='mock_wvlt', ncpu=
         "    --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \\",
         f"    --OUTPUT_SUBDIR 'MOCK_SAMPLE/{method}' \\",
         "    --PREFIX 'MOCK' \\",
-        "    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \\",
+        "    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_5000.fits' \\",
         f"    --filename '_lsbg_meas_{method}_monotonic.fits' \\",
         f"    --low {low} --high {high} --method {method}\\" if ind_list is None else f"    --ind_list {ind_list} \\",
         f"    --ncpu={ncpu} --suffix '' --sigma={sigma}",
@@ -92,27 +92,44 @@ if __name__ == '__main__':
 # python deploy_mock.py --name mock_vnla --ncpu=16 --method=vanilla \
 # --low=1000 --high=2000 --monotonic=True --bkg=True -min_grad=-0.02 --sigma=0.02
 
-############ SPERGEL #############
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1000 --high=1250 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
-
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1250 --high=1500 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
-
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1500 --high=1750 --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.02
-
-
-############ SPERGEL #############
 # Final run #
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=0 --high=500 --monotonic=True --bkg=True -min_grad=-0.05
+# python deploy_mock.py --name vnl_0.5k --ncpu=12 --method=vanilla --low=0 --high=500 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_1.0k --ncpu=12 --method=vanilla --low=500 --high=1000 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_1.5k --ncpu=12 --method=vanilla --low=1000 --high=1500 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_2.0k --ncpu=12 --method=vanilla --low=1500 --high=2000 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_2.5k --ncpu=12 --method=vanilla --low=2000 --high=2500 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_3.0k --ncpu=12 --method=vanilla --low=2500 --high=3000 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_3.5k --ncpu=12 --method=vanilla --low=3000 --high=3500 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_4.0k --ncpu=12 --method=vanilla --low=3500 --high=4000 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_4.5k --ncpu=12 --method=vanilla --low=4000 --high=4500 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
+# python deploy_mock.py --name vnl_5.0k --ncpu=12 --method=vanilla --low=4500 --high=5000 --monotonic=True --bkg=True --min_grad=-0.05 --sigma=0.02
 
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=500 --high=1000 --monotonic=True --bkg=True -min_grad=-0.05
+############ SPERGEL #############
+# Final run # Default sigma=None, only nosegmap
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel --low=0 --high=500 --monotonic=True --bkg=True -min_grad=-0.05
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel --low=500 --high=1000 --monotonic=True --bkg=True -min_grad=-0.05
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel --low=1000 --high=1500 --monotonic=True --bkg=True -min_grad=-0.05
+# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel --low=1500 --high=2000 --monotonic=True --bkg=True -min_grad=-0.05
 
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1000 --high=1500 --monotonic=True --bkg=True -min_grad=-0.05
+# python deploy_mock.py --name spgl_2.0k --ncpu=12 --method=spergel --low=2000 --high=2500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_mock.py --name spgl_2.5k --ncpu=12 --method=spergel --low=2500 --high=3000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_mock.py --name spgl_3.0k --ncpu=12 --method=spergel --low=3000 --high=3500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_mock.py --name spgl_3.5k --ncpu=12 --method=spergel --low=3500 --high=4000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_mock.py --name spgl_4.0k --ncpu=12 --method=spergel --low=4000 --high=4500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_mock.py --name spgl_4.5k --ncpu=12 --method=spergel --low=4500 --high=5000 --monotonic=True --bkg=True --min_grad=-0.05
 
-# python deploy_mock.py --name mock_spgl --ncpu=16 --method=spergel \
-# --low=1500 --high=2000 --monotonic=True --bkg=True -min_grad=-0.05
+
+############ Mono wavelet ############# (for my talk)
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=0 --high=500 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=500 --high=1000 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=1000 --high=1500 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=1500 --high=2000 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=2000 --high=2500 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=2500 --high=3000 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=3000 --high=3500 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=3500 --high=4000 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=4000 --high=4500 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+# python deploy_mock.py --name mock_mnwv --ncpu=16 --method=wavelet --low=4500 --high=5000 --monotonic=True --bkg=True --min_grad=-0.2 --starlet_thresh=0.3 --variance=2.25e-4 --scales=[0,1,2] --sigma=0.02
+
+
+

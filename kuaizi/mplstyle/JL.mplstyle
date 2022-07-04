@@ -265,7 +265,7 @@ font.serif:       Computer Modern Roman, Times New Roman, Times, DejaVu Serif, B
 font.sans-serif:  Helvetica, Arial, DejaVu Sans, Bitstream Vera Sans, Computer Modern Sans Serif, Lucida Grande, Verdana, Geneva, Lucid, Avant Garde, sans-serif
 #font.cursive:    Apple Chancery, Textile, Zapf Chancery, Sand, Script MT, Felipa, cursive
 #font.fantasy:    Comic Neue, Comic Sans MS, Chicago, Charcoal, ImpactWestern, Humor Sans, xkcd, fantasy
-font.monospace:   Courier New, Courier, Computer Modern Typewriter, monospace, Bitstream Vera Sans Mono, Andale Mono, Terminal, Fixed, Nimbus Mono L, DejaVu Sans Mono, 
+font.monospace:   Terminal, Courier New, Courier, Computer Modern Typewriter, monospace, Bitstream Vera Sans Mono, Andale Mono, Terminal, Fixed, Nimbus Mono L, DejaVu Sans Mono, 
 
 
 ## ***************************************************************************

@@ -122,7 +122,7 @@ class ScarletFitter(object):
                 Defaults to 'vanilla'.
             tigress (bool, optional): whether to use Tigress data. Defaults to True.
             bright (bool, optional): whether treat this object as bright object. Defaults to False.
-            bkg (bool, optional): whether to add a constant sky component. 
+            bkg (bool, optional): whether to add a constant sky component.
             **kwargs: keyword arguments for ScarletFitter, including
                 ['log_dir', 'figure_dir', 'model_dir', 'prefix', 'index',
                  'pixel_scale', 'zeropoint', show_figure', starlet_thresh', 'monotonic', 'variance].
@@ -298,10 +298,10 @@ class ScarletFitter(object):
             starlet_source.bbox)  # [x1, x2, y1, y2]
 
         # extra padding, to enlarge the box
-        starlet_extent[0] -= 10
-        starlet_extent[2] -= 10
-        starlet_extent[1] += 10
-        starlet_extent[3] += 10
+        starlet_extent[0] -= 15
+        starlet_extent[2] -= 15
+        starlet_extent[1] += 15
+        starlet_extent[3] += 15
 
         self.starlet_extent = starlet_extent
         self.smaller_box = smaller_box
@@ -497,10 +497,14 @@ class ScarletFitter(object):
 
     def _construct_obs_frames(self):
         # Set weights of masked pixels to zero
-        for layer in self.data.weights:
-            layer[self.msk_star.astype(bool)] = 0
-            layer[self.seg_mask_cpct.astype(bool)] = 0
-            layer[self.seg_mask_big.astype(bool)] = 0
+        try:
+            for layer in self.data.weights:
+                layer[self.msk_star.astype(bool)] = 0
+                layer[self.seg_mask_cpct.astype(bool)] = 0
+                layer[self.seg_mask_big.astype(bool)] = 0
+        except:
+            import warnings
+            warnings.warn('No weights found')
 
         # Construct `scarlet` frames and observation
         model_psf = scarlet.GaussianPSF(sigma=(0.8,) * len(self.data.channels))
@@ -637,7 +641,6 @@ class ScarletFitter(object):
             starlet_source.center = (
                 np.array(starlet_source.bbox.shape) // 2 + starlet_source.bbox.origin)[1:]
             sources.append(starlet_source)
-
         elif self.method == 'spergel':
             from .measure import g1g2, flux_radius_array
             # We first initialize an ExtendedSource to guess the color
@@ -675,8 +678,11 @@ class ScarletFitter(object):
 
             g1, g2 = g1g2(np.array(morph))
             rhalf = flux_radius_array(np.array(morph), 0.5)
-            rhalf = np.maximum(rhalf, 25) # 25
+            rhalf = np.maximum(rhalf, 25)  # 25
             nu = np.array([0.5])
+
+            if hasattr(self, 'ext_rhalf') and self.ext_rhalf is not None:
+                rhalf = self.ext_rhalf
 
             david = scarlet.SpergelSource(
                 self.model_frame,
@@ -823,25 +829,30 @@ class ScarletFitter(object):
         self._sources = sources
         self.blend = scarlet.Blend(self._sources, self.observation)
 
+        self.initial_blend = copy.deepcopy(self.blend)
+
         print(f'    Total number of sources: {len(sources)}')
         self.logger.info(f'    Total number of sources: {len(sources)}')
 
     def _optimize(self):
         # Star fitting!
         start = time.time()
-        fig = kz.display.display_scarlet_model(
-            self.blend,
-            minimum=-0.3,
-            stretch=1,
-            channels=self.data.channels,
-            show_loss=False,
-            show_mask=False,
-            show_mark=True,
-            scale_bar=False)
-        plt.savefig(
-            os.path.join(self.figure_dir, f'{self.prefix}-{self.index}-init-{self.method}.png'), dpi=70, bbox_inches='tight')
-        if not self.show_figure:
-            plt.close()
+        try:
+            fig = kz.display.display_scarlet_model(
+                self.blend,
+                minimum=-0.3,
+                stretch=1,
+                channels=self.data.channels,
+                show_loss=False,
+                show_mask=False,
+                show_mark=True,
+                scale_bar=False)
+            plt.savefig(
+                os.path.join(self.figure_dir, f'{self.prefix}-{self.index}-init-{self.method}.png'), dpi=70, bbox_inches='tight')
+            if not self.show_figure:
+                plt.close()
+        except:
+            pass
 
         [self.blend, self.best_logL, self.best_erel, self.best_epoch, self._blend] = _optimization(
             self.blend, bright=self.bright, spergel=(self.method == 'spergel'), logger=self.logger, bkg=self.bkg)
@@ -1103,14 +1114,16 @@ class ScarletFitter(object):
                 first_dblend_cont = 0.07 if max(
                     self.data.images.shape) * self.pixel_scale > 200 else 0.001
                 b = 40
+            else:
+                b = 80
             self._first_detection(first_dblend_cont, b=b)
 
             self._estimate_box(self.cen_obj)
             self._mask_stars_outside_box()
             self._cpct_obj_detection()
             self._big_obj_detection()
-            self._merge_catalogs()
             self._construct_obs_frames()
+            self._merge_catalogs()
             if self.bright:
                 self.variance = 0.05**2
                 self.scales = [0, 1, 2, 3, 4, 5, 6]
@@ -1134,12 +1147,66 @@ class ScarletFitter(object):
                     show_mark=True,
                     scale_bar_length=10,
                     add_text=f'{self.prefix}-{self.index}')
-
             self._optimize()
             self._find_sed_ind()
             self._gen_final_mask()  # also save final results to file
             self._display_results()
 
+            self.logger.info('Done! (♡˙︶˙♡)')
+            self.logger.info('\n')
+
+            return self.blend
+
+        except Exception as e:
+            raise ScarletFittingError(self.prefix, self.index, self.starlet_thresh, self.monotonic,
+                                      self.data.channels, traceback.print_exc())
+
+    def fit_pure_mock(self):
+        print('  - Detect sources and make mask')
+        self.logger.info('  - Detect sources and make mask')
+        try:
+            # First Gaia star search
+            self._first_gaia_search()
+
+            # Set the weights of saturated star centers to zero
+            # In order to make the box size estimation more accurate.
+            temp = np.copy(self.data.masks)
+            for i in range(len(self.data.channels)):
+                temp[i][~self.msk_star_ori.astype(bool)] = 0
+                self.data.weights[i][temp[i].astype(bool)] = 0.0
+
+            # Replace the vanilla detection with a convolved vanilla detection
+            first_dblend_cont = 0.07 if max(
+                self.data.images.shape) * self.pixel_scale > 200 else 0.006
+            if self.method == 'wavelet' or self.method == 'spergel':
+                first_dblend_cont = 0.07 if max(
+                    self.data.images.shape) * self.pixel_scale > 200 else 0.001
+                b = 40
+            else:
+                b = 80
+            self._first_detection(
+                first_dblend_cont, conv_radius=0.1, lvl=5, b=self.data.images.shape[-1])
+            self._estimate_box(self.cen_obj)
+            self._mask_stars_outside_box()
+            self._construct_obs_frames()
+            if self.bright:
+                self.variance = 0.05**2
+                self.scales = [0, 1, 2, 3, 4, 5, 6]
+                self.starlet_thresh = 0.5
+                self.min_grad = 0.01
+
+            self.ext_rhalf = 500
+            self._add_central_source(K=2, min_grad=self.min_grad,
+                                     thresh=0.1, shifting=True,
+                                     monotonic=self.monotonic,
+                                     variance=self.variance,
+                                     scales=self.scales)
+            self.blend = scarlet.Blend(self._sources, self.observation)
+            self._optimize()
+            self._find_sed_ind()
+            self.final_mask = None
+            # self._gen_final_mask()  # also save final results to file
+            self._display_results()
             self.logger.info('Done! (♡˙︶˙♡)')
             self.logger.info('\n')
 

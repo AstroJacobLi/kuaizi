@@ -36,6 +36,7 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
 
     # Measure!
     try:
+        print('Start for {}'.format(lsbg['viz-id']))
         measurement, _ = makeMeasurement(list(np.array(blend.sources)[info['sed_ind']]),
                                          blend.observations[0],
                                          aggr_mask=mask.astype(bool),
@@ -44,6 +45,7 @@ def measure_obj_row(index, cat, meas_cat, model_dir, PREFIX,
                                          zeropoint=27.0, out_prefix=None,
                                          show_fig=False, asinh_a=0.02, framealpha=0.7)
         row = _write_to_row(row, measurement)
+        global_logger.info('Finish for {}'.format(lsbg['viz-id']))
 
     except Exception as e:
         print(f'MEASUREMENT ERROR FOR {PREFIX.lower()}-{index}', e)
@@ -65,7 +67,7 @@ def run_all(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, cat_dir,
 
     global_logger = kz.utils.set_logger(
         logger_name=f'{PREFIX.lower()}_measure_sample' + suffix,
-        file_name=f'{PREFIX.lower()}_measure_log' + suffix, level='INFO')
+        file_name=f'{PREFIX.lower()}_measure_log_{low}_{high}' + suffix, level='INFO')
 
     lsbg_cat = Table.read(cat_dir)
 

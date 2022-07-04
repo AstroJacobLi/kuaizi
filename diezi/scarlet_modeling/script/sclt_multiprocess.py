@@ -51,16 +51,20 @@ def multiprocess_fitting(DATADIR, OUTPUT_DIR, OUTPUT_SUBDIR, PREFIX, njobs, cat_
     lsbg_cat = Table.read(cat_dir)
     # lsbg_cat.sort('viz-id')
 
+    import time
+    t = time.localtime()
+    current_time = time.strftime('%y%m%d.%Hh', t)
+
     fail_logger = kz.utils.set_logger(
-        logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_fail' + suffix, level='ERROR')
+        logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_fail_{current_time}' + suffix, level='ERROR')
     if ind_list is not None:
         fail_logger = kz.utils.set_logger(
-            logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}_ind_list_fail' + suffix, level='ERROR')
+            logger_name=f'{PREFIX.lower()}_fail' + suffix, file_name=f'{PREFIX.lower()}_ind_list_fail_{current_time}' + suffix, level='ERROR')
     global_logger = kz.utils.set_logger(
-        logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_log' + suffix, level='INFO')
+        logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}_{low}_{high}_log_{current_time}' + suffix, level='INFO')
     if ind_list is not None:
         global_logger = kz.utils.set_logger(
-            logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}_ind_list_log' + suffix, level='INFO')
+            logger_name=f'{PREFIX.lower()}_sample' + suffix, file_name=f'{PREFIX.lower()}_ind_list_log_{current_time}' + suffix, level='INFO')
 
     pool = Pool(njobs)
 

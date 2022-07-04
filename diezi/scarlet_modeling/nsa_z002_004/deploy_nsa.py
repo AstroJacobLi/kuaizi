@@ -43,15 +43,14 @@ def deploy_modeling_job(low=0, high=1000, ind_list=None, name='nsa_z002_004', nc
         "#SBATCH --mem-per-cpu=12G",
         "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
-        f"#SBATCH -o {name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o {name}_ind_list.o",
+        f"#SBATCH -o ./log/{name}_{low}_{high}.o" if ind_list is None else f"#SBATCH -o ./log/{name}_ind_list.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
         "",
         'now=$(date +"%T")',
         'echo "start time ... $now"',
         "",
-        "module purge",
-        ". /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
+        "source /home/jiaxuanl/Research/Packages/kuaizi/diezi/setup_env.sh",
         "export OMP_NUM_THREADS=1",
         "",
         run_scarlet_content if not only_measure else "",
@@ -119,3 +118,16 @@ if __name__ == '__main__':
 
 # python deploy_nsa.py --name nsa_spgl --ncpu=16 --method=spergel \
 # --monotonic=True --bkg=True -min_grad=-0.1 --sigma=0.05 --ind_list='./ind_list.npy'
+
+
+### New last run for the UDG paper ###
+# python deploy_nsa.py --name spgl_0.5k --ncpu=12 --method=spergel --low=0 --high=500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_1.0k --ncpu=12 --method=spergel --low=500 --high=1000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_1.5k --ncpu=12 --method=spergel --low=1000 --high=1500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_2.0k --ncpu=12 --method=spergel --low=1500 --high=2000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_2.5k --ncpu=12 --method=spergel --low=2000 --high=2500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_3.0k --ncpu=12 --method=spergel --low=2500 --high=3000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_3.5k --ncpu=12 --method=spergel --low=3000 --high=3500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_4.0k --ncpu=12 --method=spergel --low=3500 --high=4000 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_4.5k --ncpu=12 --method=spergel --low=4000 --high=4500 --monotonic=True --bkg=True --min_grad=-0.05
+# python deploy_nsa.py --name spgl_5.0k --ncpu=12 --method=spergel --low=4500 --high=None --monotonic=True --bkg=True --min_grad=-0.05

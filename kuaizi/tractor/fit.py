@@ -330,10 +330,11 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
                     trac_obj = Tractor([tim], src)
                     trac_obj.freezeParam('images')
                     try:
-                        # trac_obj.optimize_loop()
+                        # trac_obj.optimize()
+                        trac_obj.optimize_loop()
                         # trac_obj.optimize_loop(dchisq=0.1, shared_params=False)
-                        _ = trac_obj.optimize(
-                            variance=True, just_variance=True, shared_params=False)
+                        # _ = trac_obj.optimize(
+                        #     variance=True, just_variance=True, shared_params=False)
                         chi_1 = (trac_obj.getChiImage()**2).mean()
                     except:
                         chi_1 = 999
@@ -369,7 +370,8 @@ def tractor_blob_by_blob(obj_cat, w, img_data, invvar, psf_obj, pixel_scale,
     with HiddenPrints():
         chi2_0 = (trac_obj.getChiImage()**2).mean()
         try:
-            trac_obj.optimize_loop()
+            # trac_obj.optimize_loop()
+            _ = trac_obj.optimize(variance=False, just_variance=False, shared_params=False)
         except:
             pass
         chi2_1 = (trac_obj.getChiImage()**2).mean()
@@ -487,8 +489,13 @@ def tractor_fix_all(catalog, img_data, invvar, psf_obj, pixel_scale,
     trac_obj = Tractor([tim], catalog)
     chi2_0 = (trac_obj.getChiImage()**2).mean()
     trac_obj.freezeParam('images')
+    # trac_obj.optimize_loop(dchisq=0.001, shared_params=False)
     trac_obj.optimize_loop()
+    # trac_obj.optimize()
+    # _ = trac_obj.optimize(variance=False, just_variance=False, shared_params=False)
     chi2 = (trac_obj.getChiImage()**2).mean()
+    # if chi2_0 - chi2 == 0:
+        
     print('# Global optimization: Chi2 improvement = ', chi2_0 - chi2)
 
     blob_sources = trac_obj.catalog
@@ -583,18 +590,22 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
             mask=None,
             lvl=2.0,
             method='vanilla',
+            # method='wavelet',
+            # low_freq_lvl=0, 
+            # high_freq_lvl=2,
             layer_ind=layer_ind,
             convolve=False,
             match_gaia=False,
             show_fig=False,
             visual_gaia=False,
             tigress=True,
-            b=32,
-            f=3,
+            # b=32,
+            b=12,
+            f=2,
             pixel_scale=HSC_pixel_scale,
             minarea=5,
-            deblend_nthresh=48,
-            deblend_cont=0.001,
+            deblend_nthresh=72,
+            deblend_cont=1e-3,#0.0005,
             sky_subtract=True,
             verbose=verbose)
 
@@ -656,8 +667,9 @@ def tractor_hsc_sep_blob_by_blob(obj, filt, channels, data,
         sources, trac_obj = result
     else:
         sources, trac_obj, fig = result
+    # if not fix_all:
     trac_obj.target_ind = cen_obj_ind  # record the index of target galaxy
     trac_obj.wcs = data.wcs
-    if verbose:
-        print(trac_obj.catalog[cen_obj_ind])
+    # if verbose:
+    #     print(trac_obj.catalog[cen_obj_ind])
     return trac_obj, obj_cat

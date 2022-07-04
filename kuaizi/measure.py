@@ -1,3 +1,4 @@
+from unittest.mock import NonCallableMagicMock
 import numpy as np
 import scarlet
 import matplotlib.pyplot as plt
@@ -591,6 +592,15 @@ def makeMeasurement(components, observation, aggr_mask=None,
     else:
         segmap = np.ones_like(img)
 
+    segmap = segmap.astype(np.int)
+    if mask[img.shape[0] // 2, img.shape[1] // 2] == 1:
+        print('Masked center pixel! Wont use the mask.')
+        mask = np.zeros_like(mask)
+
+    b = _blend.sources[0].bbox
+    if np.sum(mask[b.origin[1]:b.origin[1] + b.shape[1], b.origin[2]:b.origin[2] + b.shape[2]]) / (b.shape[1] * b.shape[2]) > 0.7:
+        print('Too much masked')
+        return None, None
     source_morphs = statmorph.source_morphology(
         img, segmap, weightmap=np.sqrt(weights[filt]),
         n_sigma_outlier=15, min_cutout_size=min_cutout_size, cutout_extent=2,
@@ -838,6 +848,8 @@ def _write_to_row(row, measurement):
     Returns:
         row (astropy.table.Row)
     '''
+    if measurement is None:
+        return row
     row['flux'] = measurement['flux']
     row['flux_circ'] = measurement['flux_circ']
     row['flux_ellip'] = measurement['flux_ellip']

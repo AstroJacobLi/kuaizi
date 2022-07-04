@@ -20,7 +20,7 @@ python ../script/sclt_multiprocess.py --njobs 12 \
    --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \
    --OUTPUT_SUBDIR 'MOCK_SAMPLE/spergel' \
    --PREFIX 'MOCK' \
-   --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \
+   --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_5000.fits' \
    --low 4000 --high 4500 \
    --suffix '' --starlet_thresh 0.5 --method spergel \
    --monotonic True --bkg True --variance 0.0009 --scales '[0, 1, 2, 3, 4, 5, 6]' --min_grad -0.05
@@ -30,7 +30,7 @@ python ../script/sclt_meas_mp.py \
     --OUTPUT_DIR '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/' \
     --OUTPUT_SUBDIR 'MOCK_SAMPLE/spergel' \
     --PREFIX 'MOCK' \
-    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_2000.fits' \
+    --cat_dir '/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Catalog/mock_sample/mock_obj_cat_0_5000.fits' \
     --filename '_lsbg_meas_spergel_monotonic.fits' \
     --low 4000 --high 4500 --method spergel\
     --ncpu=12 --suffix '' --sigma=None

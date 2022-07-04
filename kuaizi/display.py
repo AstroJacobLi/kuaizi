@@ -1402,7 +1402,7 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     elif show_gray_mask and aggr_mask is not None:
         ax[1].imshow(model_rgb)
         ax[1].imshow((aggr_mask | mask).astype(float), origin='lower',
-                     alpha=0.10, cmap='Greys_r')
+                     alpha=0.07, cmap='Greys_r')
     else:
         ax[1].imshow(model_rgb)
 
@@ -1499,6 +1499,323 @@ def display_scarlet_results_tigress(blend, aggr_mask=None, zoomin_size=None, ax=
     if ax is None:
         return fig
     return ax
+
+
+def get_img_model_residual(blend, aggr_mask=None, zoomin_size=None, show_ind=None,
+                           stretch=2, Q=1, minimum=0.0, channels='griz', pixel_scale=0.168,):
+    import scarlet
+    from scarlet.display import AsinhMapping
+
+    observation = blend.observations[0]
+    sources = np.copy(blend.sources)
+    if show_ind is not None:
+        gal_sources = np.array(sources)[show_ind]
+        blend = scarlet.Blend(gal_sources, observation)
+
+    # The zoomin cutout should be centered at the target galaxy.
+    if zoomin_size is not None:
+        y_cen, x_cen = blend.sources[0].center.astype(int)
+        _, y_img_size, x_img_size = observation.data.shape
+        # x_cen = observation.model_frame.shape[2] // 2
+        # y_cen = observation.model_frame.shape[1] // 2
+        size = int(zoomin_size / pixel_scale / 2)  # half-size
+        # half-size should not exceed the image half-size
+        size = min(size, y_cen, y_img_size - y_cen, x_cen, x_img_size - x_cen)
+
+        # Image
+        images = observation.data[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
+        # Weights
+        weights = observation.weights[:, y_cen -
+                                      size:y_cen + size + 1, x_cen - size:x_cen + size + 1]
+        if aggr_mask is not None:
+            aggr_mask = aggr_mask[y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1].astype(bool)
+        # Compute model
+        model = blend.get_model()[:, y_cen - size:y_cen +
+                                  size + 1, x_cen - size:x_cen + size + 1]
+        # this model is under `model_frame`, i.e. under the modest PSF
+    else:
+        # Image
+        images = observation.data
+        # Weights
+        weights = observation.weights
+        # Compute model
+        model = blend.get_model()
+        # this model is under `model_frame`, i.e. under the modest PSF
+
+    # Render it in the observed frame
+    model_ = observation.render(model)
+    # Mask
+    mask = (np.sum(weights == 0, axis=0) != 0)
+    # Compute residual
+    residual = images - model_
+
+    # Create RGB images
+    f_c = np.array([1.9, 1.2, 1., 0.85])
+    channel_map = scarlet.display.channels_to_rgb(len(channels)) * f_c
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q)
+
+    img_rgb = scarlet.display.img_to_rgb(
+        images, norm=norm, channel_map=channel_map)
+    # channel_map = scarlet.display.channels_to_rgb(len(channels))
+    model_rgb = scarlet.display.img_to_rgb(
+        model_, norm=norm, channel_map=channel_map)
+    norm = AsinhMapping(minimum=minimum, stretch=stretch, Q=Q / 2)
+    residual_rgb = scarlet.display.img_to_rgb(
+        residual, norm=norm, channel_map=channel_map)
+
+    if zoomin_size is not None:
+        return img_rgb, model_rgb, residual_rgb, mask, size
+    else:
+        return img_rgb, model_rgb, residual_rgb, mask
+
+
+def display_scarlet_results_tigress_paper(blend, initial_blend, aggr_mask=None, zoomin_size=None, ax=None, show_loss=False, show_mask=False, show_gray_mask=True,
+                                          show_ind=None, add_boxes=True,
+                                          stretch=2, Q=1, minimum=0.0, channels='grizy', show_mark=True, pixel_scale=0.168, scale_bar=True,
+                                          scale_bar_length=10.0, scale_bar_fontsize=15, scale_bar_y_offset=0.3, scale_bar_color='w',
+                                          scale_bar_loc='left', add_text=None, usetex=False, text_fontsize=30, text_y_offset=0.80, text_color='w'):
+    '''
+    Display the scene on Tiger, including
+    - zoom-in raw img w/ gray initial mask
+    - zoom-in scarlet model w/ gray (final) mask
+    - zoom-in residual with dark final mask
+    - loss curve
+
+    Arguments:
+        blend (scarlet.blend): the blend of observation and sources
+        aggr_mask (numpy 2-D array): aggressive mask
+        zoomin_size (float, in arcsec): the size of shown image, if not showing in full size
+        ax (matplotlib.axes object): input axes object
+        show_loss (bool): whether displaying the loss curve
+        show_mask (bool): whether displaying the mask encoded in `data.weights'
+        show_ind (list): if not None, only objects with these indices are shown in the figure
+        stretch, Q, minimum (float): parameters for displaying image, see https://pmelchior.github.io/scarlet/tutorials/display.html
+        channels (str): names of the bands in `observation`
+        show_mark (bool): whether plot the indices of sources in the figure
+        pixel_scale (float): default is 0.168 arcsec/pixel
+
+    Returns:
+        ax: if input `ax` is provided
+        fig: if no `ax` is provided as input
+
+    '''
+    import scarlet
+    from scarlet.display import AsinhMapping
+
+    if ax is None:
+        fig = plt.figure(figsize=(20, 5))
+        ax = [fig.add_subplot(1, 4, n + 1) for n in range(4)]
+
+    if zoomin_size is not None:
+        img_rgb, model_rgb, residual_rgb, mask, size = get_img_model_residual(blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                                              stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                                              show_ind=show_ind, pixel_scale=pixel_scale)
+        print('Size:', size)
+    else:
+        img_rgb, model_rgb, residual_rgb, mask = get_img_model_residual(blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                                        stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                                        show_ind=show_ind, pixel_scale=pixel_scale)
+
+    ax[0].imshow(img_rgb)
+    if show_gray_mask:
+        ax[0].imshow(mask.astype(float), origin='lower',
+                     alpha=0.1, cmap='Greys_r')
+    ax[0].set_title("Data", fontsize=text_fontsize)
+
+    if add_boxes:
+        from matplotlib.patches import Rectangle
+        for k, src in enumerate(blend.sources):
+            box_kwargs = {"facecolor": "none", "edgecolor": "w", "lw": 0.5}
+            if isinstance(src, scarlet.PointSource):
+                box_kwargs['ls'] = 'dashed'
+
+            if zoomin_size is not None:
+                y_cen, x_cen = blend.sources[0].center.astype(int)
+                extent = get_extent(src.bbox, [x_cen - size, y_cen - size])
+            else:
+                extent = get_extent(src.bbox)
+            rect = Rectangle(
+                (extent[0], extent[2]),
+                extent[1] - extent[0],
+                extent[3] - extent[2],
+                **box_kwargs
+            )
+            xlim, ylim = ax[0].get_xlim(), ax[0].get_ylim()
+            ax[0].add_patch(rect)
+            ax[0].set_xlim(xlim)
+            ax[0].set_ylim(ylim)
+
+    if show_mark:
+        for k, src in enumerate(blend.sources):
+            if isinstance(src, scarlet.source.PointSource):
+                color = 'white'
+            elif isinstance(src, scarlet.source.CompactExtendedSource):
+                color = 'yellow'
+            elif isinstance(src, scarlet.source.SingleExtendedSource):
+                color = 'red'
+            elif isinstance(src, scarlet.source.MultiExtendedSource):
+                color = 'cyan'
+            elif isinstance(src, scarlet.source.StarletSource):
+                color = 'lime'
+            else:
+                color = 'gray'
+            if hasattr(src, "center"):
+                y, x = src.center
+                if zoomin_size is not None:
+                    y = y - y_cen + size
+                    x = x - x_cen + size
+                ax[0].text(x, y, k, color=color)
+                ax[0].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+                ax[1].text(x, y, k, color=color)
+                ax[1].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+                ax[2].text(x, y, k, color=color)
+                ax[2].text(x, y, '+', color=color,
+                           horizontalalignment='center', verticalalignment='center')
+
+    ########## Figure 2 & 3 ###########
+    # In Figure 2, we only show the model of target galaxy (by setting `show_ind`) with gray aggressive mask
+    if show_mask and aggr_mask is None:
+        ax[2].imshow(model_rgb * (~np.tile(mask.T, (3, 1, 1))).T)
+    elif show_mask and aggr_mask is not None:
+        ax[2].imshow(model_rgb * (~np.tile((aggr_mask | mask).T, (3, 1, 1))).T)
+    elif show_gray_mask and aggr_mask is None:
+        ax[2].imshow(model_rgb)
+        # ax[2].imshow(mask.astype(float), origin='lower',
+        #              alpha=0.10, cmap='Greys_r')
+    elif show_gray_mask and aggr_mask is not None:
+        ax[2].imshow(model_rgb)
+        # ax[2].imshow((aggr_mask | mask).astype(float), origin='lower',
+        #              alpha=0.07, cmap='Greys_r')
+    else:
+        ax[2].imshow(model_rgb)
+
+    ax[2].set_title("Optimized Model", fontsize=text_fontsize)
+
+    ########## Figure 3 ###########
+    # In Figure 3, we show the residual when removing the model of target galaxy (by setting `show_ind`) with aggressive mask
+    vmax = np.max(np.abs(residual_rgb))
+    if aggr_mask is None:
+        ax[3].imshow(residual_rgb * (~np.tile(mask.T, (3, 1, 1))).T,
+                     vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[3].set_title("Residual", fontsize=text_fontsize)
+    else:
+        ax[3].imshow(residual_rgb * (~np.tile((aggr_mask.astype(bool) | mask).T, (3, 1, 1))).T,
+                     vmin=-vmax, vmax=vmax, cmap='seismic')
+        ax[3].set_title("Residual", fontsize=text_fontsize)
+
+    ########## Figure 1.5 ###########
+    # Here we show the initial model
+    if zoomin_size is not None:
+        img_rgb, model_rgb, _, mask, size = get_img_model_residual(initial_blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                                   stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                                   show_ind=show_ind, pixel_scale=pixel_scale)
+    else:
+        img_rgb, model_rgb, _, mask = get_img_model_residual(initial_blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                             stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                             show_ind=show_ind, pixel_scale=pixel_scale)
+
+    ax[1].imshow(model_rgb)
+    ax[1].set_title("Initial model", fontsize=text_fontsize)
+
+    ########## Figure 4 ###########
+    # Here we only show the targer model
+    if zoomin_size is not None:
+        img_rgb, model_rgb, residual_rgb, mask, size = get_img_model_residual(blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                                              stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                                              show_ind=[0], pixel_scale=pixel_scale)
+    else:
+        img_rgb, model_rgb, residual_rgb, mask = get_img_model_residual(blend, aggr_mask=aggr_mask, zoomin_size=zoomin_size,
+                                                                        stretch=stretch, Q=Q, minimum=minimum, channels=channels,
+                                                                        show_ind=[0], pixel_scale=pixel_scale)
+    ax[4].imshow(model_rgb)
+    ax[4].set_title("Measurement", fontsize=text_fontsize)
+
+    ########## Optional functions ###########
+    (img_size_x, img_size_y) = model_rgb.shape[:-1]
+    if scale_bar:
+        if scale_bar_length / pixel_scale > 0.7 * min(img_size_x, img_size_y):
+            # if scale_bar_length is too large
+            scale_bar_length = 0.3 * min(img_size_x, img_size_y) * pixel_scale
+
+        if scale_bar_loc == 'left':
+            scale_bar_x_0 = int(img_size_x * 0.04)
+            scale_bar_x_1 = int(img_size_x * 0.04 +
+                                (scale_bar_length / pixel_scale))
+        else:
+            scale_bar_x_0 = int(img_size_x * 0.95 -
+                                (scale_bar_length / pixel_scale))
+            scale_bar_x_1 = int(img_size_x * 0.95)
+        scale_bar_y = int(img_size_y * 0.10)
+        scale_bar_text_x = (scale_bar_x_0 + scale_bar_x_1) / 2
+        scale_bar_text_y = (scale_bar_y * scale_bar_y_offset)
+
+        if scale_bar_length < 60:
+            scale_bar_text = r'$%d^{\prime\prime}$' % int(scale_bar_length)
+        elif 60 < scale_bar_length < 3600:
+            scale_bar_text = r'$%d^{\prime}$' % int(scale_bar_length / 60)
+        else:
+            scale_bar_text = r'$%d^{\circ}$' % int(scale_bar_length / 3600)
+        scale_bar_text_size = scale_bar_fontsize
+
+        ax[0].plot(
+            [scale_bar_x_0, scale_bar_x_1], [scale_bar_y, scale_bar_y],
+            linewidth=3,
+            c=scale_bar_color,
+            alpha=1.0)
+        ax[0].text(
+            scale_bar_text_x,
+            scale_bar_text_y,
+            scale_bar_text,
+            fontsize=scale_bar_text_size,
+            horizontalalignment='center',
+            color=scale_bar_color)
+
+    if add_text is not None:
+        text_x_0 = int(img_size_x * 0.08)
+        text_y_0 = int(img_size_y * text_y_offset)
+        if usetex:
+            ax[0].text(
+                text_x_0, text_y_0, r'$\mathrm{' + add_text + '}$', fontsize=text_fontsize, color=text_color)
+        else:
+            ax[0].text(text_x_0, text_y_0, add_text,
+                       fontsize=text_fontsize, color=text_color)
+
+    if show_loss:
+        ax[4].plot(-np.array(loss))
+        ax[4].set_xlabel('Iteration', labelpad=-40)
+        # ax[3].set_ylabel('log-Likelihood')
+        ax[4].set_title("log-Likelihood")
+        xlim, ylim = ax[3].axes.get_xlim(), ax[3].axes.get_ylim()
+        xrange = xlim[1] - xlim[0]
+        yrange = ylim[1] - ylim[0]
+        ax[4].set_aspect((xrange / yrange), adjustable='box')
+        ax[4].ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
+
+    from matplotlib.ticker import MaxNLocator, NullFormatter
+    for axx in ax:
+        axx.yaxis.set_major_locator(MaxNLocator(5))
+        axx.xaxis.set_major_locator(MaxNLocator(5))
+
+    # Show the size of PSF. FWHM is 1 arcsec.
+    # from matplotlib.patches import Circle
+    # circ1 = Circle((40, 40),
+    #                radius=1 / 0.168,
+    #                linewidth=1.,
+    #                hatch='/////',
+    #                fc='None',
+    #                ec='white')
+    # ax[1].add_patch(circ1)
+
+    plt.subplots_adjust(wspace=0.2)
+
+    if ax is None:
+        return fig, ax
+    else:
+        return ax
 
 
 def get_extent(bbox, new_cen=None):
@@ -1775,3 +2092,202 @@ def plot_measurement(lsbg_cat, meas_cat, gal_zorder=2, candy_zorder=3, junk_zord
     plt.ylabel('R_e (Sersic)')
 
     plt.subplots_adjust(wspace=0.3, hspace=0.2)
+
+
+def plot_measurement_paper(lsbg_cat, meas_cat, axes=None,
+                           gal_zorder=2, candy_zorder=3, junk_zorder=0,
+                           gal_size=10, candy_size=20, junk_size=10,
+                           gal_alpha=0.1, candy_alpha=0.2, junk_alpha=0.1,
+                           gal_label=r'$\texttt{galaxy}$', candy_label=r'$\texttt{candy}$', junk_label=r'$\texttt{junk}$',
+                           gal_color='steelblue', candy_color='forestgreen', junk_color='r',
+                           ):
+    from matplotlib.patches import Rectangle
+
+    junk = (lsbg_cat['bad_votes'] > lsbg_cat['good_votes'])
+    candy = (lsbg_cat['good_votes'] > lsbg_cat['bad_votes']) & (
+        lsbg_cat['is_candy'] > lsbg_cat['is_galaxy'])
+    gal = (~junk) & (~candy)
+
+    print('# of Candy:', np.sum(candy))
+    print('# of Gal:', np.sum(gal))
+    print('# of Junk:', np.sum(junk))
+
+    g_mag = meas_cat['mag'].data[:, 0]
+    r_mag = meas_cat['mag'].data[:, 1]
+    i_mag = meas_cat['mag'].data[:, 2]
+
+    if axes is None:
+        fig, axes = plt.subplots(1, 5, figsize=(25, 5))
+
+    plt.sca(axes[0])  # color-color figure
+    plt.scatter((g_mag - i_mag)[candy], (g_mag - r_mag)
+                [candy], color=candy_color, label=candy_label +
+                f': {np.sum(candy)}',
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter((g_mag - i_mag)[gal], (g_mag - r_mag)
+                [gal], color=gal_color, label=gal_label + f': {np.sum(gal)}',
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+    plt.scatter((g_mag - i_mag)[junk], (g_mag - r_mag)
+                [junk], color=junk_color, label=junk_label +
+                f': {np.sum(junk)}',
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+    color_bound = [0., 1.2]
+
+    half_width = 0.25
+    plt.vlines(color_bound[0], 0.7 * color_bound[0] - half_width,
+               0.7 * color_bound[0] + half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.vlines(color_bound[1], 0.7 * color_bound[1] - half_width,
+               0.7 * color_bound[1] + half_width, color='k', ls='--', lw=2, zorder=12)
+    x = np.linspace(color_bound[0], color_bound[1], 100)
+    plt.plot(x, 0.7 * x - half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.plot(x, 0.7 * x + half_width, color='k', ls='--', lw=2, zorder=12)
+    plt.xlabel('$g-i$')
+    plt.ylabel('$g-r$')
+
+    lgd = plt.legend(loc='upper left',
+                     bbox_to_anchor=(-0.08, 1.03), handletextpad=0.03, fontsize=16)
+
+    for l in lgd.legendHandles:
+        l._sizes = [30]
+        l._alpha = 1.0
+    plt.xlim(-1, 2.2)
+    plt.ylim(-0.5, 1.9)
+
+    #####################################
+    plt.sca(axes[1])  # SB-R_e figure
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][candy],
+                meas_cat['rhalf_circularized'][candy] * 0.168,
+                color=candy_color, label=candy_label,
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][junk],
+                meas_cat['rhalf_circularized'][junk] * 0.168,
+                color=junk_color, label=junk_label,
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+    plt.scatter(meas_cat['SB_eff_avg'][:, 0][~junk],
+                meas_cat['rhalf_circularized'][~junk] * 0.168,
+                color=gal_color, label=gal_label,
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+
+    # Create a Rectangle patch
+    rect = Rectangle(
+        (23, 1.8), (27.5 - 23), (12 - 1.8), lw=2., edgecolor='k', ls='--', facecolor='none', zorder=12)
+    plt.gca().add_patch(rect)
+
+    plt.yscale('log')
+    plt.xlabel(r'$\mu_{\mathrm{eff}}(g)\ [\mathrm{mag\ arcsec^{-2}}]$')
+    plt.ylabel(r'$r_e$ [arcsec]')
+    plt.xlim(20.2, 29.5)
+    plt.xticks([21, 23, 25, 27, 29])
+    plt.ylim(0.3, 16)
+
+    #####################################
+    plt.sca(axes[2])  # SB-color figure
+    plt.scatter((g_mag - i_mag)[candy], meas_cat['SB_eff_avg']
+                [:, 0][candy],
+                color=candy_color, label=candy_label,
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter((g_mag - i_mag)[junk],
+                meas_cat['SB_eff_avg'][:, 0][junk],
+                color=junk_color, label=junk_label,
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+    plt.scatter((g_mag - i_mag)[gal],
+                meas_cat['SB_eff_avg'][:, 0][gal],
+                color=gal_color, label=gal_label,
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+    plt.xlabel('$g-i$')
+    plt.ylabel(r'$\mu_{\mathrm{eff}}(g)\ [\mathrm{mag\ arcsec^{-2}}]$')
+
+    rect = Rectangle(
+        (color_bound[0], 23), (color_bound[1] - color_bound[0]), (27.5 - 23),
+        lw=2., edgecolor='k', ls='--', facecolor='none', zorder=12)
+    plt.gca().add_patch(rect)
+
+    # plt.axhline(23.0, color='k', ls='--')
+    # plt.axhline(27.5, color='k', ls='--')
+    # plt.axvline(color_bound[0], color='k', ls='--', lw=2)
+    # plt.axvline(color_bound[1], color='k', ls='--', lw=2)
+    plt.xlim(-0.7, 2.2)
+    plt.ylim(20.2, 29.5)
+
+    plt.sca(axes[3])
+    plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
+                [candy],
+                color=candy_color, label=candy_label,
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter(meas_cat['M20'][junk], meas_cat['Gini']
+                [junk],
+                color=junk_color, label=junk_label,
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+    plt.scatter(meas_cat['M20'][gal], meas_cat['Gini']
+                [gal],
+                color=gal_color, label=gal_label,
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+    plt.xlabel(r'$M_{20}$')
+    plt.ylabel(r'Gini')
+    x = np.linspace(-3, -1.1, 10)
+    plt.plot(x, -0.136 * x + 0.37, color='k', ls='--', lw=2)
+    plt.vlines(-1.1, ymin=0.3, ymax=-0.136 * -
+               1.1 + 0.37, color='k', ls='--', lw=2)
+    # plt.axhline(0.7, color='k', ls='--', lw=2)
+    plt.xlim(-2.5, -0.4)
+    plt.ylim(0.3, 0.9)
+    # x = np.linspace(-3, -1.6, 10)
+    # plt.plot(x, 0.136 * x + 0.788, color='orange')
+
+    plt.sca(axes[4])
+    plt.scatter(meas_cat['C'][candy], meas_cat['A_outer']
+                [candy],
+                color=candy_color, label=candy_label +
+                f': {np.sum(candy)}',
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter(meas_cat['C'][gal], meas_cat['A_outer']
+                [gal],
+                color=gal_color, label=gal_label +
+                f': {np.sum(gal)}',
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+    plt.scatter(meas_cat['C'][junk], meas_cat['A_outer']
+                [junk],
+                color=junk_color, label=junk_label +
+                f': {np.sum(junk)}',
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+
+    rect = Rectangle(
+        (1.8, -0.12), (3.5 - 1.8), (0.8 - -0.12),
+        lw=2., edgecolor='k', ls='--', facecolor='none', zorder=12)
+    plt.gca().add_patch(rect)
+    # plt.axvline(1.8, color='k', ls='--', lw=2)
+    # plt.axvline(3.5, color='k', ls='--', lw=2)
+    # plt.axhline(0.8, color='k', ls='--', lw=2)
+
+    plt.xlim(0., 4.8)
+    plt.ylim(-.1, 2.0)
+    plt.xlabel(r'$C$')
+    plt.ylabel(r'$A$')
+
+    # lgd = plt.legend(loc='upper left',
+    #                  bbox_to_anchor=(-0.08, 1.03), handletextpad=0.03)
+
+    # for l in lgd.legendHandles:
+    #     l._sizes = [30]
+    #     l._alpha = 1.0
+
+    if axes is None:
+        plt.subplots_adjust(wspace=0.3, hspace=0.2)
+        return fig, axes
+    else:
+        return axes

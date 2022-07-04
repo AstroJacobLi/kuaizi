@@ -131,8 +131,8 @@ def _freeze_source(src, freeze_dict):
             src.freezeParam(item)
 
         if item == 'pos' and freeze_dict[item] and item in src.namedparams:
-            src.pos.addGaussianPrior('x', src.pos.x, 1)
-            src.pos.addGaussianPrior('y', src.pos.y, 1)
+            src.pos.addGaussianPrior('x', src.pos.x, 2)
+            src.pos.addGaussianPrior('y', src.pos.y, 2)
 
         if item in ['sersicindex'] and item in src.namedparams:
             if freeze_dict[item] is True:
@@ -198,7 +198,7 @@ def _regularize_attr(item):
     return item
 
 
-def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, zeropoint=kuaizi.HSC_zeropoint):
+def getTargetProperty(trac_obj, wcs=None, target_ind=None, pixel_scale=kuaizi.HSC_pixel_scale, zeropoint=kuaizi.HSC_zeropoint):
     '''
     Write the properties of our target galaxy in a certain band into a dictionary.
 
@@ -231,11 +231,15 @@ def getTargetProperty(trac_obj, wcs=None, pixel_scale=kuaizi.HSC_pixel_scale, ze
         # first derivative is for sky bkg
         invvars = dict(zip(attri, _compute_invvars(all_derivs)[1:]))
 
-    i = trac_obj.target_ind  # only extract information of our target galaxy
+    if target_ind is None:
+        i = trac_obj.target_ind  # only extract information of our target galaxy
+    else:
+        i = target_ind
+
     src = trac_obj.catalog[i]
 
     keys_to_extract = [item for item in attri if f'source{i}.' in item]
-    source_values = {key.replace(f'source{i}.', '')                     : values[key] for key in keys_to_extract}
+    source_values = {key.replace(f'source{i}.', ''): values[key] for key in keys_to_extract}
     source_values['flux'] *= 10**((22.5 - zeropoint) / 2.5)  # in nanomaggy
 
     source_invvar = {key.replace(
@@ -317,14 +321,18 @@ def _write_to_row(row, model_dict, channels=list('grizy') + ['N708', 'N540']):
     '''
     if 'i' in model_dict.keys() and model_dict['i'] is not None:
         # Positions from i-band
-        meas_dict = getTargetProperty(model_dict['i'], wcs=model_dict['i'].wcs)
+        meas_dict = getTargetProperty(
+            model_dict['i'], wcs=model_dict['i'].wcs, target_ind=0)
+        # meas_dict = getTargetProperty(
+            # model_dict['i'], wcs=model_dict['i'].wcs, target_ind=None)
         for key in ['ra', 'ra_ivar', 'dec', 'dec_ivar', 're', 're_ivar', 'ab', 'ab_ivar', 'phi', 'phi_ivar', 'sersic', 'sersic_ivar']:
             row[key] = meas_dict[key]
         # flux
         flux = np.zeros(len(channels))
         flux_ivar = np.zeros(len(channels))
         for i, filt in enumerate(channels):
-            meas_dict = getTargetProperty(model_dict[filt])
+            # meas_dict = getTargetProperty(model_dict[filt], target_ind=None)
+            meas_dict = getTargetProperty(model_dict[filt], target_ind=0)
             if meas_dict is not None:
                 flux[i] = meas_dict['flux']
                 flux_ivar[i] = meas_dict['flux_ivar']
