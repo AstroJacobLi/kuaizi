@@ -124,77 +124,77 @@ def make_cuts_spergel(cuts_cat, max_rhalf=15, min_rhalf=1.6, max_C=3.5):
     return mask
 
 
-def post_process_cat(input_cuts_cat):
-    cuts_cat = input_cuts_cat.copy()
-    import pickle
-    # Calculate SB and R_e errors
-    SB_g_meas = cuts_cat['SB_eff_avg'][:, 0].data
-    R_e = cuts_cat['rhalf_spergel'].data * 0.168
+# def post_process_cat(input_cuts_cat):
+#     cuts_cat = input_cuts_cat.copy()
+#     import pickle
+#     # Calculate SB and R_e errors
+#     SB_g_meas = cuts_cat['SB_eff_avg'][:, 0].data
+#     R_e = cuts_cat['rhalf_spergel'].data * 0.168
 
-    with open('./Catalog/completeness/Re_meas_err.pkl', 'rb') as f:
-        (f_med, f_std) = pickle.load(f)
-    # R_e += f_med(SB_g_meas)
-    R_e_std = f_std(SB_g_meas)
-    cuts_cat['rhalf_spergel'] = R_e
-    cuts_cat['rhalf_spergel_err'] = R_e_std
+#     with open('./Catalog/completeness/Re_meas_err.pkl', 'rb') as f:
+#         (f_med, f_std) = pickle.load(f)
+#     # R_e += f_med(SB_g_meas)
+#     R_e_std = f_std(SB_g_meas)
+#     cuts_cat['rhalf_spergel'] = R_e
+#     cuts_cat['rhalf_spergel_err'] = R_e_std
 
-    with open('./Catalog/completeness/SB_meas_err.pkl', 'rb') as f:
-        (f_med, f_std) = pickle.load(f)
-    SB_g = SB_g_meas  # + f_med(SB_g_meas)
-    SB_g_std = f_std(SB_g_meas)
-    cuts_cat['SB_eff_avg_g'] = SB_g
-    cuts_cat['SB_eff_avg_g_err'] = SB_g_std
+#     with open('./Catalog/completeness/SB_meas_err.pkl', 'rb') as f:
+#         (f_med, f_std) = pickle.load(f)
+#     SB_g = SB_g_meas  # + f_med(SB_g_meas)
+#     SB_g_std = f_std(SB_g_meas)
+#     cuts_cat['SB_eff_avg_g'] = SB_g
+#     cuts_cat['SB_eff_avg_g_err'] = SB_g_std
 
-    # Physical sizes
-    # not consider peculiar motion
-    ang_diam_dist = cuts_cat['host_ang_diam_dist'].data
-    R_e_phys = R_e / 206265 * ang_diam_dist * 1000  # in kpc
-    R_e_phys_std = R_e_std / 206265 * ang_diam_dist * 1000  # in kpc
-    cuts_cat['rhalf_phys'] = R_e_phys
-    cuts_cat['rhalf_phys_err'] = R_e_phys_std
+#     # Physical sizes
+#     # not consider peculiar motion
+#     ang_diam_dist = cuts_cat['host_ang_diam_dist'].data
+#     R_e_phys = R_e / 206265 * ang_diam_dist * 1000  # in kpc
+#     R_e_phys_std = R_e_std / 206265 * ang_diam_dist * 1000  # in kpc
+#     cuts_cat['rhalf_phys'] = R_e_phys
+#     cuts_cat['rhalf_phys_err'] = R_e_phys_std
 
-    # Absolute magnitudes
-    cuts_cat['abs_mag'] = cuts_cat['mag'] - 25 - 5 * \
-        np.log10(ang_diam_dist *
-                 (1 + cuts_cat['host_z'].data)**2)[:, np.newaxis]  # griz
+#     # Absolute magnitudes
+#     cuts_cat['abs_mag'] = cuts_cat['mag'] - 25 - 5 * \
+#         np.log10(ang_diam_dist *
+#                  (1 + cuts_cat['host_z'].data)**2)[:, np.newaxis]  # griz
 
-    g_mag = cuts_cat['mag'][:, 0].data
-    g_abs = cuts_cat['abs_mag'][:, 0].data
-    # with open('./Catalog/completeness/mag_g_meas_err.pkl', 'rb') as f:
-    #     (f_med, f_std) = pickle.load(f)
-    # g_abs += f_med(g_mag)
-    # g_abs_std = f_std(g_mag)
+#     g_mag = cuts_cat['mag'][:, 0].data
+#     g_abs = cuts_cat['abs_mag'][:, 0].data
+#     # with open('./Catalog/completeness/mag_g_meas_err.pkl', 'rb') as f:
+#     #     (f_med, f_std) = pickle.load(f)
+#     # g_abs += f_med(g_mag)
+#     # g_abs_std = f_std(g_mag)
 
-    # Color
-    gr_color = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 1]).data
-    # with open('./Catalog/completeness/gr_meas_err.pkl', 'rb') as f:
-    #     (f_med, f_std) = pickle.load(f)
-    # gr_color += f_med(gr_color)
-    # gr_color_std = f_std(gr_color)
+#     # Color
+#     gr_color = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 1]).data
+#     # with open('./Catalog/completeness/gr_meas_err.pkl', 'rb') as f:
+#     #     (f_med, f_std) = pickle.load(f)
+#     # gr_color += f_med(gr_color)
+#     # gr_color_std = f_std(gr_color)
 
-    gi_color = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 2]).data
-    # with open('./Catalog/completeness/gi_meas_err.pkl', 'rb') as f:
-    #     (f_med, f_std) = pickle.load(f)
-    # gi_color += f_med(gi_color)
-    # gi_color_std = f_std(gi_color)
+#     gi_color = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 2]).data
+#     # with open('./Catalog/completeness/gi_meas_err.pkl', 'rb') as f:
+#     #     (f_med, f_std) = pickle.load(f)
+#     # gi_color += f_med(gi_color)
+#     # gi_color_std = f_std(gi_color)
 
-    # average over g-i and g-r results
-    log_ML_g = np.array([1.297 * gi_color - 0.855,
-                         1.774 * gr_color - 0.783]).mean(axis=0)
-    cuts_cat['log_ML_g'] = log_ML_g
-    # log_ML_g_std = np.sqrt((1.297 * gi_color_std)**2 + (1.774 * gr_color_std)**2) / 2
+#     # average over g-i and g-r results
+#     log_ML_g = np.array([1.297 * gi_color - 0.855,
+#                          1.774 * gr_color - 0.783]).mean(axis=0)
+#     cuts_cat['log_ML_g'] = log_ML_g
+#     # log_ML_g_std = np.sqrt((1.297 * gi_color_std)**2 + (1.774 * gr_color_std)**2) / 2
 
-    log_m_g = -0.4 * (g_abs - 5.03) + log_ML_g
-    cuts_cat['log_m_star'] = log_m_g
-    # log_m_g_std = np.sqrt((0.4 * g_abs_std)**2 + log_ML_g_std**2)
+#     log_m_g = -0.4 * (g_abs - 5.03) + log_ML_g
+#     cuts_cat['log_m_star'] = log_m_g
+#     # log_m_g_std = np.sqrt((0.4 * g_abs_std)**2 + log_ML_g_std**2)
 
-    with open('./Catalog/completeness/deblend_detection_comp.pkl', 'rb') as f:
-        f_comp = pickle.load(f)
+#     with open('./Catalog/completeness/deblend_detection_comp.pkl', 'rb') as f:
+#         f_comp = pickle.load(f)
 
-    comp = np.array([f_comp(*p)[0] for p in zip(R_e, SB_g_meas)])
-    cuts_cat['completeness'] = comp
+#     comp = np.array([f_comp(*p)[0] for p in zip(R_e, SB_g_meas)])
+#     cuts_cat['completeness'] = comp
 
-    return cuts_cat
+#     return cuts_cat
 
 
 def post_process_cat_new(input_cuts_cat, fake_udg=False):
@@ -330,7 +330,7 @@ def post_process_cat_new(input_cuts_cat, fake_udg=False):
     cuts_cat['log_m_star_err'] = np.sqrt(
         (cuts_cat['abs_mag_err'].data[:, 0] * 0.4)**2 + cuts_cat['log_ML_g_err']**2)
 
-    with open('./Catalog/completeness/deblend_detection_comp.pkl', 'rb') as f:
+    with open('./Catalog/completeness/deblend_detection_comp_S16A.pkl', 'rb') as f:
         f_comp = pickle.load(f)
     comp = np.array([f_comp(*p)[0] for p in zip(cuts_cat['rhalf_spergel'].data,
                                                 cuts_cat['SB_eff_avg'][:, 0].data)])
@@ -419,7 +419,7 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
 
     bias = re_meas * re_bias(X)
     re_meas += bias
-    std = re_std(X) * re_meas
+    std = re_std(X)# * re_meas
     std[std < 0.3] = 0.3
     re_err = std
 
@@ -525,6 +525,10 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
     cuts_cat['g-r'] = gr_meas * u.ABmag
     cuts_cat['g-r_err'] = gr_err * u.ABmag
 
+    ### Apply galactic extinction correction
+    cuts_cat['g-r'] -= (cuts_cat['A_g'] - cuts_cat['A_r'])
+    cuts_cat['g-i'] -= (cuts_cat['A_g'] - cuts_cat['A_i'])
+
     cuts_cat['host_ang_diam_dist'] = cuts_cat['host_ang_diam_dist'].data * u.Mpc
     # Physical sizes
     # not consider peculiar motion
@@ -554,7 +558,7 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
     cuts_cat['log_m_star_err'] = np.sqrt(
         (cuts_cat['abs_mag_err'].data[:, 0] * 0.4)**2 + cuts_cat['log_ML_g_err']**2)
 
-    with open('./Catalog/completeness/deblend_detection_comp.pkl', 'rb') as f:
+    with open('./Catalog/completeness/deblend_detection_comp_S18A.pkl', 'rb') as f:
         f_comp = pickle.load(f)
     comp = np.array([f_comp(*p)[0] for p in zip(cuts_cat['rhalf_spergel'].data,
                                                 cuts_cat['SB_eff_avg'][:, 0].data)])
