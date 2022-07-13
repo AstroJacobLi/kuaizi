@@ -10,7 +10,20 @@ This repo is for the notebook and scripts used for modeling LSBGs in HSC using s
 - Data: `/tiger/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/`
 - Code/Notebooks: `/home/jiaxuanl/Research/Packages/kuaizi/diezi`
 
+Completeness: `diezi/scarlet_modeling/mock_sample/detection_completeness.ipynb` and `diezi/scarlet_modeling/mock_sample/deblend_completeness.ipynb`
 
+
+```mermaid
+graph LR;
+          A(x)-->B[Encoder];
+          C(z)-->B;
+          B-->D(s);
+          D-->E[Decoder];
+          E-->F(x_rest);
+          F-->G[Resampler];
+          G-->H[x_obs];
+          C-->G;
+```
 
 ### Data Structure
 
@@ -35,6 +48,14 @@ See https://github.com/AstroJacobLi/HSC_LSBG/blob/master/sample/MW-like/README.m
 
 2. Please use `diezi/gen_cutout/lsbg_cutout_s18a.sh` to generate cutouts. Files should be saved at `/tiger/scratch/gpfs/jiaxuanl/Data/HSC/LSBG/Cutout`. For very few galaxies, HSC pipeline fails to generate PSFs at their locations. In this case, we use the default PSF (randomly choosen from a location), they are named as `psf_x.fits` in the `Cutout` folder. 
 
+### UDG sample selection
+1. Run vanilla scarlet and spergel scarlet on all LSBGs matched with MW analogs at 0.01 < z < 0.04.
+
+2. Apply cuts based on vanilla measurements. See `scarlet_modeling/nsa_z002_004/NSA-structure-vanilla-cuts-all.ipynb`. The output catalog is `/Catalog/nsa_z001_004/lsbg_after_cuts_spergel_w_missed.fits`.
+
+3. All notebooks related to UDG science plots are in `scarlet_modeling/nsa_z002_004/UDG`. In the notebook `UDG_sample_selection.ipynb`, we select UDGs from the cuts-applied catalog. At the same time, the random field experiment is done in `scarlet_modeling/random_field/random-field-structure-vanilla-cuts-UDG.ipynb`. Notice that random field exp need an UDG catalog. 
+
+4. Make science plots.
 
 ### Image Gallery
 

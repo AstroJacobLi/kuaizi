@@ -393,3 +393,164 @@ def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=
         return fig, [ax, ax_histx, ax_histy]
     else:
         return ax.get_figure(), [ax, ax_histx, ax_histy]
+
+
+def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, fake_udg_repeats=10 * 20,
+                  name=None, min_completeness=0.1, color_bins=20, quench_is_color=False, quenched_intercept=-0.23,
+                  flag=None, mass_range=(6.4, 9), mass_bins=8,
+                  ax=None, zorder=1, linecolor='firebrick', linewidth=1, fmt='o-', linealpha=0.85, fillalpha=0.4, plot_ref=True):
+
+    # Exclude objects with too small completeness
+    udg_area *= np.sum(udg_cat['completeness'] >
+                       min_completeness) / len(udg_cat)
+    fake_udg_area *= np.sum(fake_udg_cat['completeness']
+                            > min_completeness) / len(fake_udg_cat)
+
+    if flag is not None:
+        flag = flag[udg_cat['completeness'] > min_completeness]
+    udg_cat = udg_cat[udg_cat['completeness'] > min_completeness]
+    fake_udg_cat = fake_udg_cat[fake_udg_cat['completeness']
+                                > min_completeness]
+
+    # Calculate the total fraction of bkg contaminants
+    p_contam = np.mean(fake_udg_num) * (1) / \
+        fake_udg_area * udg_area / \
+        len(udg_cat)  # the fraction of contamination in the UDG sample
+    p_contam_std = np.std(fake_udg_num) * (1) / \
+        fake_udg_area * udg_area / len(udg_cat)
+
+    print(
+        f'% of contaminants in the sample: {p_contam*100:.2f} +- {p_contam_std*100:.2f}')
+
+    # Assign weights based on color
+    n1, bins = np.histogram(udg_cat['g-i'],
+                            bins=color_bins, range=(-0.1, 1.3), density=True)
+    n2, bins = np.histogram(fake_udg_cat['g-i'],
+                            bins=color_bins, range=(-0.1, 1.3), density=True)
+
+    n_weights = p_contam * n2 / n1
+    n_weights = np.nan_to_num(n_weights, nan=0.0, posinf=0.0, neginf=0.0)
+    n_weights[n_weights >= 1] = 1
+
+    # Below are weights for each galaxy in the udg_cat
+    # only consider bkg contaminants
+    weights1 = 1 - n_weights[np.digitize(udg_cat['g-i'], bins) - 1]
+    # also consider completeness. It is helpful to exclude objects with super small completeness.
+    weights2 = weights1 / udg_cat['completeness']
+    weights2 = np.nan_to_num(weights2, posinf=0.0, neginf=0.0)
+    # just to make the weights larger for visualization purpose
+    weights2 /= np.percentile(weights2, 80)
+
+    # Calculate V-band abs mag according to Lupton 2005: https://classic.sdss.org/dr7/algorithms/sdssUBVRITransform.html#Lupton2005
+    V = udg_cat['mag'][:, 0] - 0.5784 * \
+        (udg_cat['mag'][:, 0] - udg_cat['mag'][:, 1]) - 0.0038
+    V_abs = V - 25 - 5 * np.log10(udg_cat['host_ang_diam_dist'].data *
+                                  (1 + udg_cat['host_z'].data)**2)
+    # The criterion for quenching is from Carlsten+22. The original intercept is -0.23. I think 0.28 works better for our sample.
+    quenched = (udg_cat['g-i'] > (-0.067 * V_abs + quenched_intercept))
+    if quench_is_color:
+        quenched = (udg_cat['g-i'] > 0.8)
+
+    # Quenched frac data
+    saga_q = np.array([[6.747422680412371, 0.3474698795180722],
+                       [7.247422680412371, 0.35903614457831323],
+                       [7.747422680412371, 0.188433734939759],
+                       [8.24742268041237, 0.19132530120481916],
+                       [8.74742268041237, 0.11759036144578305],
+                       [9.24742268041237, 0.010602409638553967]])
+    saga_q_err = np.array([[-0.1, 0.12], [-0.084, 0.094], [-0.06, 0.078],
+                           [-0.05, 0.07], [-0.05, 0.091], [-0.1, 0.1]])
+
+    elves_confirmed_q = np.array([5.742268041237113, 0.8506024096385543,
+                                  6.252577319587629, 0.8650602409638555,
+                                  6.742268041237113, 0.752289156626506,
+                                  7.247422680412371, 0.6612048192771085,
+                                  7.747422680412371, 0.7334939759036145,
+                                  8.24742268041237, 0.392289156626506,
+                                  8.74742268041237, 0.36337349397590357,
+                                  9.24742268041237, 0.12626506024096373]).reshape(-1, 2)
+
+    elves_confirmed_q_upper = np.array([5.752577319587629, 0.895421686746988,
+                                        6.242268041237113, 0.9026506024096386,
+                                        6.757731958762887, 0.7956626506024097,
+                                        7.247422680412371, 0.7204819277108434,
+                                        7.747422680412371, 0.7913253012048194,
+                                        8.24742268041237, 0.4949397590361446,
+                                        8.74742268041237, 0.5137349397590361,
+                                        9.24742268041237, 0.28385542168674693]).reshape(-1, 2)
+
+    elves_confirmed_q_lower = np.array([5.752577319587629, 0.7927710843373494,
+                                        6.252577319587629, 0.8144578313253013,
+                                        6.742268041237113, 0.6959036144578314,
+                                        7.247422680412371, 0.5961445783132531,
+                                        7.747422680412371, 0.6684337349397591,
+                                        8.24742268041237, 0.29831325301204814,
+                                        8.74742268041237, 0.23759036144578305,
+                                        9.231958762886597, 0.05831325301204815]).reshape(-1, 2)
+
+    if flag is None:
+        flag = np.ones_like(udg_cat['host_z']).data.astype(bool)
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(6.9, 5.4))
+    else:
+        plt.sca(ax)
+
+    y1, cens = moving_binned_statistic(udg_cat['log_m_star'][flag],
+                                       quenched[flag].astype(
+                                           float) * weights2[flag],
+                                       x_err=udg_cat['log_m_star_err'][flag],
+                                       statistic='sum', range_=mass_range, bins=mass_bins, n_slide=20)
+
+    y2, cens = moving_binned_statistic(udg_cat['log_m_star'][flag],
+                                       weights2[flag],
+                                       x_err=udg_cat['log_m_star_err'][flag],
+                                       statistic='sum', range_=mass_range, bins=mass_bins, n_slide=20)
+
+    num, cens = moving_binned_statistic(udg_cat['log_m_star'][flag],
+                                        udg_cat['log_m_star'][flag],
+                                        x_err=udg_cat['log_m_star_err'][flag],
+                                        statistic='count', range_=mass_range, bins=mass_bins, n_slide=20)
+    num = np.median(num, axis=0)
+
+    quench_frac = np.median(y1 / y2, axis=0)
+    quench_frac_std = np.sqrt(quench_frac * (1 - quench_frac) / num)
+    quench_frac_std = np.std(y1 / y2, axis=0)
+
+    quench_frac[num < 10] = np.nan
+    quench_frac_std[num < 10] = np.nan
+
+    plt.errorbar(cens,
+                 quench_frac,
+                 yerr=quench_frac_std, fmt=fmt,
+                 label=name,
+                 color=linecolor, lw=linewidth, alpha=linealpha, zorder=zorder)
+    plt.fill_between(cens,
+                     quench_frac - quench_frac_std,
+                     quench_frac + quench_frac_std,
+                     color=linecolor, alpha=fillalpha, zorder=zorder)
+
+    if plot_ref:
+        plt.plot(elves_confirmed_q[:, 0], elves_confirmed_q[:, 1],
+                 color='orange',  # label='ELVES',
+                 ls='-.', zorder=0, alpha=1, lw=1.5)
+        plt.fill_between(elves_confirmed_q[:, 0],
+                         elves_confirmed_q_upper[:, 1],
+                         elves_confirmed_q_lower[:, 1],
+                         color='orange',
+                         alpha=0.2)
+        plt.errorbar(saga_q[:, 0], saga_q[:, 1],
+                     yerr=[-saga_q_err[:, 0], saga_q_err[:, 1]], fmt='s',
+                     color='grey',
+                     #  label='SAGA'
+                     )
+
+    plt.xlabel(r'$\log\ M_\star\ [M_\odot]$')
+    plt.ylabel(r'Quenched Fraction')
+
+    plt.ylim(0, 1.06)
+
+    if ax is None:
+        return fig, ax
+    else:
+        return ax.get_figure(), ax
