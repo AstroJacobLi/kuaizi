@@ -329,3 +329,67 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
         return fig, ax
     else:
         return ax.get_figure(), ax
+
+
+def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=True,):
+    # Distribution of the full sample after junk cuts
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    else:
+        plt.sca(ax)
+
+    red = (udg_cat['g-i'].data > 0.8)
+
+    markers, caps, bars = ax.errorbar(udg_cat[red]['SB_eff_avg'][:, 0],
+                                      udg_cat[red]['rhalf_phys'],
+                                      xerr=udg_cat[red]['SB_eff_avg_err'][:, 0],
+                                      yerr=udg_cat[red]['rhalf_phys_err'],
+                                      color='r', fmt='o', ms=5, alpha=0.3, label='$g-i > 0.8$')
+    [bar.set_alpha(0.1) for bar in bars]
+    [cap.set_alpha(0.1) for cap in caps]
+
+    markers, caps, bars = ax.errorbar(udg_cat[~red]['SB_eff_avg'][:, 0],
+                                      udg_cat[~red]['rhalf_phys'],
+                                      xerr=udg_cat[~red]['SB_eff_avg_err'][:, 0],
+                                      yerr=udg_cat[~red]['rhalf_phys_err'],
+                                      color='steelblue', fmt='o', ms=5, alpha=0.35, label='$g-i < 0.8$')
+    [bar.set_alpha(0.1) for bar in bars]
+    [cap.set_alpha(0.1) for cap in caps]
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel(r'$\overline{\mu}_{\rm eff}(g)\ [\rm mag\ arcsec^{-2}\,]$')
+    ax.set_ylabel(r'$r_e\ [\rm kpc]$')
+    ax.set_yscale('log')
+    plt.tick_params(axis='y', which='minor', right=False)
+    ax.set_yticks([1], minor=False)
+    ax.set_yticklabels([1], minor=False)
+    ax.set_yticks([2, 3, 4, 5, 6, 7], minor=True)
+    ax.set_yticklabels([2, 3, 4, 5, 6, 7], minor=True)
+
+    ax_histx = ax.inset_axes((0, 1.02, 1, .2))
+    ax_histx.tick_params(axis="x", labelbottom=False)
+    ax_histx.hist(udg_cat[red]['SB_eff_avg'][:, 0], lw=1.5,
+                  histtype='step', density=True, color='r', alpha=0.5, label='$g-i > 0.8$')
+    ax_histx.hist(udg_cat[~red]['SB_eff_avg'][:, 0], lw=1.5,
+                  histtype='step', density=True, color='steelblue', label='$g-i < 0.8$')
+    ax_histx.set_xlim(ax.get_xlim())
+
+    ax_histy = ax.inset_axes((1.02, 0, 0.2, 1))
+    ax_histy.tick_params(axis="y", which='both', labelleft=False)
+    ax_histy.hist(udg_cat[red]['rhalf_phys'], lw=1.5,
+                  histtype='step', density=True, orientation='horizontal', color='r', alpha=0.5)
+    ax_histy.hist(udg_cat[~red]['rhalf_phys'], lw=1.5,
+                  histtype='step', density=True, orientation='horizontal', color='steelblue')
+    ax_histy.set_yscale('log')
+    ax_histy.set_ylim(ax.get_ylim())
+
+    ax_histx.set_yticks([])
+    ax_histy.set_xticks([])
+    if show_legend:
+        leg = ax_histx.legend(loc=(0.02, 0.17), frameon=False, fontsize=13)
+
+    if ax is None:
+        return fig, [ax, ax_histx, ax_histy]
+    else:
+        return ax.get_figure(), [ax, ax_histx, ax_histy]
