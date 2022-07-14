@@ -344,7 +344,7 @@ def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=
                                       udg_cat[red]['rhalf_phys'],
                                       xerr=udg_cat[red]['SB_eff_avg_err'][:, 0],
                                       yerr=udg_cat[red]['rhalf_phys_err'],
-                                      color='r', fmt='o', ms=5, alpha=0.3, label='$g-i > 0.8$')
+                                      color='r', fmt='o', ms=4, alpha=0.3, label='$g-i > 0.8$', rasterized=True)
     [bar.set_alpha(0.1) for bar in bars]
     [cap.set_alpha(0.1) for cap in caps]
 
@@ -352,7 +352,7 @@ def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=
                                       udg_cat[~red]['rhalf_phys'],
                                       xerr=udg_cat[~red]['SB_eff_avg_err'][:, 0],
                                       yerr=udg_cat[~red]['rhalf_phys_err'],
-                                      color='steelblue', fmt='o', ms=5, alpha=0.35, label='$g-i < 0.8$')
+                                      color='steelblue', fmt='o', ms=4, alpha=0.35, label='$g-i < 0.8$', rasterized=True)
     [bar.set_alpha(0.1) for bar in bars]
     [cap.set_alpha(0.1) for cap in caps]
 
