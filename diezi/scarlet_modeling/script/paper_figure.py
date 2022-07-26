@@ -295,9 +295,11 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
                         yerr=n_corr_std,
                         fmt='s', color='orangered', alpha=0.9,
                         markersize=7, label='Completeness corrected', zorder=10)
-    if dots_legend:
+    if dots_legend and lines_legend:
         leg = plt.legend(loc='upper right', fontsize=legend_fontsize)
         ax.add_artist(leg)
+    elif dots_legend:
+        plt.legend(loc='upper right', fontsize=legend_fontsize)
 
     r = np.linspace(0.15, 1, 100)
     sigma = p_einasto.surfaceDensity(r)
@@ -370,24 +372,24 @@ def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=
     ax_histx = ax.inset_axes((0, 1.02, 1, .2))
     ax_histx.tick_params(axis="x", labelbottom=False)
     ax_histx.hist(udg_cat[red]['SB_eff_avg'][:, 0], lw=1.5,
-                  histtype='step', density=True, color='r', alpha=0.5, label='$g-i > 0.8$')
+                  histtype='step', density=False, color='r', alpha=0.5, label='$g-i > 0.8$')
     ax_histx.hist(udg_cat[~red]['SB_eff_avg'][:, 0], lw=1.5,
-                  histtype='step', density=True, color='steelblue', label='$g-i < 0.8$')
+                  histtype='step', density=False, color='steelblue', label='$g-i < 0.8$')
     ax_histx.set_xlim(ax.get_xlim())
 
     ax_histy = ax.inset_axes((1.02, 0, 0.2, 1))
     ax_histy.tick_params(axis="y", which='both', labelleft=False)
     ax_histy.hist(udg_cat[red]['rhalf_phys'], lw=1.5,
-                  histtype='step', density=True, orientation='horizontal', color='r', alpha=0.5)
+                  histtype='step', density=False, orientation='horizontal', color='r', alpha=0.5)
     ax_histy.hist(udg_cat[~red]['rhalf_phys'], lw=1.5,
-                  histtype='step', density=True, orientation='horizontal', color='steelblue')
+                  histtype='step', density=False, orientation='horizontal', color='steelblue')
     ax_histy.set_yscale('log')
     ax_histy.set_ylim(ax.get_ylim())
 
     ax_histx.set_yticks([])
     ax_histy.set_xticks([])
     if show_legend:
-        leg = ax_histx.legend(loc=(0.02, 0.17), frameon=False, fontsize=13)
+        leg = ax_histx.legend(loc=(0.01, 0.17), frameon=False, fontsize=13)
 
     if ax is None:
         return fig, [ax, ax_histx, ax_histy]
@@ -435,6 +437,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     # Below are weights for each galaxy in the udg_cat
     # only consider bkg contaminants
     weights1 = 1 - n_weights[np.digitize(udg_cat['g-i'], bins) - 1]
+    # weights1 = np.ones(len(udg_cat))
     # also consider completeness. It is helpful to exclude objects with super small completeness.
     weights2 = weights1 / udg_cat['completeness']
     weights2 = np.nan_to_num(weights2, posinf=0.0, neginf=0.0)
@@ -549,7 +552,8 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     plt.ylabel(r'Quenched Fraction')
 
     plt.ylim(0, 1.06)
-
+    
+    # return weights2
     if ax is None:
         return fig, ax
     else:

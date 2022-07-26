@@ -419,7 +419,7 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
 
     bias = re_meas * re_bias(X)
     re_meas += bias
-    std = re_std(X)# * re_meas
+    std = re_std(X)  # * re_meas
     std[std < 0.3] = 0.3
     re_err = std
 
@@ -513,7 +513,7 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
         [mag_meas['g'], mag_meas['r'], mag_meas['i']]).T * u.ABmag
     cuts_cat['mag_err'] = np.vstack(
         [mag_err['g'], mag_err['r'], mag_err['i']]).T * u.ABmag
-
+    
     cuts_cat['SB_eff_avg'] = np.vstack(
         [SB_meas['g'], SB_meas['r'], SB_meas['i']]).T * u.ABmag
     cuts_cat['SB_eff_avg_err'] = np.vstack(
@@ -525,10 +525,14 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
     cuts_cat['g-r'] = gr_meas * u.ABmag
     cuts_cat['g-r_err'] = gr_err * u.ABmag
 
-    ### Apply galactic extinction correction
+    # Apply galactic extinction correction
+    cuts_cat['mag'] -= np.vstack([cuts_cat['A_g'], cuts_cat['A_r'], cuts_cat['A_i']]).T
+    cuts_cat['SB_eff_avg'] -= np.vstack([cuts_cat['A_g'], cuts_cat['A_r'], cuts_cat['A_i']]).T
     cuts_cat['g-r'] -= (cuts_cat['A_g'] - cuts_cat['A_r'])
     cuts_cat['g-i'] -= (cuts_cat['A_g'] - cuts_cat['A_i'])
 
+
+    ###### Calculate physical quantities ###### 
     cuts_cat['host_ang_diam_dist'] = cuts_cat['host_ang_diam_dist'].data * u.Mpc
     # Physical sizes
     # not consider peculiar motion
@@ -583,7 +587,7 @@ def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
     else:
         cols2 = [
             'host_name', 'host_z', 'host_ang_diam_dist', 'host_stellar_mass', 'host_halo_mass',
-            'host_r_vir', 'host_r_vir_ang', 'host_300kpc_ang', 'host_nvotes', 'host_spiral',
+            'host_r_vir', 'host_r_vir_ang', 'host_300kpc_ang', 'host_gi', 'host_nvotes', 'host_spiral',
             'host_elliptical', 'host_uncertain', 'host_RA', 'host_DEC']
     cols3 = [
         'SB_eff_circ', 'SB_0', 'ell_cen', 'ell_sym',
