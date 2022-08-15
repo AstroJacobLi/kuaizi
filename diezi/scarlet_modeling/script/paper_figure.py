@@ -171,10 +171,220 @@ def plot_size_distribution(udg_cat, fake_udg_cat, udg_area, fake_udg_area, fake_
         return ax.get_figure(), ax
 
 
+def plot_size_distribution_new(udg_cat, fake_udg_cat, udg_area, fake_udg_area, fake_udg_repeats=10 * 20, name='UDG',
+                               fit_line=False, refit=False, save=True,
+                               ax=None, n_bins=10, n_slide=20, range_0=np.array([np.log10(1.5), np.log10(6.1)]),
+                               top_banner=True, vline=False, dots_legend=True, legend_fontsize=14, verbose=False, nolinelegend=False):
+    """
+    Distribution of the physical size of UDG/UPGs.
+
+    """
+    log_re = np.log10(udg_cat['rhalf_phys'])
+    log_re_err = udg_cat['rhalf_phys_err'] / udg_cat['rhalf_phys']
+
+    # R_e distribution of the fake udg sample: remove background
+    output, cen = moving_binned_statistic(np.log10(fake_udg_cat['rhalf_phys']),
+                                          np.log10(fake_udg_cat['rhalf_phys']),
+                                          x_err=fake_udg_cat['rhalf_phys_err'] /
+                                          fake_udg_cat['rhalf_phys'],
+                                          bins=n_bins, range_=range_0,
+                                          statistic='count', n_slide=n_slide)
+    n_cen_bkg = np.nanmean(output, axis=0) / (fake_udg_repeats) / \
+        fake_udg_area / np.diff(cen)[0]  # num of fake UDG per sqr deg
+    n_std_bkg1 = np.sqrt(np.nanmean(output, axis=0)) / \
+        (fake_udg_repeats) / fake_udg_area / \
+        np.diff(cen)[0]  # Poisson error for counts
+    n_std_bkg2 = np.nanstd(output, axis=0) / (fake_udg_repeats) / \
+        fake_udg_area / np.diff(cen)[0]  # error of shiting bins
+    n_std_bkg = np.sqrt(n_std_bkg1**2 + n_std_bkg2**2)
+
+    # R_e distribution of the real udg sample
+    unique_name, ind = np.unique(udg_cat['host_name'].data, return_index=True)
+    # deg^2
+    vir_areas = (np.pi * (udg_cat['host_r_vir_ang'].data[ind]**2))
+    print('Total angular area [deg2]:', vir_areas.sum())
+
+    result = {}
+    result['n_cen'] = []
+    result['n_std'] = []
+    result['n_cen_nobkg'] = []
+
+    for i in range(10):
+        np.random.seed(i)
+        _unique_name = np.random.choice(unique_name, size=200)
+        n_cens = []
+        n_cens_nobkg = []
+        n_stds_hist = []
+        for hostname in _unique_name:
+            output, cen = moving_binned_statistic(log_re[udg_cat['host_name'] == hostname],
+                                                  log_re[udg_cat['host_name']
+                                                         == hostname],
+                                                  x_err=udg_cat['rhalf_phys_err'][udg_cat['host_name']
+                                                                                  == hostname],
+                                                  bins=n_bins, range_=range_0,
+                                                  statistic='count', n_slide=n_slide)
+            area = (
+                np.pi * (udg_cat['host_r_vir_ang'].data[[udg_cat['host_name'] == hostname]]**2))
+            _n_cen = np.nanmean(output, axis=0) / np.diff(cen)[0]
+            _n_cen_nobkg = _n_cen - n_cen_bkg * area[0]
+            _n_std = np.nanstd(output, axis=0) / np.diff(cen)[0]
+            # n_cens_nobkg.append(_n_cen_nobkg / area[0] * vir_areas.mean())
+            # n_cens.append(_n_cen / area[0] * vir_areas.mean())
+            # n_stds_hist.append(_n_std / area[0] * vir_areas.mean())
+            n_cens_nobkg.append(_n_cen_nobkg)
+            n_cens.append(_n_cen)
+            n_stds_hist.append(_n_std)
+
+        result['n_cen'].append(np.mean(n_cens, axis=0))
+        result['n_cen_nobkg'].append(np.mean(n_cens_nobkg, axis=0))
+        result['n_std'].append(
+            np.sqrt(np.sum(np.array(n_stds_hist) ** 2, axis=0)) / len(n_stds_hist))
+
+    # completeness in each size bin
+    output, cen = moving_binned_statistic(np.log10(udg_cat['rhalf_phys']),
+                                          udg_cat['completeness'],
+                                          x_err=udg_cat['rhalf_phys_err'],
+                                          bins=n_bins, range_=range_0,
+                                          statistic=np.nanmean,
+                                          n_slide=n_slide)
+    comp_avg = np.nanmean(output, axis=0)
+    comp_std = np.nanstd(output, axis=0)
+
+    n_cen = np.mean(np.array(result['n_cen_nobkg']), axis=0)
+    n_std = np.mean(np.array(result['n_std']), axis=0)
+    n_cen_bkg = n_cen_bkg * np.mean(vir_areas)
+    n_std_bkg = n_std_bkg * np.mean(vir_areas)
+    n_corr = n_cen / comp_avg
+    n_corr_std = n_std / comp_avg
+    n_corr_std = np.sqrt((n_std / n_cen)**2 +
+                         (comp_std / comp_avg)**2) * n_corr
+
+    ### Fit a linear line using numpyro ###
+    if fit_line and (~refit):
+        from numpyro.diagnostics import hpdi
+        predictions = np.load(
+            './Catalog/nsa_z001_004/{}_size_distribution_fit.npy'.format(name))
+        pred_mean = predictions.mean(axis=0)
+        pred_hpdi = hpdi(predictions, 0.68)
+
+    if fit_line and refit:
+        try:
+            import jax.numpy as jnp
+            from jax import random
+            import numpyro
+            import numpyro.distributions as dist
+            from numpyro.infer import MCMC, NUTS
+            from numpyro.infer import Predictive
+            from numpyro.diagnostics import hpdi, summary
+        except ImportError:
+            print('Numpyro is not installed. Skipping fitting.')
+            fit_line = False
+
+        # don't include the last bin, because the statistic is very poor there
+        x0 = np.linspace(*range_0, 10)
+        x = cen[:-1]
+        y = n_corr[:-1]
+        yerr = n_corr_std[:-1]
+
+        def model(x, y=None, yerr=0.1):
+            a = numpyro.sample('a', dist.Uniform(-10, 0))
+            b = numpyro.sample('b', dist.Uniform(-10, 10))
+            y_ = 10**(b + a * x)
+            # notice that we clamp the outcome of this sampling to the observation y
+            numpyro.sample('obs', dist.Normal(y_, yerr), obs=y)
+
+        # need to split the key for jax's random implementation
+        rng_key = random.PRNGKey(0)
+        rng_key, rng_key_ = random.split(rng_key)
+
+        # run HMC with NUTS
+        kernel = NUTS(model, target_accept_prob=0.8)
+        mcmc = MCMC(kernel, num_warmup=1000, num_samples=5000)
+        mcmc.run(rng_key_, x=x, y=y, yerr=yerr)
+        if verbose:
+            mcmc.print_summary()
+        samples = mcmc.get_samples()
+        summary_dict = summary(samples, group_by_chain=False)
+        predictive = Predictive(model, samples)
+        predictions = predictive(rng_key_, x=x0, yerr=0)['obs']
+        predictions = predictions[-2000:]
+        pred_mean = predictions.mean(axis=0)
+        pred_hpdi = hpdi(predictions, 0.95)
+        if save:
+            np.save(
+                './Catalog/nsa_z001_004/{}_size_distribution_fit.npy'.format(name), predictions)
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    else:
+        plt.sca(ax)
+
+    sct1 = plt.errorbar(cen, n_cen + n_cen_bkg, yerr=n_std,
+                        capsize=0,
+                        fmt='+', color='k', label='Raw counts')
+
+    sct2 = plt.errorbar(cen, n_cen_bkg, capsize=0,
+                        yerr=n_std_bkg, fmt='.', color='gray',
+                        markersize=5, label='Background')
+
+    sct3 = plt.errorbar(cen - 0.006, n_cen, capsize=0,
+                        yerr=n_std, fmt='p', color='teal', alpha=0.4,
+                        markersize=5, label='Background subtracted')
+
+    sct4 = plt.errorbar(cen + 0.006, n_corr,
+                        yerr=n_corr_std,
+                        fmt='s', color='orangered', alpha=0.9,
+                        markersize=7, label='Completeness corrected')
+    if dots_legend:
+        leg = plt.legend(loc=(0., 0.025), fontsize=legend_fontsize)
+        ax.add_artist(leg)
+
+    x0 = np.linspace(*range_0, 10)
+    line1 = plt.plot(x0, 10**(-2.71 * x0 + 1.49), ls='-.',
+                     color='dimgray', label=r'vdBurg+17: $n\propto r_e^{-2.71\pm0.33}$')
+    if fit_line:
+        line2 = plt.plot(x0, pred_mean, color='salmon',
+                         lw=2, label=r'This work: $n\propto r_e^{' + f'{summary_dict["a"]["mean"]:.2f}\pm{summary_dict["a"]["std"]:.2f}' + '}$')
+        plt.fill_between(
+            x0, pred_hpdi[0], pred_hpdi[1], alpha=0.3, color='salmon', interpolate=True)
+        if not nolinelegend:
+            plt.legend(handles=[line1[0], line2[0]], fontsize=legend_fontsize)
+    else:
+        if not nolinelegend:
+            plt.legend(handles=[line1[0]], fontsize=legend_fontsize)
+
+    if vline:
+        plt.axvline(np.log10(1.5), ls=':', color='gray')
+    plt.xlabel(r'$\log\,r_e\ [\rm kpc]$')
+    plt.ylabel(r'$n\ [\rm dex^{-1}]$')
+    plt.yscale('log')
+
+    if top_banner:
+        ax2 = ax.twiny()
+        ax2.tick_params(direction='in')
+        lin_label = [1, 1.5, 2, 3, 5, 7, 9]
+        lin_pos = [np.log10(i) for i in lin_label]
+        ax2.set_xticks(lin_pos)
+        ax2.set_xlim(ax.get_xlim())
+        ax2.set_xlabel(r'kpc', fontsize=16)
+        ax2.xaxis.set_label_coords(1, 1.035)
+        ax2.tick_params(which='minor', top=False)
+
+        ax2.set_xticklabels(
+            [r'$\mathrm{' + str(i) + '}$' for i in lin_label], fontsize=16)
+        for tick in ax2.xaxis.get_major_ticks():
+            tick.label.set_fontsize(16)
+
+    if ax is None:
+        return fig, ax
+    else:
+        return ax.get_figure(), ax
+
+
 def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_repeats=10 * 20, name='UDG',
-                               refit=False, save=True, r_min=0.2,
+                               refit=False, save=True, r_min=0.2, amp_vdb16=0.5,
                                ax=None, n_bins=13, n_slide=10, range_0=np.array([0.05, 1.0]),
-                               dots_legend=True, lines_legend=True, legend_fontsize=14, verbose=False):
+                               dots_legend=True, lines_legend=True, legend_fontsize=15, verbose=False):
     from colossus.cosmology import cosmology
     from colossus.halo import profile_nfw, profile_einasto
     from astropy.coordinates import SkyCoord
@@ -227,7 +437,9 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
                 _n_cen = np.nanmean(output, axis=0) / \
                     (np.diff(np.pi * bins**2))
                 # error due to histogram
+                _n_std_poisson = np.sqrt(_n_cen)
                 _n_std = np.nanstd(output, axis=0) / (np.diff(np.pi * bins**2))
+                _n_std = np.sqrt(_n_std**2 + _n_std_poisson**2)
 
                 contam_profile = density_bkg * np.diff(
                     np.pi * (bins * udg_cat[udg_cat['host_name']
@@ -252,16 +464,19 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
 
     # correct for the completeness
     n_cen = np.mean(np.array(result['n_cen']), axis=0)
-    n_std = np.array(result['n_cen']).std(axis=0)
+    n_std = np.array(result['n_std']).mean(axis=0)
+    # n_std = np.array(result['n_cen']).std(axis=0)
     n_corr = n_cen / comp_avg
-    n_corr_std = n_std / comp_avg
+    # n_corr_std = n_std / comp_avg
+    n_corr_std = np.sqrt((n_std / n_cen)**2 +
+                         (comp_std / comp_avg)**2) * n_corr
 
     # Fit NFW and Einasto profiles
     flag = (cen > r_min)
     p_nfw = profile_nfw.NFWProfile(rhos=10, rs=0.1, z=0.0, mdef='vir')
     res_nfw = p_nfw.fit(cen[flag], n_corr[flag],
                         quantity='Sigma',
-                        q_err=n_std[flag - 1]
+                        q_err=n_std[flag]
                         )
     p_einasto = profile_einasto.EinastoProfile(
         M=10, alpha=0.8, c=1.83, z=0.0, mdef='vir')
@@ -311,7 +526,7 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
                      label='NFW projected')
 
     p_ein_vdb = profile_einasto.EinastoProfile(
-        rhos=0.5, alpha=0.92, rs=1 / 1.83, z=0.0, mdef='vir')
+        rhos=amp_vdb16, alpha=0.92, rs=1 / 1.83, z=0.0, mdef='vir')
     line3 = plt.plot(r, p_ein_vdb.surfaceDensity(r), color='gray',
                      label='vdBurg+17', ls='--')
 
@@ -491,6 +706,22 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                                         8.74742268041237, 0.23759036144578305,
                                         9.231958762886597, 0.05831325301204815]).reshape(-1, 2)
 
+    samuel_q = np.array([[5.48, 1],
+                         [6.48, 0.9837662337662338],
+                         [7.48, 0.5016233766233766],
+                         [8.48, 0.168831168831169],
+                         [9.48, 0.008116883116883189]])
+    samuel_q_lower = np.array([[5.48, 0.9870129870129871],
+                               [6.48, 0.9431818181818183],
+                               [7.48, 0.4269480519480521],
+                               [8.48, 0.11688311688311703],
+                               [9.48, 0.004870129870129913]])
+    samuel_q_upper = np.array([[5.48, 1.0],
+                               [6.48, 0.9870129870129871],
+                               [7.48, 0.5779220779220781],
+                               [8.48, 0.28733766233766234],
+                               [9.48, 0.45779220779220786]])
+
     if flag is None:
         flag = np.ones_like(udg_cat['host_z']).data.astype(bool)
 
@@ -547,12 +778,20 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                      color='grey',
                      #  label='SAGA'
                      )
+        plt.plot(samuel_q[:, 0], samuel_q[:, 1],
+                 color='hotpink',  # label='ELVES',
+                 ls=':', zorder=0, alpha=1, lw=1.5)
+        plt.fill_between(samuel_q[:, 0],
+                         samuel_q_lower[:, 1],
+                         samuel_q_upper[:, 1],
+                         color='hotpink',
+                         alpha=0.2, zorder=0)
 
     plt.xlabel(r'$\log\ M_\star\ [M_\odot]$')
     plt.ylabel(r'Quenched Fraction')
 
     plt.ylim(0, 1.06)
-    
+
     # return weights2
     if ax is None:
         return fig, ax
