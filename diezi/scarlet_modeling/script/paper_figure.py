@@ -528,7 +528,7 @@ def plot_radial_number_profile(udg_cat, fake_udg_cat, fake_udg_area, fake_udg_re
     p_ein_vdb = profile_einasto.EinastoProfile(
         rhos=amp_vdb16, alpha=0.92, rs=1 / 1.83, z=0.0, mdef='vir')
     line3 = plt.plot(r, p_ein_vdb.surfaceDensity(r), color='gray',
-                     label='vdBurg+17', ls='--')
+                     label='vdBurg+16', ls='--')
 
     if lines_legend:
         plt.legend(handles=[line1[0], line2[0], line3[0]],
@@ -722,6 +722,15 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                                [8.48, 0.28733766233766234],
                                [9.48, 0.45779220779220786]])
 
+    font_q = np.array([5.809045226130653, 1,
+                       6.464824120603015, 0.9769357495881383,
+                       7.1206030150753765, 0.8929159802306426,
+                       7.768844221105527, 0.6177924217462931,
+                       8.077889447236181, 0.48434925864909384,
+                       8.424623115577889, 0.33443163097199335,
+                       9.065326633165828, 0.11037891268533773,
+                       9.72110552763819, 0.008237232289950436]).reshape(-1, 2)
+
     if flag is None:
         flag = np.ones_like(udg_cat['host_z']).data.astype(bool)
 
@@ -786,6 +795,9 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                          samuel_q_upper[:, 1],
                          color='hotpink',
                          alpha=0.2, zorder=0)
+        plt.plot(font_q[:, 0], font_q[:, 1],
+                 color='#a125ff',  # label='ELVES',
+                 ls='-', zorder=0, alpha=1, lw=1.5)
 
     plt.xlabel(r'$\log\ M_\star\ [M_\odot]$')
     plt.ylabel(r'Quenched Fraction')
