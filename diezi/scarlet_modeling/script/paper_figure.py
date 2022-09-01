@@ -615,7 +615,8 @@ def re_SB_distribution(udg_cat, ax, xlim=(28.4, 23), ylim=(0.8, 8), show_legend=
 def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, fake_udg_repeats=10 * 20,
                   name=None, min_completeness=0.1, color_bins=20, quench_is_color=False, quenched_intercept=-0.23,
                   flag=None, mass_range=(6.4, 9), mass_bins=8,
-                  ax=None, zorder=1, linecolor='firebrick', linewidth=1, fmt='o-', linealpha=0.85, fillalpha=0.4, plot_ref=True):
+                  ax=None, zorder=1, linecolor='firebrick', linewidth=1, fmt='o-', linealpha=0.85, fillalpha=0.4,
+                  plot_elves=True, plot_ref=True, plot_upg=False):
 
     # Exclude objects with too small completeness
     udg_area *= np.sum(udg_cat['completeness'] >
@@ -658,6 +659,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     weights2 = np.nan_to_num(weights2, posinf=0.0, neginf=0.0)
     # just to make the weights larger for visualization purpose
     weights2 /= np.percentile(weights2, 80)
+    np.savetxt(f'{name}_weights.txt', weights2)
 
     # Calculate V-band abs mag according to Lupton 2005: https://classic.sdss.org/dr7/algorithms/sdssUBVRITransform.html#Lupton2005
     V = udg_cat['mag'][:, 0] - 0.5784 * \
@@ -731,6 +733,16 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                        9.065326633165828, 0.11037891268533773,
                        9.72110552763819, 0.008237232289950436]).reshape(-1, 2)
 
+    greene_upg_q = np.array([[5.5, 6.0, 6.5, 7.0, 7.5, 8.0],
+                             [1.0, 0.8198198198198198, 0.7752808988764045, 0.6666666666666666, 0.6666666666666666, 0.3333333333333333]]).T
+    greene_upg_q_err = np.array([[5.5, 6.0, 6.5, 7.0, 7.5, 8.0],
+                                 [0.14798573455920383, 0.13684434857425543, 0.21038378982621647, 0.27595045183908556, 0.26989033114002436, 0.2857142857142857]]).T
+
+    greene_nonupg_q = np.array([[5.5, 6.0, 6.5, 7.0, 7.5, 8.0],
+                                [0.8459715639810425, 0.8821892393320966, 0.7302977232924693, 0.6468129571577848, 0.6774193548387096, 0.42857142857142855]]).T
+    greene_nonupg_q_err = np.array([[5.5, 6.0, 6.5, 7.0, 7.5, 8.0],
+                                    [0.05556766016165791, 0.04391157106134102, 0.0587319236484889, 0.0690956594049264, 0.08395897088010118, 0.1079898494312077]]).T
+
     if flag is None:
         flag = np.ones_like(udg_cat['host_z']).data.astype(bool)
 
@@ -763,17 +775,40 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     quench_frac[num < 10] = np.nan
     quench_frac_std[num < 10] = np.nan
 
-    plt.errorbar(cens,
-                 quench_frac,
-                 yerr=quench_frac_std, fmt=fmt,
+    flag = (cens <= 8.6)
+    plt.errorbar(cens[flag],
+                 quench_frac[flag],
+                 yerr=quench_frac_std[flag], fmt=fmt,
                  label=name,
                  color=linecolor, lw=linewidth, alpha=linealpha, zorder=zorder)
-    plt.fill_between(cens,
-                     quench_frac - quench_frac_std,
-                     quench_frac + quench_frac_std,
+    plt.fill_between(cens[flag],
+                     (quench_frac - quench_frac_std)[flag],
+                     (quench_frac + quench_frac_std)[flag],
                      color=linecolor, alpha=fillalpha, zorder=zorder)
 
-    if plot_ref:
+    flag = (cens > 8.2)
+    plt.errorbar(cens[flag],
+                 quench_frac[flag],
+                 yerr=quench_frac_std[flag], fmt=fmt,
+                 label=name,
+                 color=linecolor, lw=linewidth, alpha=linealpha / 2, zorder=zorder)
+    plt.fill_between(cens[flag],
+                     (quench_frac - quench_frac_std)[flag],
+                     (quench_frac + quench_frac_std)[flag],
+                     color=linecolor, alpha=fillalpha / 2, zorder=zorder)
+
+    # plt.errorbar(cens,
+    #              quench_frac,
+    #              yerr=quench_frac_std, fmt=fmt,
+    #              label=name,
+    #              color=linecolor, lw=linewidth, alpha=linealpha, zorder=zorder)
+    # plt.fill_between(cens,
+    #                  quench_frac - quench_frac_std,
+    #                  quench_frac + quench_frac_std,
+    #                  color=linecolor, alpha=fillalpha, zorder=zorder)
+
+    if plot_elves:
+        # ELVES Carlsten et al. average quenched fraction
         plt.plot(elves_confirmed_q[:, 0], elves_confirmed_q[:, 1],
                  color='orange',  # label='ELVES',
                  ls='-.', zorder=0, alpha=1, lw=1.5)
@@ -782,6 +817,9 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                          elves_confirmed_q_lower[:, 1],
                          color='orange',
                          alpha=0.2)
+    if plot_ref:
+
+        # SAGA f_q based on colors, from Carlsten et al. 2022 paper
         plt.errorbar(saga_q[:, 0], saga_q[:, 1],
                      yerr=[-saga_q_err[:, 0], saga_q_err[:, 1]], fmt='s',
                      color='grey',
@@ -795,10 +833,24 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                          samuel_q_upper[:, 1],
                          color='hotpink',
                          alpha=0.2, zorder=0)
+
+        # ARTEMIS
         plt.plot(font_q[:, 0], font_q[:, 1],
                  color='#a125ff',  # label='ELVES',
                  ls='-', zorder=0, alpha=1, lw=1.5)
 
+    if plot_upg:
+        # Greene et al. UPG quenched fraction
+        plt.plot(greene_upg_q[:, 0], greene_upg_q[:, 1],
+                 color='#D2B48C',  # label='ELVES',
+                 ls='-.', zorder=0, alpha=1, lw=1.5)
+        plt.fill_between(greene_upg_q[:, 0],
+                         np.minimum(
+                             1, (greene_upg_q[:, 1] + greene_upg_q_err[:, 1])),
+                         np.maximum(
+                             0, (greene_upg_q[:, 1] - greene_upg_q_err[:, 1])),
+                         color='#FAF0E6',
+                         alpha=0.7, zorder=-1)
     plt.xlabel(r'$\log\ M_\star\ [M_\odot]$')
     plt.ylabel(r'Quenched Fraction')
 
