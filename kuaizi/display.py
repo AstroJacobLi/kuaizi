@@ -2275,7 +2275,7 @@ def plot_measurement_paper(lsbg_cat, meas_cat, axes=None,
     # plt.axhline(0.8, color='k', ls='--', lw=2)
 
     plt.xlim(0., 4.8)
-    plt.ylim(-.1, 2.0)
+    plt.ylim(-.1, 1.8)
     plt.xlabel(r'$C$')
     plt.ylabel(r'$A$')
 
