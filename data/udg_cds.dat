@@ -1,9 +1,10 @@
                                                       (Jiaxuan Li, 2022)
 ================================================================================
-UDGs and UPGs in MW analogs
-    Jiaxuan Li, Jenny E. Greene, Johnny Greco, Song Huang, Peter Melchior, Remy
-    Joseph, Rachel Beaton, Kirsten Casey, Shany Danieli, Andy Goulding, Erin
-    Kado-Fong
+Beyond Ultra-Diffuse Galaxies I: Mass-Size Outliers in the Satellites of Milky
+Way Analogs
+    Jiaxuan Li, Jenny E. Greene, Johnny Greco, Song Huang, Peter Melchior,
+    Rachel Beaton, Kirsten Casey, Shany Danieli, Andy Goulding, Remy Joseph,
+    Erin Kado-Fong, Ji Hoon Kim, Lauren MacArthur
     =
 ================================================================================
 Keywords: Low surface brightness galaxies (940), Dwarf galaxies (416),
@@ -15,7 +16,27 @@ Objects:
     -----------------------------------------
 
 Abstract:
-  This is my abstract...
+  Large diffuse galaxies are hard to find, but understanding the environments
+  where they live and their numbers, and ultimately their origins, is of intense
+  interest and important for galaxy formation and evolution. Using the Hyper
+  Suprime-Cam data, we perform a systematic search for low surface-brightness
+  galaxies and present novel and effective methods for detecting and modeling
+  them. As a case study, we build a statistical sample of galaxies that are
+  outliers in the mass-size relation and are satellites of Milky Way analogs in
+  the nearby Universe ($0.01 < z < 0.04$). These ultra-puffy galaxies (UPGs),
+  defined to be $1.5\sigma$ above the average mass-size relation, better
+  represents the tail of satellite size distribution. We find that each MW
+  analog hosts $N_{\rm UPG} = 0.61\pm 0.04$ ultra-puffy galaxies on average,
+  which is comparable to the observed abundance at this halo mass in the Local
+  Volume. We also construct a sample of ultra-diffuse galaxies (UDGs) in MW
+  analogs and find an abundance of $N_{\rm UDG} = 0.76\pm0.04$ per host. We
+  compare with literature results including UDG searches in clusters and massive
+  groups. The UDG abundance scales with the host halo mass following a sublinear
+  power law. We argue that our definition for ultra-puffy galaxies, which is
+  based on the mass-size relation, is more physically-motivated and objective
+  than the common definition of ultra-diffuse galaxies, which depends on a
+  surface brightness cut and thus yields different surface mass density cuts for
+  quenched and star-forming galaxies.
 
 Description:
   The UDG and UPG catalog contains all objects satisfying the UDG (UPG)
@@ -27,11 +48,11 @@ File Summary:
  FileName    Lrecl   Records    Explanations
 --------------------------------------------------------------------------------
 ReadMe          80        .  this file
-udg            211      412  
+udg_cat        211      412  
 
 
 --------------------------------------------------------------------------------
-Byte-by-byte Description of file: udg
+Byte-by-byte Description of file: udg_cat
 --------------------------------------------------------------------------------
  Bytes Format Units  Label     Explanations
 --------------------------------------------------------------------------------
