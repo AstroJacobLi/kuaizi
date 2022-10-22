@@ -861,3 +861,115 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
         return fig, ax
     else:
         return ax.get_figure(), ax
+
+
+def plot_measurement_paper_onlymorph(lsbg_cat, meas_cat, axes=None,
+                           gal_zorder=2, candy_zorder=3, junk_zorder=0,
+                           gal_size=10, candy_size=20, junk_size=15,
+                           gal_alpha=0.1, candy_alpha=0.2, junk_alpha=0.1,
+                           gal_label=r'$\texttt{galaxy}$', candy_label=r'$\texttt{candy}$', junk_label=r'$\texttt{junk}$',
+                           gal_color='steelblue', candy_color='forestgreen', junk_color='r',
+                           ):
+    from matplotlib.patches import Rectangle
+
+    junk = (lsbg_cat['bad_votes'] > lsbg_cat['good_votes'])
+    candy = (lsbg_cat['good_votes'] > lsbg_cat['bad_votes']) & (
+        lsbg_cat['is_candy'] > lsbg_cat['is_galaxy'])
+    gal = (~junk) & (~candy)
+    
+    candy = candy | gal
+
+    print('# of Candy:', np.sum(candy))
+    print('# of Gal:', np.sum(gal))
+    print('# of Junk:', np.sum(junk))
+
+    g_mag = meas_cat['mag'].data[:, 0]
+    r_mag = meas_cat['mag'].data[:, 1]
+    i_mag = meas_cat['mag'].data[:, 2]
+
+    if axes is None:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    plt.sca(axes[0])
+    plt.scatter(meas_cat['M20'][candy], meas_cat['Gini']
+                [candy],
+                color=candy_color, label=candy_label +
+                f': {np.sum(candy)}',
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter(meas_cat['M20'][junk], meas_cat['Gini']
+                [junk],
+                color=junk_color, label=junk_label +
+                f': {np.sum(junk)}',
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+    # plt.scatter(meas_cat['M20'][gal], meas_cat['Gini']
+    #             [gal],
+    #             color=gal_color, label=gal_label +
+    #             f': {np.sum(gal)}',
+    #             s=gal_size, alpha=gal_alpha,
+    #             zorder=gal_zorder, rasterized=True)
+    plt.xlabel(r'$M_{20}$')
+    plt.ylabel(r'Gini')
+    x = np.linspace(-3, -1.1, 10)
+    plt.plot(x, -0.136 * x + 0.37, color='k', ls='--', lw=2)
+    plt.vlines(-1.1, ymin=0.3, ymax=-0.136 * -
+               1.1 + 0.37, color='k', ls='--', lw=2)
+    # plt.axhline(0.7, color='k', ls='--', lw=2)
+    plt.xlim(-2.5, -0.4)
+    plt.ylim(0.3, 0.9)
+    
+    lgd = plt.legend(loc='upper left',
+                     bbox_to_anchor=(-0.08, 1.03), handletextpad=0.02, fontsize=20.5)
+
+    for l in lgd.legendHandles:
+        l._sizes = [30]
+        l._alpha = 1.0
+    # x = np.linspace(-3, -1.6, 10)
+    # plt.plot(x, 0.136 * x + 0.788, color='orange')
+
+    plt.sca(axes[1])
+    plt.scatter(meas_cat['C'][candy], meas_cat['A_outer']
+                [candy],
+                color=candy_color, label=candy_label +
+                f': {np.sum(candy)}',
+                s=candy_size, alpha=candy_alpha,
+                zorder=candy_zorder, rasterized=True)
+    plt.scatter(meas_cat['C'][gal], meas_cat['A_outer']
+                [gal],
+                color=gal_color, label=gal_label +
+                f': {np.sum(gal)}',
+                s=gal_size, alpha=gal_alpha,
+                zorder=gal_zorder, rasterized=True)
+    plt.scatter(meas_cat['C'][junk], meas_cat['A_outer']
+                [junk],
+                color=junk_color, label=junk_label +
+                f': {np.sum(junk)}',
+                s=junk_size, alpha=junk_alpha,
+                zorder=junk_zorder, rasterized=True)
+
+    rect = Rectangle(
+        (1.8, -0.12), (3.5 - 1.8), (0.8 - -0.12),
+        lw=2., edgecolor='k', ls='--', facecolor='none', zorder=12)
+    plt.gca().add_patch(rect)
+    # plt.axvline(1.8, color='k', ls='--', lw=2)
+    # plt.axvline(3.5, color='k', ls='--', lw=2)
+    # plt.axhline(0.8, color='k', ls='--', lw=2)
+
+    plt.xlim(0., 4.8)
+    plt.ylim(-.1, 1.8)
+    plt.xlabel(r'$C$')
+    plt.ylabel(r'$A$')
+
+    # lgd = plt.legend(loc='upper left',
+    #                  bbox_to_anchor=(-0.08, 1.03), handletextpad=0.03)
+
+    # for l in lgd.legendHandles:
+    #     l._sizes = [30]
+    #     l._alpha = 1.0
+
+    if axes is None:
+        plt.subplots_adjust(wspace=0.3, hspace=0.2)
+        return fig, axes
+    else:
+        return axes
