@@ -24,7 +24,7 @@ default_cuts_dict = {'color_bound': [0., 1.2],
 ##### Make cuts based on color, SB, size, etc. #####
 
 
-def make_cuts_vanilla(lsbg_cat, meas_cat, cuts_dict=None):
+def make_cuts_vanilla(lsbg_cat, meas_cat, cuts_dict=None, include_morph_cut=True):
     if cuts_dict is not None:
         cuts_dict = cuts_dict
     else:
@@ -68,18 +68,20 @@ def make_cuts_vanilla(lsbg_cat, meas_cat, cuts_dict=None):
     mask &= (meas_cat['SB_eff_avg'][:, 0] > min_eff_SB)
     mask &= (meas_cat['SB_eff_avg'][:, 0] < max_eff_SB)
 
-    # Shape cuts
-    mask &= (meas_cat['ell_sym'] < cuts_dict['max_ell'])
+    if include_morph_cut:
+        print('Including morphological cuts')
+        # Shape cuts
+        mask &= (meas_cat['ell_sym'] < cuts_dict['max_ell'])
 
-    mask &= (meas_cat['M20'] < cuts_dict['max_M20'])
-    mask &= (meas_cat['Gini'] < cuts_dict['max_Gini'])
-    # mask &= ~((meas_cat['M20'] < -1.6) & (
-    #     meas_cat['Gini'] > meas_cat['M20'] * 0.136 + 0.788) & (meas_cat['Gini'] < meas_cat['M20'] * -0.136 + 0.33))
-    mask &= (meas_cat['Gini'] < meas_cat['M20'] * -0.136 + 0.37)
+        mask &= (meas_cat['M20'] < cuts_dict['max_M20'])
+        mask &= (meas_cat['Gini'] < cuts_dict['max_Gini'])
+        # mask &= ~((meas_cat['M20'] < -1.6) & (
+        #     meas_cat['Gini'] > meas_cat['M20'] * 0.136 + 0.788) & (meas_cat['Gini'] < meas_cat['M20'] * -0.136 + 0.33))
+        mask &= (meas_cat['Gini'] < meas_cat['M20'] * -0.136 + 0.37)
 
-    mask &= (meas_cat['C'] <= cuts_dict['C_bound'][1]) & (
-        meas_cat['C'] >= cuts_dict['C_bound'][0])
-    mask &= (meas_cat['A_outer'] <= cuts_dict['max_A_outer'])
+        mask &= (meas_cat['C'] <= cuts_dict['C_bound'][1]) & (
+            meas_cat['C'] >= cuts_dict['C_bound'][0])
+        mask &= (meas_cat['A_outer'] <= cuts_dict['max_A_outer'])
 
     # mask &= (meas_cat['A'] < 0.7)
     # mask &= (seg_meas_cat['rhalf_circularized'] > 1.8 / 0.168) & (seg_meas_cat['rhalf_circularized'] < 12 / 0.168)
