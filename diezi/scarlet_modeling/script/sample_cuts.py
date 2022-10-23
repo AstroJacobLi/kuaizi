@@ -369,7 +369,7 @@ def post_process_cat_new(input_cuts_cat, fake_udg=False):
     return cuts_cat
 
 
-def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False):
+def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False,):
     """
     We correct for bias and add errors to the measured quantities.
 
