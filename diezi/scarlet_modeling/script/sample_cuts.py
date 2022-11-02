@@ -199,174 +199,174 @@ def make_cuts_spergel(cuts_cat, max_rhalf=15, min_rhalf=1.6, max_C=3.5):
 #     return cuts_cat
 
 
-def post_process_cat_new(input_cuts_cat, fake_udg=False):
-    """
-    We correct for bias and add errors to the measured quantities.
-    """
-    import joblib
-    import astropy.units as u
-    import pickle
+# def post_process_cat_new(input_cuts_cat, fake_udg=False):
+#     """
+#     We correct for bias and add errors to the measured quantities.
+#     """
+#     import joblib
+#     import astropy.units as u
+#     import pickle
 
-    cuts_cat = input_cuts_cat.copy()
-    cuts_cat['rhalf_spergel'] *= 0.168
-    cuts_cat['rhalf_circ'] *= 0.168
-    cuts_cat['rhalf_circularized'] *= 0.168
-    cuts_cat['rhalf_ellip'] *= 0.168
+#     cuts_cat = input_cuts_cat.copy()
+#     cuts_cat['rhalf_spergel'] *= 0.168
+#     cuts_cat['rhalf_circ'] *= 0.168
+#     cuts_cat['rhalf_circularized'] *= 0.168
+#     cuts_cat['rhalf_ellip'] *= 0.168
 
-    # Apply bias correction
-    re_meas = cuts_cat['rhalf_spergel'].data
-    SB_meas = {}
-    SB_err = {}
-    SB_meas['g'] = cuts_cat['SB_eff_avg'].data[:, 0]
-    SB_meas['r'] = cuts_cat['SB_eff_avg'].data[:, 1]
-    SB_meas['i'] = cuts_cat['SB_eff_avg'].data[:, 2]
+#     # Apply bias correction
+#     re_meas = cuts_cat['rhalf_spergel'].data
+#     SB_meas = {}
+#     SB_err = {}
+#     SB_meas['g'] = cuts_cat['SB_eff_avg'].data[:, 0]
+#     SB_meas['r'] = cuts_cat['SB_eff_avg'].data[:, 1]
+#     SB_meas['i'] = cuts_cat['SB_eff_avg'].data[:, 2]
 
-    mag_meas = {}
-    mag_err = {}
-    mag_meas['g'] = cuts_cat['mag'][:, 0].data
-    mag_meas['r'] = cuts_cat['mag'][:, 1].data
-    mag_meas['i'] = cuts_cat['mag'][:, 2].data
+#     mag_meas = {}
+#     mag_err = {}
+#     mag_meas['g'] = cuts_cat['mag'][:, 0].data
+#     mag_meas['r'] = cuts_cat['mag'][:, 1].data
+#     mag_meas['i'] = cuts_cat['mag'][:, 2].data
 
-    gi_meas = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 2]).data
-    gr_meas = (cuts_cat['mag'][:, 1] - cuts_cat['mag'][:, 2]).data
+#     gi_meas = (cuts_cat['mag'][:, 0] - cuts_cat['mag'][:, 2]).data
+#     gr_meas = (cuts_cat['mag'][:, 1] - cuts_cat['mag'][:, 2]).data
 
-    X = np.vstack([re_meas, SB_meas['g']]).T
+#     X = np.vstack([re_meas, SB_meas['g']]).T
 
-    # Re
-    re_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/re_bias.pkl')
-    re_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/re_std.pkl')
-    bias = re_bias.predict(X)
-    std = re_std.predict(X)
-    std = np.sqrt(std**2 + 0.2**2)
-    re_meas += bias
-    re_err = std
+#     # Re
+#     re_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/re_bias.pkl')
+#     re_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/re_std.pkl')
+#     bias = re_bias.predict(X)
+#     std = re_std.predict(X)
+#     std = np.sqrt(std**2 + 0.2**2)
+#     re_meas += bias
+#     re_err = std
 
-    # SB
-    for filt in list('gri'):
-        SB_bias = joblib.load(
-            f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_bias.pkl')
-        SB_std = joblib.load(
-            f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_std.pkl')
-        bias = SB_bias.predict(X)
-        std = SB_std.predict(X)
-        std = np.sqrt(std**2 + 0.05**2)
+#     # SB
+#     for filt in list('gri'):
+#         SB_bias = joblib.load(
+#             f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_bias.pkl')
+#         SB_std = joblib.load(
+#             f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_std.pkl')
+#         bias = SB_bias.predict(X)
+#         std = SB_std.predict(X)
+#         std = np.sqrt(std**2 + 0.05**2)
 
-        SB_meas[filt] += bias
-        SB_err[filt] = std
+#         SB_meas[filt] += bias
+#         SB_err[filt] = std
 
-    # mag
-    for filt in list('gri'):
-        mag_bias = joblib.load(
-            f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_bias.pkl')
-        mag_std = joblib.load(
-            f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_std.pkl')
-        bias = mag_bias.predict(X)
-        std = mag_std.predict(X)
-        std = np.sqrt(std**2 + 0.05**2)
+#     # mag
+#     for filt in list('gri'):
+#         mag_bias = joblib.load(
+#             f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_bias.pkl')
+#         mag_std = joblib.load(
+#             f'./Catalog/mock_sample/spergel/bias_std/SB_eff_{filt}_std.pkl')
+#         bias = mag_bias.predict(X)
+#         std = mag_std.predict(X)
+#         std = np.sqrt(std**2 + 0.05**2)
 
-        mag_meas[filt] += bias
-        mag_err[filt] = std
+#         mag_meas[filt] += bias
+#         mag_err[filt] = std
 
-    # color
-    gi_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/gi_bias.pkl')
-    gi_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/gi_std.pkl')
-    bias = gi_bias.predict(X)
-    std = gi_std.predict(X)
-    std = np.sqrt(std**2 + 0.05**2)
-    gi_meas += bias
-    gi_err = std
+#     # color
+#     gi_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/gi_bias.pkl')
+#     gi_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/gi_std.pkl')
+#     bias = gi_bias.predict(X)
+#     std = gi_std.predict(X)
+#     std = np.sqrt(std**2 + 0.05**2)
+#     gi_meas += bias
+#     gi_err = std
 
-    gr_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/gr_bias.pkl')
-    gr_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/gr_std.pkl')
-    bias = gr_bias.predict(X)
-    std = gr_std.predict(X)
-    std = np.sqrt(std**2 + 0.05**2)
-    gr_meas += bias
-    gr_err = std
+#     gr_bias = joblib.load('./Catalog/mock_sample/spergel/bias_std/gr_bias.pkl')
+#     gr_std = joblib.load('./Catalog/mock_sample/spergel/bias_std/gr_std.pkl')
+#     bias = gr_bias.predict(X)
+#     std = gr_std.predict(X)
+#     std = np.sqrt(std**2 + 0.05**2)
+#     gr_meas += bias
+#     gr_err = std
 
-    # Write to catalog
-    cuts_cat['rhalf_spergel'] = re_meas * u.arcsec
-    cuts_cat['rhalf_spergel_err'] = re_err * u.arcsec
+#     # Write to catalog
+#     cuts_cat['rhalf_spergel'] = re_meas * u.arcsec
+#     cuts_cat['rhalf_spergel_err'] = re_err * u.arcsec
 
-    cuts_cat['mag'] = np.vstack(
-        [mag_meas['g'], mag_meas['r'], mag_meas['i']]).T * u.ABmag
-    cuts_cat['mag_err'] = np.vstack(
-        [mag_err['g'], mag_err['r'], mag_err['i']]).T * u.ABmag
+#     cuts_cat['mag'] = np.vstack(
+#         [mag_meas['g'], mag_meas['r'], mag_meas['i']]).T * u.ABmag
+#     cuts_cat['mag_err'] = np.vstack(
+#         [mag_err['g'], mag_err['r'], mag_err['i']]).T * u.ABmag
 
-    cuts_cat['SB_eff_avg'] = np.vstack(
-        [SB_meas['g'], SB_meas['r'], SB_meas['i']]).T * u.ABmag
-    cuts_cat['SB_eff_avg_err'] = np.vstack(
-        [SB_err['g'], SB_err['r'], SB_err['i']]).T * u.ABmag
+#     cuts_cat['SB_eff_avg'] = np.vstack(
+#         [SB_meas['g'], SB_meas['r'], SB_meas['i']]).T * u.ABmag
+#     cuts_cat['SB_eff_avg_err'] = np.vstack(
+#         [SB_err['g'], SB_err['r'], SB_err['i']]).T * u.ABmag
 
-    cuts_cat['g-i'] = gi_meas * u.ABmag
-    cuts_cat['g-i_err'] = gi_err * u.ABmag
+#     cuts_cat['g-i'] = gi_meas * u.ABmag
+#     cuts_cat['g-i_err'] = gi_err * u.ABmag
 
-    cuts_cat['g-r'] = gr_meas * u.ABmag
-    cuts_cat['g-r_err'] = gr_err * u.ABmag
+#     cuts_cat['g-r'] = gr_meas * u.ABmag
+#     cuts_cat['g-r_err'] = gr_err * u.ABmag
 
-    cuts_cat['host_ang_diam_dist'] = cuts_cat['host_ang_diam_dist'].data * u.Mpc
-    # Physical sizes
-    # not consider peculiar motion
-    ang_diam_dist = cuts_cat['host_ang_diam_dist'].data
-    R_e_phys = cuts_cat['rhalf_spergel'].data / \
-        206265 * ang_diam_dist * 1000  # in kpc
-    R_e_phys_std = cuts_cat['rhalf_spergel_err'].data / \
-        206265 * ang_diam_dist * 1000  # in kpc
-    cuts_cat['rhalf_phys'] = R_e_phys * u.kpc
-    cuts_cat['rhalf_phys_err'] = R_e_phys_std * u.kpc
+#     cuts_cat['host_ang_diam_dist'] = cuts_cat['host_ang_diam_dist'].data * u.Mpc
+#     # Physical sizes
+#     # not consider peculiar motion
+#     ang_diam_dist = cuts_cat['host_ang_diam_dist'].data
+#     R_e_phys = cuts_cat['rhalf_spergel'].data / \
+#         206265 * ang_diam_dist * 1000  # in kpc
+#     R_e_phys_std = cuts_cat['rhalf_spergel_err'].data / \
+#         206265 * ang_diam_dist * 1000  # in kpc
+#     cuts_cat['rhalf_phys'] = R_e_phys * u.kpc
+#     cuts_cat['rhalf_phys_err'] = R_e_phys_std * u.kpc
 
-    # Absolute magnitudes
-    cuts_cat['abs_mag'] = cuts_cat['mag'] - 25 - 5 * \
-        np.log10(ang_diam_dist *
-                 (1 + cuts_cat['host_z'].data)**2)[:, np.newaxis]  # griz
-    cuts_cat['abs_mag_err'] = cuts_cat['mag_err'] * u.ABmag  # griz
+#     # Absolute magnitudes
+#     cuts_cat['abs_mag'] = cuts_cat['mag'] - 25 - 5 * \
+#         np.log10(ang_diam_dist *
+#                  (1 + cuts_cat['host_z'].data)**2)[:, np.newaxis]  # griz
+#     cuts_cat['abs_mag_err'] = cuts_cat['mag_err'] * u.ABmag  # griz
 
-    # average over g-i and g-r results
-    log_ML_g = np.array([1.297 * cuts_cat['g-i'].data - 0.855,
-                         1.774 * cuts_cat['g-r'].data - 0.783]).mean(axis=0)
-    cuts_cat['log_ML_g'] = log_ML_g
-    cuts_cat['log_ML_g_err'] = np.abs(cuts_cat['g-i_err'].data * 1.297)
+#     # average over g-i and g-r results
+#     log_ML_g = np.array([1.297 * cuts_cat['g-i'].data - 0.855,
+#                          1.774 * cuts_cat['g-r'].data - 0.783]).mean(axis=0)
+#     cuts_cat['log_ML_g'] = log_ML_g
+#     cuts_cat['log_ML_g_err'] = np.abs(cuts_cat['g-i_err'].data * 1.297)
 
-    cuts_cat['log_m_star'] = -0.4 * \
-        (cuts_cat['abs_mag'][:, 0].data - 5.03) + log_ML_g
-    cuts_cat['log_m_star_err'] = np.sqrt(
-        (cuts_cat['abs_mag_err'].data[:, 0] * 0.4)**2 + cuts_cat['log_ML_g_err']**2)
+#     cuts_cat['log_m_star'] = -0.4 * \
+#         (cuts_cat['abs_mag'][:, 0].data - 5.03) + log_ML_g
+#     cuts_cat['log_m_star_err'] = np.sqrt(
+#         (cuts_cat['abs_mag_err'].data[:, 0] * 0.4)**2 + cuts_cat['log_ML_g_err']**2)
 
-    with open('./Catalog/completeness/deblend_detection_comp_S16A.pkl', 'rb') as f:
-        f_comp = pickle.load(f)
-    comp = np.array([f_comp(*p)[0] for p in zip(cuts_cat['rhalf_spergel'].data,
-                                                cuts_cat['SB_eff_avg'][:, 0].data)])
-    cuts_cat['completeness'] = comp
+#     with open('./Catalog/completeness/deblend_detection_comp_S16A.pkl', 'rb') as f:
+#         f_comp = pickle.load(f)
+#     comp = np.array([f_comp(*p)[0] for p in zip(cuts_cat['rhalf_spergel'].data,
+#                                                 cuts_cat['SB_eff_avg'][:, 0].data)])
+#     cuts_cat['completeness'] = comp
 
-    # units
-    cuts_cat['ra'] = cuts_cat['ra'].data * u.deg
-    cuts_cat['dec'] = cuts_cat['dec'].data * u.deg
+#     # units
+#     cuts_cat['ra'] = cuts_cat['ra'].data * u.deg
+#     cuts_cat['dec'] = cuts_cat['dec'].data * u.deg
 
-    cols1 = ['viz-id', 'ra', 'dec', 'image_flag', 'psf_flag', 'radius',
-             'flux', 'mag', 'mag_err', 'g-i', 'g-i_err', 'g-r', 'g-r_err',
-             'SB_eff_avg', 'SB_eff_avg_err',
-             'rhalf_spergel', 'rhalf_spergel_err', 'rhalf_phys', 'rhalf_phys_err',
-             'abs_mag', 'abs_mag_err', 'log_ML_g', 'log_ML_g_err',
-             'log_m_star', 'log_m_star_err', 'completeness', 'tract', 'patch', 'synth_id',
-             'mag_auto_g', 'mag_auto_r', 'mag_auto_i', 'flux_radius_ave_g', 'flux_radius_ave_i',
-             'A_g', 'A_r', 'A_i',
-             'is_candy', 'is_galaxy', 'is_tidal', 'is_outskirts', 'is_cirrus', 'is_junk',
-             'num_votes', 'good_votes', 'bad_votes']
-    if fake_udg:
-        cols2 = ['host_z', 'host_ang_diam_dist']
-    else:
-        cols2 = [
-            'host_name', 'host_z', 'host_ang_diam_dist', 'host_stellar_mass', 'host_halo_mass',
-            'host_r_vir', 'host_r_vir_ang', 'host_300kpc_ang', 'host_nvotes', 'host_spiral',
-            'host_elliptical', 'host_uncertain', 'host_RA', 'host_DEC']
-    cols3 = [
-        'SB_eff_circ', 'SB_0', 'ell_cen', 'ell_sym',
-        'PA_cen', 'PA_sym', 'rhalf_circularized', 'spergel_nu',
-        'r20', 'r50', 'r80', 'Gini', 'M20', 'F(G,M20)', 'S(G,M20)', 'C', 'A', 'S',
-        'A_outer', 'A_shape', 'sersic_n', 'sersic_rhalf', 'sersic_ell', 'sersic_PA', 'flag_sersic',
-    ]
-    cuts_cat = cuts_cat[cols1 + cols2 + cols3]
-    return cuts_cat
+#     cols1 = ['viz-id', 'ra', 'dec', 'image_flag', 'psf_flag', 'radius',
+#              'flux', 'mag', 'mag_err', 'g-i', 'g-i_err', 'g-r', 'g-r_err',
+#              'SB_eff_avg', 'SB_eff_avg_err',
+#              'rhalf_spergel', 'rhalf_spergel_err', 'rhalf_phys', 'rhalf_phys_err',
+#              'abs_mag', 'abs_mag_err', 'log_ML_g', 'log_ML_g_err',
+#              'log_m_star', 'log_m_star_err', 'completeness', 'tract', 'patch', 'synth_id',
+#              'mag_auto_g', 'mag_auto_r', 'mag_auto_i', 'flux_radius_ave_g', 'flux_radius_ave_i',
+#              'A_g', 'A_r', 'A_i',
+#              'is_candy', 'is_galaxy', 'is_tidal', 'is_outskirts', 'is_cirrus', 'is_junk',
+#              'num_votes', 'good_votes', 'bad_votes']
+#     if fake_udg:
+#         cols2 = ['host_z', 'host_ang_diam_dist']
+#     else:
+#         cols2 = [
+#             'host_name', 'host_z', 'host_ang_diam_dist', 'host_stellar_mass', 'host_halo_mass',
+#             'host_r_vir', 'host_r_vir_ang', 'host_300kpc_ang', 'host_nvotes', 'host_spiral',
+#             'host_elliptical', 'host_uncertain', 'host_RA', 'host_DEC']
+#     cols3 = [
+#         'SB_eff_circ', 'SB_0', 'ell_cen', 'ell_sym',
+#         'PA_cen', 'PA_sym', 'rhalf_circularized', 'spergel_nu',
+#         'r20', 'r50', 'r80', 'Gini', 'M20', 'F(G,M20)', 'S(G,M20)', 'C', 'A', 'S',
+#         'A_outer', 'A_shape', 'sersic_n', 'sersic_rhalf', 'sersic_ell', 'sersic_PA', 'flag_sersic',
+#     ]
+#     cuts_cat = cuts_cat[cols1 + cols2 + cols3]
+#     return cuts_cat
 
 
 def post_process_cat_new_rbf(input_cuts_cat, fake_udg=False,):
