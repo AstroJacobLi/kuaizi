@@ -172,9 +172,10 @@ def plot_size_distribution(udg_cat, fake_udg_cat, udg_area, fake_udg_area, fake_
 
 
 def plot_size_distribution_new(udg_cat, fake_udg_cat, udg_area, fake_udg_area, fake_udg_repeats=10 * 20, name='UDG',
-                               fit_line=False, refit=False, save=True,
+                               fit_line=False, refit=False, save=True, only_result=False, color=None,
                                ax=None, n_bins=10, n_slide=20, range_0=np.array([np.log10(1.5), np.log10(6.1)]),
-                               top_banner=True, vline=False, dots_legend=True, legend_fontsize=14, verbose=False, nolinelegend=False):
+                               top_banner=True, vline=False, dots_legend=True, legend_fontsize=14, verbose=False,
+                               nolinelegend=False):
     """
     Distribution of the physical size of UDG/UPGs.
 
@@ -190,15 +191,16 @@ def plot_size_distribution_new(udg_cat, fake_udg_cat, udg_area, fake_udg_area, f
                                           bins=n_bins, range_=range_0,
                                           statistic='count', n_slide=n_slide)
     n_cen_bkg = np.nanmean(output, axis=0) / (fake_udg_repeats) / \
-        fake_udg_area / np.diff(cen)[0]  # num of fake UDG per sqr deg
-    n_std_bkg1 = np.sqrt(np.nanmean(output, axis=0)) / \
-        (fake_udg_repeats) / fake_udg_area / \
-        np.diff(cen)[0]  # Poisson error for counts
+        fake_udg_area / \
+        np.diff(cen)[0]  # num of fake UDG per sqr deg per log_re
+    n_std_bkg1 = np.sqrt(np.nanmean(output, axis=0)) / (fake_udg_repeats) / \
+        fake_udg_area / np.diff(cen)[0]  # Poisson error for counts
     n_std_bkg2 = np.nanstd(output, axis=0) / (fake_udg_repeats) / \
         fake_udg_area / np.diff(cen)[0]  # error of shiting bins
     n_std_bkg = np.sqrt(n_std_bkg1**2 + n_std_bkg2**2)
 
     # R_e distribution of the real udg sample
+    # First we need to know the total searched area
     unique_name, ind = np.unique(udg_cat['host_name'].data, return_index=True)
     # deg^2
     vir_areas = (np.pi * (udg_cat['host_r_vir_ang'].data[ind]**2))
@@ -211,7 +213,7 @@ def plot_size_distribution_new(udg_cat, fake_udg_cat, udg_area, fake_udg_area, f
 
     for i in range(10):
         np.random.seed(i)
-        _unique_name = np.random.choice(unique_name, size=200)
+        _unique_name = unique_name  # np.random.choice(unique_name, size=200)
         n_cens = []
         n_cens_nobkg = []
         n_stds_hist = []
@@ -319,32 +321,39 @@ def plot_size_distribution_new(udg_cat, fake_udg_cat, udg_area, fake_udg_area, f
     else:
         plt.sca(ax)
 
-    sct1 = plt.errorbar(cen, n_cen + n_cen_bkg, yerr=n_std,
-                        capsize=0,
-                        fmt='+', color='k', label='Raw counts')
+    if only_result:
+        color = 'orangered' if color is None else color
+        sct4 = plt.errorbar(cen + 0.006, n_corr,
+                            yerr=n_corr_std,
+                            fmt='s', color=color, alpha=0.9,
+                            markersize=7, label='Completeness corrected')
+    else:
+        sct1 = plt.errorbar(cen, n_cen + n_cen_bkg, yerr=n_std,
+                            capsize=0,
+                            fmt='+', color='k', label='Raw counts')
 
-    sct2 = plt.errorbar(cen, n_cen_bkg, capsize=0,
-                        yerr=n_std_bkg, fmt='.', color='gray',
-                        markersize=5, label='Background')
+        sct2 = plt.errorbar(cen, n_cen_bkg, capsize=0,
+                            yerr=n_std_bkg, fmt='.', color='gray',
+                            markersize=5, label='Background')
 
-    sct3 = plt.errorbar(cen - 0.006, n_cen, capsize=0,
-                        yerr=n_std, fmt='p', color='teal', alpha=0.4,
-                        markersize=5, label='Background subtracted')
+        sct3 = plt.errorbar(cen - 0.006, n_cen, capsize=0,
+                            yerr=n_std, fmt='p', color='teal', alpha=0.4,
+                            markersize=5, label='Background subtracted')
 
-    sct4 = plt.errorbar(cen + 0.006, n_corr,
-                        yerr=n_corr_std,
-                        fmt='s', color='orangered', alpha=0.9,
-                        markersize=7, label='Completeness corrected')
+        sct4 = plt.errorbar(cen + 0.006, n_corr,
+                            yerr=n_corr_std,
+                            fmt='s', color='orangered', alpha=0.9,
+                            markersize=7, label='Completeness corrected')
     if dots_legend:
         leg = plt.legend(loc=(0., 0.025), fontsize=legend_fontsize)
         ax.add_artist(leg)
 
     x0 = np.linspace(*range_0, 10)
     line1 = plt.plot(x0, 10**(-2.71 * x0 + 1.49), ls='-.',
-                     color='dimgray', label=r'vdBurg+17: $n\propto r_e^{-2.71\pm0.33}$')
+                     color='dimgray', label=r'vdBurg+17: $n\, [\mathrm{dex^{-1}}] \propto r_e^{-2.71\pm0.33}$')
     if fit_line:
         line2 = plt.plot(x0, pred_mean, color='salmon',
-                         lw=2, label=r'This work: $n\propto r_e^{' + f'{summary_dict["a"]["mean"]:.2f}\pm{summary_dict["a"]["std"]:.2f}' + '}$')
+                         lw=2, label=r'This work: $n\, [\mathrm{dex^{-1}}] \propto r_e^{' + f'{summary_dict["a"]["mean"]:.2f}\pm{summary_dict["a"]["std"]:.2f}' + '}$')
         plt.fill_between(
             x0, pred_hpdi[0], pred_hpdi[1], alpha=0.3, color='salmon', interpolate=True)
         if not nolinelegend:
@@ -864,19 +873,19 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
 
 
 def plot_measurement_paper_onlymorph(lsbg_cat, meas_cat, axes=None,
-                           gal_zorder=2, candy_zorder=3, junk_zorder=0,
-                           gal_size=10, candy_size=20, junk_size=15,
-                           gal_alpha=0.1, candy_alpha=0.2, junk_alpha=0.1,
-                           gal_label=r'$\texttt{galaxy}$', candy_label=r'$\texttt{candy}$', junk_label=r'$\texttt{junk}$',
-                           gal_color='steelblue', candy_color='forestgreen', junk_color='r',
-                           ):
+                                     gal_zorder=2, candy_zorder=3, junk_zorder=0,
+                                     gal_size=10, candy_size=20, junk_size=15,
+                                     gal_alpha=0.1, candy_alpha=0.2, junk_alpha=0.1,
+                                     gal_label=r'$\texttt{galaxy}$', candy_label=r'$\texttt{candy}$', junk_label=r'$\texttt{junk}$',
+                                     gal_color='steelblue', candy_color='forestgreen', junk_color='r',
+                                     ):
     from matplotlib.patches import Rectangle
 
     junk = (lsbg_cat['bad_votes'] > lsbg_cat['good_votes'])
     candy = (lsbg_cat['good_votes'] > lsbg_cat['bad_votes']) & (
         lsbg_cat['is_candy'] > lsbg_cat['is_galaxy'])
     gal = (~junk) & (~candy)
-    
+
     candy = candy | gal
 
     print('# of Candy:', np.sum(candy))
@@ -918,7 +927,7 @@ def plot_measurement_paper_onlymorph(lsbg_cat, meas_cat, axes=None,
     # plt.axhline(0.7, color='k', ls='--', lw=2)
     plt.xlim(-2.5, -0.4)
     plt.ylim(0.3, 0.9)
-    
+
     lgd = plt.legend(loc='upper left',
                      bbox_to_anchor=(-0.08, 1.03), handletextpad=0.02, fontsize=20.5)
 
