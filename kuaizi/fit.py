@@ -551,8 +551,11 @@ class ScarletFitter(object):
         # as well as larger bright star mask
         # This is used to help getting the SED initialization correct.
         # When estimating the starlet box and SED, we need to mask out saturated pixels and nearby bright stars.
-        self.starlet_mask = ((np.sum(self.observation.weights == 0, axis=0)
-                              != 0) + self.msk_star_ori + (~((self.segmap_ori == 0) | (self.segmap_ori == self.cen_obj['idx'] + 1)))).astype(bool)
+        try:
+            self.starlet_mask = ((np.sum(self.observation.weights == 0, axis=0)
+                                  != 0) + self.msk_star_ori + (~((self.segmap_ori == 0) | (self.segmap_ori == self.cen_obj['idx'] + 1)))).astype(bool)
+        except:
+            self.starlet_mask = np.zeros_like(self.data.images[0]).astype(bool)
 
     def _add_central_source(self, K=2, min_grad=0.02, thresh=0.05,
                             shifting=True, monotonic=True, variance=0.03**2,

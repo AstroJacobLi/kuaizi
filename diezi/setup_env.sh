@@ -3,9 +3,11 @@
 # Setup hscPipe enviroment
 # module load rh/devtoolset/8
 # . /tigress/HSC/LSST/stack3_tiger/loadLSST.bash
-LSST_CONDA_ENV_NAME=lsst-scipipe-4.0.0
-source /projects/HSC/LSST/stack/loadLSST.bash
+LSST_CONDA_ENV_NAME=lsst-scipipe-4.0.1
+# source /projects/HSC/LSST/stack/loadLSST.bash
+source /scratch/gpfs/HSC/LSST/stack/loadLSST.sh
 
+setup lsst_distrib
 setup lsst_apps
 setup obs_subaru
 
