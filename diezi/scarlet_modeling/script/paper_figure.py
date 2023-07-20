@@ -638,7 +638,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                   name=None, min_completeness=0.1, color_bins=20, quench_is_color=False, quenched_intercept=-0.23,
                   flag=None, mass_range=(6.4, 9), mass_bins=8,
                   ax=None, zorder=1, linecolor='firebrick', linewidth=1, fmt='o-', linealpha=0.85, fillalpha=0.4,
-                  plot_elves=True, plot_saga=True, plot_sim=False, plot_elves_upg=False):
+                  plot_udg=True, plot_elves=True, plot_saga=True, plot_MW_M31=False, plot_sim=False, plot_elves_upg=False):
 
     # Exclude objects with too small completeness
     udg_area *= np.sum(udg_cat['completeness'] >
@@ -694,12 +694,14 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
         quenched = (udg_cat['g-i'] > 0.8)
 
     # Quenched frac data
+    # This is based on H-alpha EW (from Yao)
     saga_m_star = np.array([6.791, 7.394, 7.739, 7.971, 8.145, 8.580, 9.119])
     saga_fq = np.array([0.056, 0.222, 0.222, 0.222, 0.167, 0.056, 0.053]) + \
         np.array([0.53, 0.168, 0.107, 0.041, 0.035, 0.025, 0.012])
     saga_fq_err = np.array([[-0.056, 0.071], [-0.102, 0.102], [-0.102, 0.102], [-0.102, 0.102],
                             [-0.094, 0.094], [-0.056, 0.071], [-0.053, 0.067]])
 
+    # This is based on color
     saga_q = np.array([[6.747422680412371, 0.3474698795180722],
                        [7.247422680412371, 0.35903614457831323],
                        [7.747422680412371, 0.188433734939759],
@@ -709,6 +711,24 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     saga_q_err = np.array([[-0.1, 0.12], [-0.084, 0.094], [-0.06, 0.078],
                            [-0.05, 0.07], [-0.05, 0.091], [-0.1, 0.1]])
 
+    # MW + M31
+    MW_M31_q = np.array([5.4949053857350805, 0.9487179487179488,
+        6.496360989810771, 1.,
+        7.491994177583697, 0.832579185520362,
+        8.499272197962156, 0.6666666666666667,
+        9.500727802037847, 0]).reshape(-1, 2)
+    MW_M31_q_upper = np.array([5.500727802037846, 0.9834087481146305,
+        6.496360989810771, 1.,
+        7.497816593886464, 0.8959276018099548,
+        8.49344978165939, 0.8129713423831071,
+        9.500727802037847, 0.4570135746606335,]).reshape(-1, 2)
+    MW_M31_q_lower = np.array([5.4949053857350805, 0.8506787330316743,
+        6.496360989810771, 0.832579185520362,
+        7.497816593886464, 0.6003016591251886,
+        8.499272197962156, 0.3815987933634992,
+        9.500727802037847, 0]).reshape(-1, 2)
+    
+    # ELVES
     elves_confirmed_q = np.array([5.742268041237113, 0.8506024096385543,
                                   6.252577319587629, 0.8650602409638555,
                                   6.742268041237113, 0.752289156626506,
@@ -794,6 +814,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     greene_nonupg_q_err = np.array([[5.5, 6.0, 6.5, 7.0, 7.5, 8.0],
                                     [0.05556766016165791, 0.04391157106134102, 0.0587319236484889, 0.0690956594049264, 0.08395897088010118, 0.1079898494312077]]).T
 
+        
     if flag is None:
         flag = np.ones_like(udg_cat['host_z']).data.astype(bool)
 
@@ -801,6 +822,21 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
         fig, ax = plt.subplots(1, 1, figsize=(6.9, 5.4))
     else:
         plt.sca(ax)
+        
+    if plot_MW_M31:
+        plt.fill_between(MW_M31_q[:, 0],
+                         MW_M31_q_upper[:, 1],
+                         MW_M31_q_lower[:, 1],
+                         color='firebrick',
+                         alpha=0.1)
+        plt.errorbar(MW_M31_q[:, 0], MW_M31_q[:, 1],
+                     yerr=[-(MW_M31_q_lower[:, 1] - MW_M31_q[:, 1]), (MW_M31_q_upper[:, 1] - MW_M31_q[:, 1])],
+                     fmt='s', mfc='firebrick', markersize=8,
+                     color='firebrick',
+                     )
+        # plt.plot(MW_M31_q[:, 0], MW_M31_q[:, 1],
+        #          color='firebrick', 
+        #          ls='-.', lw=1)
 
     y1, cens = moving_binned_statistic(udg_cat['log_m_star'][flag],
                                        quenched[flag].astype(
@@ -825,28 +861,29 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
 
     quench_frac[num < 10] = np.nan
     quench_frac_std[num < 10] = np.nan
+    
+    if plot_udg:
+        flag = (cens <= 8.6)
+        plt.errorbar(cens[flag],
+                    quench_frac[flag],
+                    yerr=quench_frac_std[flag], fmt=fmt,
+                    label=name,
+                    color=linecolor, lw=linewidth, alpha=linealpha, zorder=zorder)
+        plt.fill_between(cens[flag],
+                        (quench_frac - quench_frac_std)[flag],
+                        (quench_frac + quench_frac_std)[flag],
+                        color=linecolor, alpha=fillalpha, zorder=zorder)
 
-    flag = (cens <= 8.6)
-    plt.errorbar(cens[flag],
-                 quench_frac[flag],
-                 yerr=quench_frac_std[flag], fmt=fmt,
-                 label=name,
-                 color=linecolor, lw=linewidth, alpha=linealpha, zorder=zorder)
-    plt.fill_between(cens[flag],
-                     (quench_frac - quench_frac_std)[flag],
-                     (quench_frac + quench_frac_std)[flag],
-                     color=linecolor, alpha=fillalpha, zorder=zorder)
-
-    flag = (cens > 8.2)
-    plt.errorbar(cens[flag],
-                 quench_frac[flag],
-                 yerr=quench_frac_std[flag], fmt=fmt,
-                 label=name,
-                 color=linecolor, lw=linewidth, alpha=linealpha / 3, zorder=zorder)
-    plt.fill_between(cens[flag],
-                     (quench_frac - quench_frac_std)[flag],
-                     (quench_frac + quench_frac_std)[flag],
-                     color=linecolor, alpha=fillalpha / 3, zorder=zorder)
+        flag = (cens > 8.2)
+        plt.errorbar(cens[flag],
+                    quench_frac[flag],
+                    yerr=quench_frac_std[flag], fmt=fmt,
+                    label=name,
+                    color=linecolor, lw=linewidth, alpha=linealpha / 3, zorder=zorder)
+        plt.fill_between(cens[flag],
+                        (quench_frac - quench_frac_std)[flag],
+                        (quench_frac + quench_frac_std)[flag],
+                        color=linecolor, alpha=fillalpha / 3, zorder=zorder)
 
     # plt.errorbar(cens,
     #              quench_frac,
@@ -857,7 +894,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     #                  quench_frac - quench_frac_std,
     #                  quench_frac + quench_frac_std,
     #                  color=linecolor, alpha=fillalpha, zorder=zorder)
-
+        
     if plot_elves:
         # ELVES Carlsten et al. average quenched fraction
         plt.plot(elves_confirmed_q[:, 0], elves_confirmed_q[:, 1],
@@ -867,7 +904,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
                          elves_confirmed_q_upper[:, 1],
                          elves_confirmed_q_lower[:, 1],
                          color='orange',
-                         alpha=0.2)
+                         alpha=0.3, zorder=2)
     if plot_saga:
         # SAGA f_q based on colors, from Carlsten et al. 2022 paper
         plt.errorbar(saga_q[:, 0], saga_q[:, 1],
@@ -882,6 +919,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
         #              color='grey',
         #              #  label='SAGA'
         #              )
+
 
     if plot_sim:
         plt.plot(samuel_q[:, 0], samuel_q[:, 1],
