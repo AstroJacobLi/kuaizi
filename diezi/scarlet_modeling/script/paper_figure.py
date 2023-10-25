@@ -863,6 +863,7 @@ def quenched_frac(udg_cat, fake_udg_cat, fake_udg_num, udg_area, fake_udg_area, 
     quench_frac_std[num < 10] = np.nan
     
     if plot_udg:
+        print(cens, quench_frac, quench_frac_std)
         flag = (cens <= 8.6)
         plt.errorbar(cens[flag],
                     quench_frac[flag],
