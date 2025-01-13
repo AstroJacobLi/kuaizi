@@ -366,7 +366,7 @@ def _image_gaia_stars_tigress(image, wcs, pixel_scale=0.168, mask_a=694.7, mask_
     # find out the Shard ID of target area in the HTM (Hierarchical triangular mesh) system
     if logger is not None:
         logger.info('    Taking Gaia catalogs stored in `Tigress`')
-    print('    Taking Gaia catalogs stored in `Tigress`')
+        print('    Taking Gaia catalogs stored in `Tigress`')
 
     shards = getShards(ra_cen, dec_cen, max(
         img_ra_size, img_dec_size).to(u.degree).value)
@@ -585,15 +585,15 @@ def gaia_star_mask(img, wcs, gaia_stars=None, pixel_scale=0.168, mask_a=694.7, m
             if logger is not None:
                 logger.info(
                     f'    {len(gaia_stars)} stars from Gaia are masked!')
-            print(f'    {len(gaia_stars)} stars from Gaia are masked!')
+                print(f'    {len(gaia_stars)} stars from Gaia are masked!')
         else:  # does not find Gaia stars
             if logger is not None:
                 logger.info('    No Gaia stars are masked.')
-            print('    No Gaia stars are masked.')
+                print('    No Gaia stars are masked.')
     else:
         if logger is not None:
             logger.info(f'    {len(gaia_stars)} stars from Gaia are masked!')
-        print(f'    {len(gaia_stars)} stars from Gaia are masked!')
+            print(f'    {len(gaia_stars)} stars from Gaia are masked!')
 
     # Make a mask image
     msk_star = np.zeros(img.shape).astype('uint8')
@@ -748,19 +748,19 @@ def img_cutout(img, wcs, coord_1, coord_2, size=[60.0, 60.0], pixel_scale=0.168,
             cutout_header.set(
                 keyword, img_header[keyword], img_header.comments[keyword])
 
-    if 'PC1_1' in dict(cutout_header).keys():
-        cutout_header['CD1_1'] = cutout_header['PC1_1']
-        #cutout_header['CD1_2'] = cutout_header['PC1_2']
-        #cutout_header['CD2_1'] = cutout_header['PC2_1']
-        cutout_header['CD2_2'] = cutout_header['PC2_2']
-        cutout_header['CDELT1'] = cutout_header['CD1_1']
-        cutout_header['CDELT2'] = cutout_header['CD2_2']
-        cutout_header.pop('PC1_1')
-        # cutout_header.pop('PC2_1')
-        # cutout_header.pop('PC1_2')
-        cutout_header.pop('PC2_2')
-        # cutout_header.pop('CDELT1')
-        # cutout_header.pop('CDELT2')
+    # if 'PC1_1' in dict(cutout_header).keys():
+    #     cutout_header['CD1_1'] = cutout_header['PC1_1']
+    #     #cutout_header['CD1_2'] = cutout_header['PC1_2']
+    #     #cutout_header['CD2_1'] = cutout_header['PC2_1']
+    #     cutout_header['CD2_2'] = cutout_header['PC2_2']
+    #     cutout_header['CDELT1'] = cutout_header['CD1_1']
+    #     cutout_header['CDELT2'] = cutout_header['CD2_2']
+    #     cutout_header.pop('PC1_1')
+    #     # cutout_header.pop('PC2_1')
+    #     # cutout_header.pop('PC1_2')
+    #     cutout_header.pop('PC2_2')
+    #     # cutout_header.pop('CDELT1')
+    #     # cutout_header.pop('CDELT2')
 
     # Build a HDU
     hdu = fits.PrimaryHDU(header=cutout_header)

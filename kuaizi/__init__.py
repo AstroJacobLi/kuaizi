@@ -48,8 +48,8 @@ __author__ = ['Jiaxuan Li']
 
 from . import utils
 from . import display
-from . import measure
-from . import detection
+# from . import measure
+# from . import detection
 from .utils import set_env, set_matplotlib
 
 # Version
